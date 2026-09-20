@@ -1,0 +1,10 @@
+# Local agent execution records
+.run-artifacts/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# macOS metadata
+.DS_Store
