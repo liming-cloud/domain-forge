@@ -1,12 +1,12 @@
 # ADR-0003：先按包隔离服务内 DDD 边界
 
-- 状态：Proposed（待讨论）；日期：2026-09-19
+- 状态：Accepted（2026-09-20，DESIGN-v0.1 / H02）；日期：2026-09-19
 - 决策负责人：用户；整理：AI；评审：R2 / Q03
 - 需求：C01、C02；验证：A01、A02
 
-## 背景与推荐
+## 背景与决定
 
-首批只有一个 IAM 规则上下文。推荐每个服务一个 Maven 模块，内部按领域语言组织功能、按 domain/application/infrastructure/interfaces 划清依赖，由 bootstrap 装配；用 ArchUnit 检查禁止依赖和循环。
+首批只有一个 IAM 规则上下文。采用每个服务一个 Maven 模块，内部按领域语言组织功能、按 domain/application/infrastructure/interfaces 划清依赖，由 bootstrap 装配；用 ArchUnit 检查禁止依赖和循环。
 
 根工程可聚合基础库和独立服务，这不等于每个服务都要拆成四五个 Maven 子模块。领域模型和领域测试保持无框架依赖。
 

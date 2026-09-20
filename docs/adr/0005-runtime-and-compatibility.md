@@ -1,12 +1,12 @@
 # ADR-0005：运行栈与版本验证策略
 
-- 状态：Proposed（待讨论）；日期：2026-09-19
+- 状态：Accepted（2026-09-20，DESIGN-v0.1 / H02）；日期：2026-09-19
 - 决策负责人：用户；整理：AI；评审：R2 / Q07
 - 需求：C03–C05、C14；验证：T-V01–T-V07
 
-## 推荐决定
+## 决定
 
-以最新稳定 Spring Boot/Cloud 与 Nacos 的组合为验证目标，候选快照只在[技术矩阵](../design/04-technology-compatibility.md)维护。推荐 Java 21 + Maven Wrapper，Web 与网关采用 MVC；服务间同步访问采用 Spring HTTP Service Clients 和 LoadBalancer。
+以最新稳定 Spring Boot/Cloud 与 Nacos 的组合为验证目标，候选快照只在[技术矩阵](../design/04-technology-compatibility.md)维护。采用 Java 21 + Maven Wrapper，Web 与网关采用 MVC；服务间同步访问采用 Spring HTTP Service Clients 和 LoadBalancer。
 
 理由：首批 MyBatis、Redis 和在线授权均采用同步调用模型，本地已有 Java 21/Maven；先保持一种主要并发编程模型，有利于 AI 理解事务和请求上下文。该便利性不是必须使用 Java 21 的产品要求。
 

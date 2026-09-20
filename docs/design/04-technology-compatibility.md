@@ -1,6 +1,6 @@
 # 技术选型、官方证据与兼容矩阵
 
-状态：待讨论设计 / 待实测。资料核实日期：2026-09-19 至 2026-09-20；版本快照取自 2026-09-19 的官方页面。技术负责人：用户；资料整理：AI。运行工具存在不等于选型接受，官方支持说明不等于整套组合已经通过测试。
+状态：技术策略已接受（DESIGN-v0.1 / H02）；具体组合与参数待实测。资料核实日期：2026-09-19 至 2026-09-20；版本快照取自 2026-09-19 的官方页面。技术负责人：用户；资料整理：AI。设计接受不等于运行验证；官方支持说明不等于整套组合已经通过测试。
 
 ## 1. 首批候选与证据
 
@@ -15,7 +15,7 @@
 | Sa-Token | 1.46.0，Boot 4 集成包 | 官方发布记录列出 Boot 4 适配及该版本修复 | 会话/序列化/撤销适配仍需 T-V03；[发布记录](https://github.com/dromara/Sa-Token/releases) |
 | MyBatis-Plus | 3.5.17，Boot 4 starter | 安装文档提供专用 starter；插件依赖需按需引入 | SQL、事务和分页等组合待 T-V04；[安装文档](https://baomidou.com/getting-started/install/) |
 | 数据权限 | MyBatis-Plus DataPermissionInterceptor | 使用 SQL 解析和自定义处理器添加范围条件 | 不保证自动覆盖全部读写；T-V05 按支持清单验证；[插件说明](https://baomidou.com/plugins/data-permission/) |
-| Java / 构建 | Java 21 + Maven Wrapper（推荐）；Java 25 为备选 | Java 21/25 均在 Boot 文档支持区间 | R2 确认；本机 Java 21 的存在只是开发便利性证据；T-V01 |
+| Java / 构建 | Java 21 + Maven Wrapper；Java 25 为保留备选 | Java 21/25 均在 Boot 文档支持区间 | H02 已接受策略；本机 Java 21 的存在只是开发便利性证据；T-V01 |
 | HTTP / 网关 | Spring MVC、Gateway Server Web MVC、HTTP Service Clients + LoadBalancer | 官方存在 Gateway MVC 和 HTTP Service Client 的负载均衡接入 | 不推断 Sa-Token 过滤器对所有路由自动生效；T-V06；[Gateway](https://docs.spring.io/spring-cloud-gateway/reference/spring-cloud-gateway-server-webmvc/starter.html) / [LoadBalancer](https://docs.spring.io/spring-cloud-commons/reference/spring-cloud-commons/loadbalancer.html) |
 | MySQL / 迁移 | MySQL 8.4 LTS + Flyway（推荐） | MySQL 有维护中的 8.4 文档及 LTS 说明 | 非“所有组件均最新”的承诺；驱动、Flyway/MySQL 模块与镜像补丁在 T-V04 冻结；[MySQL 文档](https://dev.mysql.com/doc/refman/8.4/en/) |
 | 缓存 | Redis + Spring Cache；会话与通用缓存隔离配置 | Spring 提供 Redis 缓存集成 | Redis 镜像、客户端和序列化候选由验证清单锁定；不加入二级缓存；[Spring Boot 缓存](https://docs.spring.io/spring-boot/reference/io/caching.html) |
@@ -47,7 +47,7 @@
 | T-V07 | OpenAPI 与公共协议一致 | 校验生成的文档与契约断言、错误和分页示例 | 文档与实际 JSON 一致，管理文档暴露有配置控制 |
 | T-V08 | 发布制品可被独立项目消费 | 隔离工作目录、干净依赖缓存、只读消费凭据 | 不借助平台源码/本机 install，不泄露发布凭据 |
 
-## 4. 配置、数据迁移与版本策略候选
+## 4. 配置、数据迁移与版本策略
 
 - 使用 Boot/Cloud BOM 管理传递依赖，项目 BOM 只统一未被合适上游管理的必要版本。明确 BOM 优先级并检查最终依赖树；不使用动态版本或 SNAPSHOT 作为发行基线。
 - 使用 Nacos 的配置导入方式前，核实当前版本支持；Alibaba 2025.1.0.0 的发布说明已移除旧 bootstrap 配置支持。[官方发布说明](https://github.com/alibaba/spring-cloud-alibaba/releases/tag/2025.1.0.0)
@@ -64,4 +64,4 @@
 | 私有仓库分支保护可用性受套餐影响 | R3 必须检查实际支持与生效状态，不能把文件存在等同于强制门禁 | [Protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) |
 | GitHub Maven 包消费需要认证，跨仓库权限需另核实 | 凭据与权限是制品消费验收前置；不默认一个仓库的 GITHUB_TOKEN 可读取另一个私有仓库 | [Maven registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry) |
 
-实际 owner、仓库是否存在、套餐、读写凭据、发布权限仍未确认。本阶段不登录 CLI、不创建远程资源、不配置秘密。
+2026-09-20 已通过 GitHub 应用确认 `liming-cloud/domain-forge` 为个人私有仓库且可写，设计文档已提交（H01）。实际套餐、保护规则是否生效、制品发布和跨仓库消费权限仍未核实；本轮不更改远程规则或配置秘密。
