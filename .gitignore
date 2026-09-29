@@ -1,0 +1,11 @@
+# 本机文件与私有环境配置不属于产品输入。
+.DS_Store
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+
+# Agent 的本地索引和运行证据不得混入版本化规范。
+.codegraph/
+.run-artifacts/
