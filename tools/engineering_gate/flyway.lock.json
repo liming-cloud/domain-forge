@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "boot_version": "4.0.8",
+  "flyway_version": "11.14.1",
+  "driver_version": "42.7.13",
+  "postgresql_version": "18.4",
+  "image": "postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+  "dependency_plugin_version": "3.9.0"
+}

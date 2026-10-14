@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "isolated-boot4-http-calibration-not-product-baseline",
+  "boot_version": "4.0.8",
+  "spring_version": "7.0.9",
+  "springdoc_version": "3.0.3",
+  "openapi_version": "3.0.1",
+  "dependency_plugin_version": "3.9.0",
+  "validator": {"group": "com.atlassian.oai", "artifact": "openapi-request-validator-core", "version": "3.0.0"},
+  "diff": {"group": "org.openapitools.openapidiff", "artifact": "openapi-diff-core", "version": "2.1.7"},
+  "sources": [
+    "https://docs.spring.io/spring-boot/4.0/system-requirements.html",
+    "https://springdoc.org/faq.html",
+    "https://repo.maven.apache.org/maven2/org/springdoc/springdoc-openapi-starter-webmvc-api/3.0.3/",
+    "https://github.com/atlassian/openapi-request-validator/tree/openapi-request-validator-3.0.0",
+    "https://github.com/OpenAPITools/openapi-diff/releases/tag/2.1.7"
+  ]
+}

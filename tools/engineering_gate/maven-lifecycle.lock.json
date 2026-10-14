@@ -1,0 +1,17 @@
+{
+  "scope": "isolated-maven-lifecycle-calibration-not-product-baseline",
+  "java_release": 21,
+  "surefire_version": "3.5.4",
+  "jar_version": "3.4.2",
+  "junit_version": "5.11.4",
+  "dependency_capabilities": [
+    {
+      "provider": {"group": "org.junit.jupiter", "artifact": "junit-jupiter", "version_key": "junit_version"},
+      "apis": [
+        {"group": "org.junit.jupiter", "artifact": "junit-jupiter-api", "version_key": "junit_version"},
+        {"group": "org.junit.jupiter", "artifact": "junit-jupiter-params", "version_key": "junit_version"}
+      ],
+      "source": "https://docs.junit.org/5.11.4/api/org.junit.jupiter/module-summary.html"
+    }
+  ]
+}

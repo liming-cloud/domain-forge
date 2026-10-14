@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "scope": "isolated-access-state-calibration-not-product-policy",
+  "redis_version": "8.8.1",
+  "redis_image": "redis@sha256:c88d347edef6249a6d2293f926f1eeb48bd40c57cbcd02c07f52e7f1fd2cb46b",
+  "redis_adapter": "sa-token-redis-template",
+  "spring_data_redis_version": "4.0.7",
+  "lettuce_version": "6.8.2.RELEASE",
+  "sources": [
+    "https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-doc/up/integ-redis.md",
+    "https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-plugin/sa-token-redis-template/src/main/java/cn/dev33/satoken/dao/SaTokenDaoForRedisTemplate.java",
+    "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/4.0.8/spring-boot-dependencies-4.0.8.pom",
+    "https://raw.githubusercontent.com/redis/redis/8.8.1/00-RELEASENOTES"
+  ]
+}

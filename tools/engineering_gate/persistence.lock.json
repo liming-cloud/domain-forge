@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "scope": "isolated-mybatis-dynamic-datasource-not-product-baseline",
+  "migration_lock_sha256": "d010657c5cc82aa3ac4de56797f7679a8a685ac1346ec6ef04c2d69143b759b4",
+  "mybatis_plus_version": "3.5.17",
+  "jsqlparser_version": "5.2",
+  "mybatis_version": "3.5.19",
+  "mybatis_spring_version": "4.0.0",
+  "spring_version": "7.0.9",
+  "dynamic_datasource_version": "4.5.0"
+}

@@ -1,0 +1,38 @@
+{
+  "scope": "isolated-engineering-gate-calibration-not-product-baseline",
+  "java_feature": 21,
+  "source_release": 21,
+  "preview": false,
+  "tools": {
+    "archunit": {
+      "version": "1.5.1",
+      "file": "archunit-1.5.1.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/tngtech/archunit/archunit/1.5.1/archunit-1.5.1.jar",
+      "sha256": "a4dbfc51c90005ad6ac9967672a7efb43aa6928287a57238b28e60e0a75c5c6f"
+    },
+    "slf4j-api": {
+      "version": "2.0.19",
+      "file": "slf4j-api-2.0.19.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.19/slf4j-api-2.0.19.jar",
+      "sha256": "e91ff6d720609e7a194ffe758c3ed5c84e798617ae07b0a0f6a4fe229741b4bb"
+    },
+    "slf4j-nop": {
+      "version": "2.0.19",
+      "file": "slf4j-nop-2.0.19.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-nop/2.0.19/slf4j-nop-2.0.19.jar",
+      "sha256": "d0226062f9b3a2793f62002f892a8e624eb07f396130fc949e01b1d5f4888cba"
+    },
+    "checkstyle": {
+      "version": "14.3.0",
+      "file": "checkstyle-14.3.0-all.jar",
+      "url": "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-14.3.0/checkstyle-14.3.0-all.jar",
+      "sha256": "754e218ab1fcabb1e1c5f8530e9d3aa37636806c22987bb279dd907a6ee749b2"
+    },
+    "formatter": {
+      "version": "1.37.0",
+      "file": "google-java-format-1.37.0-all-deps.jar",
+      "url": "https://github.com/google/google-java-format/releases/download/v1.37.0/google-java-format-1.37.0-all-deps.jar",
+      "sha256": "834b2a0c38cb774953322a84b5ca3f2f40dd3156650b3cd44d3b744345962f7a"
+    }
+  }
+}

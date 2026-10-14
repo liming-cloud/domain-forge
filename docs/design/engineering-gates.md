@@ -1,0 +1,409 @@
+# 工程门禁机制与支持边界
+
+本设计规定第五层工程校准的入口、检查事实及支持边界，不定义产品模块。实际结果和未完成项见[当前任务](../tasks/control-plane-verification.md#唯一任务记录)。校准仅在相关规则、工具或 CI 变化及完整候选验收时执行；普通功能使用适用产品门禁，不重复测试无关上游工具。
+
+## 工具选择与支持边界
+
+| 责任 | 实现与唯一配置 | 边界 |
+|---|---|---|
+| Java 语法与 Javadoc 结构 | Checkstyle；[工具锁](../../tools/engineering_gate/tools.lock.json)及[注释配置](../../tools/engineering_gate/comments.xml) | 全可见性生产命名类型；不采用 Generated 或 Override 的默认免检 |
+| 固定格式 | google-java-format；同一工具锁 | 使用 `--dry-run --set-exit-if-changed`，检查不改源码；不导入整套 Google 编码指南 |
+| 类型与成员依赖 | ArchUnit 及[适配器](../../tools/engineering_gate/ArchitectureInventory.java) | 核对实际产物、类型来源、依赖、精确成员及解析完整性；不推断业务语义或动态访问 |
+| 声明和使用位置 | JDK 公开编译器 API 及[方法适配器](../../tools/engineering_gate/MethodInventory.java) | 使用实际类型系统和源码位置，不自写 Java 解析器 |
+| 构建观察 | Maven EventSpy 及[观察器](../../tools/engineering_gate/MavenScopeSpy.java) | 真实目标、源码、类产物、有效声明、原生解析图及类路径 |
+| 执行环境 | 当前校准：Temurin 21.0.12.1+1、Python 3.14.5；工具身份由锁文件核对 | 不是产品版本选择；本地 Darwin 不证明 Linux／Windows 已通过 |
+
+校准限定 Java 21 普通源码与类文件；默认单工程 JAR、普通 javac 类路径及 POSIX Wrapper。父工程、聚合、配置集、生成链、预览形式、替换编译器、fork／toolchain、自定义类路径、多版本输出及发布组合未实测时报告缺口，不静默排除，不把工具边界变成产品禁令。实际产品选定组合在使用前补适用验证，不建设通用语言证明平台。
+
+依据：[Checkstyle](https://checkstyle.org/)、[格式工具](https://github.com/google/google-java-format)、[ArchUnit](https://www.archunit.org/userguide/html/000_Index.html)、[JDK 编译器 API](https://docs.oracle.com/en/java/javase/21/docs/api/jdk.compiler/com/sun/source/util/JavacTask.html)。资料不代替真实正反例。
+
+## 注释与格式的限定校准
+
+[源码入口](../../tools/engineering_gate/calibrate_source.py)处理显式输入；正式用途由[真实编译绑定](#真实编译范围与源码检查绑定)提供，调用方填写 production／test 不能证明实际用途。
+
+| 入口 | 必须核对的行为 |
+|---|---|
+| `comments --purpose production` | 全可见性命名类型，包括嵌套、局部、匿名体内命名类型及 interface／record／enum／annotation；Javadoc 在全部注解和修饰符前；缺失、空正文、仅空标签及错位拒绝 |
+| `comments --purpose test` | 不强制重复 Javadoc；已采用的 Javadoc 仍检查位置和基本正文 |
+| `method-presence` | 对明确选择的方法／构造器核对说明，不默认跳过 Override、getter、短方法或紧凑构造器 |
+| `format` | 固定排版只检查；整改通过且再次排版无新增变化，保留中文及正确注释位置 |
+
+简体中文、职责准确性、关键行为、省略和文档继承的语义要求按[源码规范](../standards/source-quality.md#适用范围与阅读入口)评审，不以汉字检测或正文非空证明准确。不附加统一句号格式。
+
+## 方法规模计量决策
+
+采用圈复杂度和可执行语句数硬门禁；方法行数仅辅助可读性评审。定义与独立实现范围由[计量适配器](../../tools/engineering_gate/MetricInventory.java)和[配置](../../tools/engineering_gate/measure.xml)维护。
+
+- 方法、普通／紧凑构造器、初始化块及真实 lambda 独立计量，嵌套实现不重复计入外层。零语句仍记录；表达式 lambda 的零值不证明表达式简单。
+- 复用同一 Checkstyle AST 及决定点定义，补齐原工具未单列的 lambda 范围；分别保存原生 `tool_measurements/tool_coverage` 与适配 `measurements/coverage`，不冒充原生输出。
+- switch 箭头不是 lambda；抽象声明、字段普通表达式、方法引用与数据字面量不虚构实现体。所选指标漏采以 `SG_METRIC_COVERAGE` 拒绝。
+- `measure` 只采集；其零／负一上限不是质量阈值。`limits` 比较显式试验上限，标为 `explicit-candidate-limits-only`，不产生正式通过。
+- [计量回归](../../tools/engineering_gate/test_source_probe.py)验证循环、switch／模式守卫、catch、逻辑与／或、三目、同行／嵌套、零值及边界整改；关闭计量后必须因覆盖缺失拒绝。长表格不因行数成为硬违规，顺序操作仍受语句上限约束。
+
+## 初始上限与校准边界
+
+有效上限只维护于[复杂度配置](../../tools/engineering_gate/complexity.json)，批准来源见[唯一规范](../standards/source-quality.md#已确认的复杂度门禁)。生产、测试主体、夹具及辅助逻辑分别校准，不默认放宽测试；当前没有超限例外。
+
+正式 `complexity` 入口只读取该配置，不接受命令行上限覆盖；缺失、重复／未知字段、范围不完整或非正整数拒绝。报告保存配置字节、用途、计量及覆盖，限定为 `approved-complexity-subset-only`。
+
+[数值回归](../../tools/engineering_gate/test_complexity_baseline.py)对生产和测试分别验证两项指标低于、等于、超过正式基线及整改，保留长数据辅助值和漏采拒绝。数值只触发质量审阅，不独自证明职责正确；不得为当前代码通过擅自提高上限、碎片化职责或删减断言。
+
+## 用途与合同识别的落实方案
+
+使用一份集中模块声明与真实构建／类型依赖核对，不由目录名、public、getter 名称或自报用途决定覆盖。只登记真实模块包根、允许依赖及精确合同，不制造空四层、镜像 DTO、入口接口或额外 Maven 模块。
+
+生产／测试取实际编译目标；模块归属取源码包声明与产物来源；合同取已审阅的类型及精确成员。公开输入输出的数据类型通过同一声明的 `data_contracts` 登记，须为 `contract_types` 子集；不把服务对象内部状态当作输出字段。数据角色与登记完整性由源码和消费场景评审，声明本身不证明边界合理。关键内部行为、省略依据、业务归属和公开范围也需语义评审。
+
+## 字节码与直接合同的限定校准
+
+[显式入口](../../tools/engineering_gate/calibrate_architecture.py)接收 schema 1 模块声明和显式类目录，只证明该输入的机械约束。
+
+- 声明包含模块 ID、唯一包根、用途、允许依赖、合同类型及成员，可选 `data_contracts` 登记数据合同；缺失、未知字段、重复或越界数据声明、重叠归属、空目标和不存在合同拒绝。
+- 全部显式类文件与 ArchUnit 导入逐项一致，包含嵌套、局部及匿名实现；空／重复目录、同名类型、符号链接、损坏和未解析类型拒绝。模块／包描述文件不静默排除。
+- 未声明引用、生产引用测试、依赖环、非合同类型及越界成员访问拒绝。构造器、字段、方法引用与精确签名核对；泛型／数组及直接声明类型纳入公开范围。
+- 继承访问同时核对符号目标与实际声明者，不要求复制方法；成功导入的桩不能当作完整类型信息。
+- 从精确签名及已登记数据根展开可达自有数据类型的实例字段、泛型与继承，包含私有字段，保留违规路径并防环；不递归展开外部 SDK 的内部实现或服务私有状态。所有可达自有类型须满足公开合同边界。
+
+[架构正反例](../../tools/engineering_gate/test_architecture_probe.py)验证目标诊断及新工程整改。类型与泛型观察复用 [ArchUnit](https://www.archunit.org/userguide/html/000_Index.html)，不自研 Java 解析器。报告保留实际类文件、声明、适配器、工具与运行时摘要；`source_ownership_proven/build_proven/contract_closure_proven` 为 false。未登记或动态序列化成员、外部 SDK 闭包、发布用途及语义完整性不由此证明。
+
+## 真实 Maven 编译范围校准
+
+[范围入口](../../tools/engineering_gate/calibrate_maven.py)固定执行真实 `test-compile`，复用 EventSpy，逐项核对成功目标、维护源码、编译器输入清单、类产物及实际类路径。生产／测试取 `compile/testCompile`，不看文件名或 src/test；同包测试不另建业务模块。
+
+[Maven 工具锁](../../tools/engineering_gate/maven-scope.lock.json)固定发行、插件及摘要；准备只写仓库外专用空目录，不覆盖损坏输入、不清理已有输出。准备实际解析固定资源和编译插件，再执行同一环境预检，保存原生命令及 `prepare.log`；分发下载成功不能代替插件就绪。[范围回归](../../tools/engineering_gate/test_maven_scope.py)覆盖全新目录准备与插件缺失拒绝、合法资源目录、含 test 的生产根、局部／匿名产物及排除、跳过、未归属、额外产物、真实失败、陈旧输出和缺环境。失败保存退出码、具体文件差异和 `target/maven-scope.log`。
+
+报告为 `observed-maven-compilation-scope-only`；语义用途、测试执行、发布、框架入口和独立消费未证明。
+
+## 真实编译范围与源码检查绑定
+
+[源码联合入口](../../tools/engineering_gate/calibrate_maven_source.py)在无输出隔离工程重新编译，内部绑定真实范围与源码检查，不接受外传用途、文件清单或历史报告。
+
+- 全部实际输入执行适用类型 Javadoc 结构／位置与固定格式检查；测试不强制重复说明。
+- 同一语法树清单按实际用途执行正式数值基线。无显式实现时仍先校验基线并查注释和格式，复杂度明确不适用，不伪造零值或让独立计量接受空扫描。
+- 输入、产物、配置、工具及环境前后核对；规则问题汇总文件、位置、用途及目标，不因第一项失败省略其余已接入检查。
+
+[绑定回归](../../tools/engineering_gate/test_maven_source.py)验证合法同包测试、声明文件、非 public 生产类型、错位说明、格式／数值、零实现坏基线及输入覆盖尝试。报告为 `observed-maven-source-subset-only`，不证明方法语义、关键内部行为、省略合理性、发布或人工验收。
+
+## 真实编译与模块合同绑定
+
+[架构联合入口](../../tools/engineering_gate/calibrate_maven_architecture.py)重新执行真实 Maven、JDK 语义分析及 ArchUnit。schema 2 声明使用 `id/package/depends_on/contract_types/contract_members` 和可选 `data_contracts`、`critical_methods`，不接受 purpose、旧 schema、整包公开或其他字段。
+
+- 合同属于实际生产编译的公开类型及精确成员；测试合同、缺失对象和返回类型漂移拒绝。
+- 实际产物集合、来源 URI、源码包声明及 SourceFile 共同唯一绑定维护源码；支持同文件多类型、不同包同名文件、局部及匿名类型，不截外层类名猜测。缺来源、无类型产物或重复二进制名明确报告缺口。
+- SDK 解析仅用同次成功编译的原生类路径、用途、专用仓库对象及字节快照；缺失、重复、用途冲突、越界和依赖漂移拒绝。第三方类型不混入自有模块。
+- ArchUnit 使用仅含实际产物、依赖及 JDK 的隔离解析上下文；延迟解析也不得借用工具自身同名库。
+- 依赖、签名和实际继承声明者的来源必须属于本次产物、已观察依赖或 JDK。JAR 来源用原生 JarURLConnection 提取；清单引入的未观察类型即使可解析，仍以 `SG_DEPENDENCY_ORIGIN` 拒绝，不自动补入证据。
+- 数据图沿用上述字段闭包及来源检查；`payload_field_closure_checked` 仅表示已登记图的机械检查，不证明数据角色或运行期序列化完整性。
+- 无 debug 来源信息、编译属性越界和无法解析类型不能当作零违规；与默认相同的显式配置允许。
+
+[联合回归](../../tools/engineering_gate/test_maven_architecture.py)按合同、用途、来源和类路径固定分组。报告为 `observed-maven-architecture-subset-only`；`source_bindings_complete/module_ownership_bound/declared_contracts_bound` 仅表示机械关联，完整合同闭包、框架动态入口、发布和语义审阅未证明。
+
+## 源码依赖声明与能力入口校准
+
+复用[依赖核对](../../tools/engineering_gate/dependency_declarations.py)、JDK 语义树及 Maven 原生依赖身份，不增加另一套依赖解析器。
+
+- 实际源码的限定名、导入、源码保留期注解及内联常量绑定到消费者、实际用途、来源 JAR 和坐标；具名／通配静态导入及继承成员保留公开入口，不反推 SDK 内部实现库为用户直接引用。
+- 根节点直接依赖与有效声明一致；缺失、矛盾及错误归属拒绝。`system` 用途含属性解析和未使用声明均以 `SG_BUILD_DEPENDENCY_PATH` 拒绝，正常坐标在新工程整改。
+- [能力关系基线](../../tools/engineering_gate/maven-lifecycle.lock.json)只登记精确入口、所承诺 API、版本键及用途。当前 JUnit 普通／参数化 API 为校准正例，不是产品选型；测试入口不许可生产，BOM、starter 名称和普通传递库不自动豁免。
+- 未校准的官方入口或版本组合报告校准缺口，不误称编码违规；纳入新组件时依据官方承诺及真实正反例校准一次，不逐需求添加豁免。
+
+[依赖回归](../../tools/engineering_gate/test_dependency_declarations.py)覆盖入口／版本、源码／继承、用途／输入，坏配置在构建前拒绝，纯构建机制关联不能遗漏。`dependency_declarations` 保存实际引用与依据；不证明运行期反射、生成链、官方承诺语义或完整源码门禁。
+
+## 默认职责与技术注解校准
+
+[职责入口](../../tools/engineering_gate/calibrate_roles.py)复用同次构建、绑定、合同与依赖观察。schema 3 增加 `kind`：context、component、assembly；默认业务上下文根据真实包声明定位 interfaces/application/domain/infrastructure，组件和装配不强套四层。
+
+- 方向：领域→领域；应用→应用／领域；入口→入口／应用／领域；基础设施可连接这些职责。允许层次方向不豁免跨模块合同和允许依赖。
+- [职责基线](../../tools/engineering_gate/role-boundaries.lock.json)登记 Boot 4 方向所需的 Spring 7 类型校准、有限装配／事务注解、枚举关系、技术客户端及已验证通用 API；不按框架整组放行。未知 API 或版本以 `SG_ROLE_CALIBRATION` 报缺口，Spring 类型检查不证明 Boot 及其他组件组合已运行。
+- JDK 输出实际所属二进制类型和使用位置；去重包含消费者与位置。注解许可不包含同一类型的类字面量、客户端操作或静态导入枚举后的方法调用。
+- 领域拒绝已校准框架绑定及 JDK SQL／数据源／HTTP 客户端；自定义组合注解沿真实源码关系追溯并防环。内联 SQL 常量虽从字节码消失，仍关联领域消费者。
+- 私有、局部及匿名实现按实际职责检查；必要应用装配／事务元数据允许。修改 kind 标签不能证明职责合理。
+- 技术库按实际 Maven 坐标及精确版本分类，技术与通用身份不得重叠；未知组合报告校准缺口。MyBatis-Plus core／annotation 3.5.17 与 dynamic-datasource-spring 4.5.0 属隔离校准，不作为完整产品组合证明，不泛化到未验证模块；`@DS` 不能作为应用装配元数据放行。
+- 业务上下文公开签名与已登记数据图不得暴露已校准技术类型或基础设施类型，包括私有字段、泛型和继承路径；基础设施内部的 Mapper、Wrapper、IPage 和映射注解允许。技术库不能借允许应用装配元数据的规则获得许可。
+
+[职责回归](../../tools/engineering_gate/test_role_boundaries.py)固定策略、元数据使用、归属和输入四组，缺失／矛盾观察拒绝。[持久化边界回归](../../tools/engineering_gate/test_persistence_boundaries.py)用真实 MyBatis-Plus 依赖验证应用继承、非公开领域映射、公开数据字段及合法基础设施用法；依据 [官方模块说明](https://baomidou.com/getting-started/install/)与 [CRUD 接口说明](https://baomidou.com/guides/data-interface/)确定技术身份。报告保存 `role_bindings/role_scope/role_boundaries_checked`；不证明外部注解内部语义、动态入口、真实 Bean 装配、代理、自调用、数据库、回滚或跨库原子性。
+
+## 实际合同方法与源码说明
+
+[方法核对](../../tools/engineering_gate/method_contracts.py)只检查同次真实生产合同的精确方法／构造器，不将全部内部访问器或同包测试一律改成必写注释。
+
+- JDK 原生类型系统解析同次维护源码，路径限实际类路径与 JDK，禁用处理器、隐式加载及类生成。二进制所属类型、擦除签名、参数和结果与 ArchUnit 精确匹配，覆盖隐式 public 接口方法、数组／可变参数、泛型、嵌套及显式紧凑构造器。
+- 选中成员必须关联实际显式声明和源位置，不能借另一个重载的说明或虚构隐式成员。
+- DocTrees 核对有效正文与解析错误，复用 Checkstyle 核对所有已采用 Javadoc 的位置。注解后的说明不能当作缺省继承而放行。
+- 覆盖关系由类型系统识别；缺少自身说明或使用 inheritDoc 时，须定位本次源码中唯一有效来源。仅 Override／继承标记、无来源及降低既有合同可见性拒绝。
+- 外部源码说明、多重有效继承来源、生成成员及不符分析环境的扩展未完整支持时报告缺口，不强迫合法产品改写设计。
+
+[方法回归](../../tools/engineering_gate/test_method_contracts.py)固定说明／位置、签名／构造器、继承／可见性三组。`method_contracts/method_scope` 保留来源及数量；关联／结构标志只表达本次机械核对，空合同不产生整体说明证明。新增语义、内部关键行为及合法省略仍需审阅。
+
+## 真实 HTTP 合同校准
+
+[HTTP 入口](../../tools/engineering_gate/calibrate_http.py)只执行仓库外无构建输出的隔离 Maven 工程。先运行真实编译，再以应用原生类路径启动 Boot，采集实际注册处理器、springdoc 生成物及回环 HTTP 字节；成熟请求验证和兼容库单独运行，不向应用注入门禁依赖。
+
+- [固定校准组合](../../tools/engineering_gate/http-contract.lock.json)：Boot 4.0.8、Spring 7.0.9、springdoc 3.0.3、OpenAPI 3.0.1；Atlassian OpenAPI Request Validator 3.0.0 与 OpenAPI Diff 2.1.7。该组合只锁定此适配，不证明完整产品 Cloud／Alibaba／Sa-Token 等最终组合。
+- 调用方提供独立场景、交付版本及已发布合同的固定摘要。实际注册、生成及场景入口逐项相等；无鉴权逻辑的观察器记录 DispatcherServlet 首次选择的模式和处理器，场景请求另一入口不能冒充覆盖。有效继承与组合路由允许，隐藏实际入口、少场景、默认版本及改变发布基线拒绝。每个入口至少一个请求执行完整结构验证，必要无效请求可单列反例。
+- 原生库验证实际请求、响应和发布兼容性；查询参数与路径分别处理，保留重复值及标准解码。独立场景核对 HTTP 状态、三字段外壳、稳定结果及数据；业务拒绝不因 HTTP 200 变为成功，无数据不省略字段。二进制按媒体类型和原始字节核对，不强套 JSON 外壳。
+- 版本、输入、类产物、场景、发布合同及工具前后核对；报告分别保存原生问题、当前结构校验与发布兼容事实。当前实现和生成物同时变化，仍须由独立已发布合同判断兼容。
+- 当前仅校准 Servlet 注解路由、自包含 OpenAPI 3.0.1 和有限同步交互；仅允许已知默认位置且没有实际内容的静态资源空映射。自定义资源 URL、已有静态内容、功能式／未知映射、同路径条件分流及外部引用等未校准形式显式报告缺口，不忽略后放行，也不将适配边界变成产品禁令。消费方处理、观测、其余协议、发布来源及实际授权仍由对应责任验证。
+
+[正反例](../../tools/engineering_gate/test_http_contract.py)执行真实框架，不使用手写运行报告；适配器本身执行类／方法说明、固定格式和批准的复杂度检查。共享请求／响应类型的局部可空声明使用官方 `SchemaResolution.INLINE`；不得手改生成物或靠扫描顺序获得正确合同。
+
+依据：[Boot 4.0 系统要求](https://docs.spring.io/spring-boot/4.0/system-requirements.html)、[springdoc 版本矩阵](https://springdoc.org/faq.html)、[验证器固定版本](https://github.com/atlassian/openapi-request-validator/tree/openapi-request-validator-3.0.0)、[兼容库固定版本](https://github.com/OpenAPITools/openapi-diff/releases/tag/2.1.7)、[Schema 局部解析声明](https://docs.swagger.io/swagger-core/v2.2.47/apidocs/io/swagger/v3/oas/annotations/media/Schema.html)。资料不替代实际校准。
+
+## 真实 Sa-Token 凭证校准
+
+[访问入口](../../tools/engineering_gate/calibrate_access.py)复用同一次真实编译、应用上下文、HTTP 分派及合同验证，观察 `StpUtil` 实际使用的配置和 DAO。工具不替应用设置令牌渠道、注册鉴权拦截器或修补策略；只在请求结束后调用原生 DAO 生命周期释放隔离资源。
+
+- [固定适配](../../tools/engineering_gate/sa-access.lock.json)为 Sa-Token 1.46.0 的 Boot 4 starter，实际解析的 Sa-Token 模块须同版本；不据此锁定整个产品组合。
+- 实际配置须符合[唯一凭证合同](../standards/security-and-access.md#已确认的-http-凭证传递)。独立访问文件以 `schema: 1` 和 `transport` 映射 HTTP 场景 ID；必需角色为 `bearer`、`absent`、`wrong-prefix`、`invalid`、`query`、`form`、`cookie`。核对真实请求与标签，拒绝重复、遗漏、未执行及把空请求冒充渠道反例；各适用请求方法保留有效 Header 成功正例。
+- 公开访问报告只输出场景、HTTP 状态、分派、固定诊断及输入摘要，不复制认证头、Cookie、查询／表单值、原始响应或原生消息中的输入值；内部真实验证不因报告最小化而省略。
+- 有效 Bearer Header 正常访问；缺少／无效／缺前缀 Header、仅参数、非法表单及 Cookie 凭证均须未认证拒绝。非法表单只作为不受支持输入的反例，不声明表单登录合同；实际响应、三字段外壳和 401 始终检查。误开原生参数或 Cookie 取令牌、取消前缀及只加注解不执行拦截的夹具须真实暴露越界访问，再由门禁拒绝，整改对象须恢复通过。
+- [校准夹具](../../tools/engineering_gate/test_sa_access.py)使用合成会话与原生内存 DAO，正常清理周期为一秒；保留过期机制并按原生生命周期释放，不提高命令预算。该结果只证明凭证渠道及限定拦截机制，不证明密码认证、有效策略完整解析、默认拒绝、业务权限、资源／数据范围、状态变更生效或 Redis 接入。
+
+接口策略、统一配置、继承与组合继续按[访问规范](../standards/security-and-access.md#访问策略与执行细化)验证；未完成适配仍阻断完整访问门禁。独立文件是校准输入，不是产品新增配置项，也不把测试令牌当实际账号或管理员初始化。
+
+一手依据：[Boot 4 starter](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-starter/sa-token-spring-boot4-starter/pom.xml)、[原生读取配置](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-core/src/main/java/cn/dev33/satoken/config/SaTokenConfig.java)、[令牌读取与会话](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-core/src/main/java/cn/dev33/satoken/stp/StpLogic.java)、[原生注解拦截](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-starter/sa-token-spring-boot-webmvc-v3v4-common/src/main/java/cn/dev33/satoken/interceptor/SaInterceptor.java)。资料不代替实际正反例。
+
+## 原生访问策略校准
+
+[访问入口](../../tools/engineering_gate/calibrate_access.py)的 `--policies` 接收独立校准合同，由[条件核对](../../tools/engineering_gate/sa_policy_contracts.py)绑定同次实际注册、原生解析与真实 HTTP；不是产品配置格式或新策略语言。没有该合同的旧凭证校准仍只证明渠道，不产生策略通过事实。
+
+- 独立文件固定 `schema: 1`、`entries`；每项声明 `path/method/kind/conditions/cases/login_witness`。条件支持默认账号体系的原生登录、AND／OR 操作权限；实际条件与独立预期逐项比较，权限顺序不改变结果。原生处理器被移除或替换、其他未校准条件须报告缺口，不降级为仅登录或改成产品禁令。
+- [原生观察器](../../tools/engineering_gate/SaAccessInventory.java)从实际映射取得处理器，以应用实际采用的 `SaAnnotationStrategy` 解析其声明类及方法，不搜索注解文本或由场景反推扫描范围。`SaIgnore` 按原生优先语义形成匿名策略，类与方法条件共同核对；匿名范围仍须评审。
+- 合法类级、继承及组合声明须实际可用。组合夹具由应用通过原生公开解析扩展委托 Spring `findMergedAnnotation`；工具不安装解析器，不将该扩展冒称 Starter 默认行为。未安装扩展且未执行组合权限的对象须拒绝并整改。
+- 匿名场景不携带身份；登录策略验证有效 Header 成功及匿名 401；操作权限策略还须验证缺权限的有效身份得到 403。该身份在同次仅登录入口的成功请求作为见证，不能用失效令牌或另一主体冒充。上述状态只用于限定夹具，不替代产品错误码及接口合同设计。
+- 实际入口、有效策略和独立合同完整对应；遗漏、空权限、条件漂移及删除／伪装拒绝场景不能通过。受保护入口失去全部声明时，用匿名和有效身份请求核对默认拒绝，同时策略覆盖仍失败；一律拒绝合法访问不能形成通过。
+- 原接口及生成合同采集完成后，通过原生 MVC 注册／清理一个工具拥有的临时未声明探针，以匿名和已在同次真实入口成功的 Header 请求它。探针没有鉴权、业务数据或产品接口职责；路径唯一，类型位于被测业务包但独立编译，不声明组件、不进入原 Bean 装配，不覆盖应用类，也不改源码、拦截器或策略。核对两次真实 403 和首次分派，不能用 404、前置失败或现有声明齐全推定默认拒绝；只删除默认拒绝、保留全部正常声明也必须失败。
+- 探针使用已校准的默认 Servlet MVC 映射；自定义注册或前置过滤导致无法取得相同分派证明时报告适配缺口，不强迫合法产品改变安全实现。探针不进入产品注册清单、OpenAPI 或发布兼容比较，也不证明产品错误码与响应合同。
+- 原生策略不参与真实拦截、拦截范围遗漏及处理器替换须用实际越界响应证明反例有效。观察器不补鉴权或默认拒绝；公开报告只保留路径、方法、策略类别、条件数量、场景状态和固定诊断，不复制认证材料、声明值或原始响应。
+
+[正反例](../../tools/engineering_gate/test_sa_policy.py)按行为、覆盖、执行及输入固定分组；观察器和[临时探针](../../tools/engineering_gate/DomainForgeUnassignedProbe.java)执行既有中文说明、格式和数值检查，不增设 CI job 或放宽预算。`annotation_policy_checked/default_deny_checked` 仅表达此合同及同次请求通过，`access_policy_verified/redis_verified/product_verified` 仍为 false；资源权限、数据范围、账号变更、会话及真实 Redis 等责任不由限定注解校准证明。
+
+依据：[原生注解策略](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-core/src/main/java/cn/dev33/satoken/strategy/SaAnnotationStrategy.java)、[原生忽略语义](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-core/src/main/java/cn/dev33/satoken/annotation/SaIgnore.java)、[框架拦截执行](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-starter/sa-token-spring-boot-webmvc-v3v4-common/src/main/java/cn/dev33/satoken/interceptor/SaInterceptor.java)。资料与隔离结果不产生产品或人工验收。
+
+## 真实 Argon2id 密码校准
+
+[密码入口](../../tools/engineering_gate/calibrate_password.py)在仓库外干净 Maven 工程中编译，以实际 Boot 应用取得指定 `PasswordEncoder` Bean；观察器不补 Bean、不替换实现、不初始化账号。只使用工具内固定合成密码，声明文件为 `schema: 1`、`application` 和 `bean`，不接收生产密码或摘要。
+
+- [固定适配](../../tools/engineering_gate/password.lock.json)为 Spring Security Crypto 7.0.7 与 Bouncy Castle 1.86。只使用密码哈希模块，不引入 Spring Security Web 鉴权，不改变 Sa-Token 的项目访问控制责任。
+- ASCII、Unicode、超过 72 字节及零字节场景均实际生成两次，核对正确输入成功、错误及大小写／尾部变体拒绝；原始输入不静默截断或归一化。已加载的 Bean 及同次生产类产物／类路径参与核对。
+- 只核对固定 Argon2id 自描述格式、规范编码及不复用盐；独立工具 JVM 不加载应用类，用成熟实现验证实际摘要，不能以伪实现自己的 `matches` 结果证明正确。算法与比较不由门禁自写；盐不重复不证明任意自定义实现使用安全随机源，实现来源仍须源码评审。
+- 隔离参数固定于工具锁：19 MiB、2 次迭代、并行度 1、16 字节盐和 32 字节输出。它们仅用于有效校准；生产工作参数仍须能力基线及目标负载验证，其他参数明确为未校准，不将工具边界改成产品禁令。独立校验器依据摘要自身参数验证，不以其工厂默认值推导生产安全性。
+- 原始材料只经过仓库外私有临时文件传递并在结束时清理；公开报告仅含固定场景及布尔结果、输入摘要、环境与支持边界。识别本轮固定合成密码／摘要及 Base64 表示出现在实际进程输出的情况，不建设通用秘密解码平台，也不把此结果当作产品全部日志已受验证。
+
+[正反例](../../tools/engineering_gate/test_password.py)须拒绝明文／快速哈希、复用盐、伪造有效形状的摘要、输入截断／归一化及材料输出；整改对象用新的干净工程恢复。适配器自身执行注释、格式与批准的数值检查，固定分组和 CI 不遗漏或重复。缺失原生环境不跳过。
+
+本项不证明数据库保存、SQL 初始化、密码登录、会话撤销、生产负载或端到端传输已完成；完整访问与持久化门禁仍保留各自责任。
+
+依据：[OWASP 密码保存](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)、[成熟编码与校验源码](https://raw.githubusercontent.com/spring-projects/spring-security/7.0.7/crypto/src/main/java/org/springframework/security/crypto/argon2/Argon2PasswordEncoder.java)、[原生保存格式](https://raw.githubusercontent.com/spring-projects/spring-security/7.0.7/crypto/src/main/java/org/springframework/security/crypto/argon2/Argon2EncodingUtils.java)、[Crypto 模块边界](https://docs.spring.io/spring-security/reference/7.0/features/integrations/cryptography.html)、[Bouncy Castle 发行](https://www.bouncycastle.org/download/bouncy-castle-java/)。资料不代替真实校准或人工验收。
+
+## 访问控制具体适配
+
+[具体入口](../../tools/engineering_gate/calibrate_access_state.py)补齐限定注解与内存会话之外的第五层访问校准。[合成应用](../../tools/engineering_gate/AccessStateFixture.java)复制到仓库外干净 Maven 工程，由[独立观察器](../../tools/engineering_gate/AccessStateInventory.java)启动三个真实 JVM；同项目两实例使用同一 Redis 库，另一个项目使用另一库。应用通过实际 PostgreSQL 取得账号、角色、权限、资源和审计，使用成熟 Argon2id 校验与原生 Sa-Token Redis DAO；观察器不替应用补登录、授权、状态写入或审计。
+
+[组合锁](../../tools/engineering_gate/access-state.lock.json)固定 Redis 8.8.1 镜像摘要、`sa-token-redis-template`、Spring Data Redis 4.0.7 与 Lettuce 6.8.2.RELEASE；Sa-Token 1.46.0、Boot 4.0.8、Spring 7.0.9、PostgreSQL 18.4／JDBC 42.7.13 和密码组件沿用已有锁。实际应用类路径必须包含匹配依赖，独立工具目录不能补应用缺失；实际 DAO 类及来源、连接工厂、库号、项目、注册入口、JDBC 元数据与同次编译分别核对。只支持此限定原生组合和本地临时容器，未校准形式保持缺口。
+
+独立 JSON 仅含 `schema: 1`、`application`、`profile`；不允许配置期望值、任意 SQL 或省略固定场景。[场景适配](../../tools/engineering_gate/access_state_scenarios.py)固定以下八类合同，详细正反例由[分组回归](../../tools/engineering_gate/test_access_state.py)运行：
+
+| 场景 | 独立观察与拒绝条件 |
+|---|---|
+| session／expiration | 真实账号登录、跨 JVM 读取、进程重启、登出、Redis 键及原生过期、另一项目隔离；内存 DAO、错库、未登出和错误 TTL 拒绝 |
+| authorization | 真实操作权限、资源归属、范围内／外单资源与列表、条件写入及全部资源行值；客户端自报主体／范围无效，漏范围、漏归属、读权限冒充写权限拒绝 |
+| changes | 已登录主体在禁用、权限／角色撤销和范围缩小报告完成后的新请求，两实例均读取新状态；旧权限、旧角色、禁用后继续通过拒绝，另一项目仍可访问 |
+| password | 两个独立旧会话包括执行更改的会话全部失效，新密码可登录、旧密码拒绝；实际摘要变化及其他账号／项目不受影响，单独保存密码不能证明完成 |
+| failures | 暂停本轮 Redis、账号查询失败和恢复；在真实密码 UPDATE 等待期间制造 Redis 故障，数据库提交但撤销未完成必须报告依赖失败，不能借审计容错报告完成 |
+| throttle | 真实登录的默认限制、交替实例、其他账号／项目、窗口恢复及合法调整，两实例并发竞争同一限额；恢复后错误密码仍拒绝，未知依赖状态不放行 |
+| audit | 安全写入及真实记录的可信主体、对象、动作、结果和时间；审计表故障不回滚已生效变更，必须表达缺失并独立告警；人工补录只记录当前可核对事实，缺失原始主体／时间保持未知 |
+
+合成选择仅用于可重复校准：两个固定项目、Redis 库 0／1、账号与部门范围、三次／两秒窗口、可调一至五次、120 秒会话及过期场景的一秒会话、固定 JSON 401／403／429／503 分类。它们不选定产品阈值、锁定策略、密码接口、审计存储、公开配置或部署算法；普通用户误触限制、恶意触发及生产负载仍须第六层能力设计。合成数据库使用项目字段隔离，Redis 使用库号隔离；物理部署方式没有据此确定。
+
+密码写入先提交摘要和版本，再由原生机制撤销会话；每次新身份校验同时检查数据库当前版本。中途故障不宣称跨存储原子性或完整成功。审计在已完成安全变更之外写入，失败告警只携带随机事件编号，通过独立标准错误流供本轮观察；补录采用当前快照并明确 `partial` 和事实来源，不承诺原始记录一定恢复。应用实际授权及安全状态完成条件不能被审计容错豁免。
+
+[资源边界](../../tools/engineering_gate/access_state_environment.py)只接受本轮 0600 私有连接、精确临时容器 ID、固定镜像、校准标签、回环端口、自动清理和 tmpfs，无宿主数据挂载或既有卷；不清空用户数据库。故障操作仅暂停／恢复这一 Redis，表故障仅作用于这一 PostgreSQL。新反例使用干净工程，合成状态在工具拥有的临时库中重建。准备及命令日志留档；可能包含泄露反例材料的私有 JVM 原始日志在本轮检查后清理。公开报告只保存输入摘要、固定场景、状态与布尔证据，本轮密码、摘要、令牌及 Base64 不得进入响应头、普通响应字段、实际进程输出或审计；仅豁免成功登录的 `data.token` 交付字段。实际错误口令同样登记为私有材料；取得最终摘要后回扫已接收响应，防止新摘要漏检。
+
+`access-gate` 执行三实例资源组合，其他访问状态登记命令共同覆盖八类合同；旧凭证、策略、密码校准继续保留。源文件、分组、原生环境和 CI 逐项登记，所有用例恰好运行一次，复用现有职责分组，按实际负载设置有界预算，当前数值以执行器和 CI 配置为准。首次 Maven 下载超时仅说明依赖准备未完成，不作为 CI 机制失效事实；未完成准备也不能当作功能通过。真实时间记录仅是本地合成工作负载剖面，不证明远端冷启动或生产负载。`real_redis_checked` 只覆盖该固定场景，`product_verified/access_policy_verified/semantic_review_proven/human_acceptance` 仍为 false；源码及场景语义评审单独提供，产品 TLS、业务 IAM 和整套人工验收没有据此完成。
+
+一手依据：[原生 Redis 集成](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-doc/up/integ-redis.md)、[实际 Redis DAO](https://raw.githubusercontent.com/dromara/Sa-Token/v1.46.0/sa-token-plugin/sa-token-redis-template/src/main/java/cn/dev33/satoken/dao/SaTokenDaoForRedisTemplate.java)、[Boot 组合 BOM](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/4.0.8/spring-boot-dependencies-4.0.8.pom)、[Redis 8.8.1 发行](https://raw.githubusercontent.com/redis/redis/8.8.1/00-RELEASENOTES)。资料用于确定适配输入，不替代真实运行。
+
+## 启动 Flyway 迁移校准
+
+[迁移入口](../../tools/engineering_gate/calibrate_flyway.py)编译仓库外干净工程，由真实 Boot 应用启动执行 Flyway；观察器只读取应用的数据源、迁移 Bean、原生历史／校验结果及合成表，不调用 `migrate`、`repair`、`baseline` 或 `clean`，不实现业务初始化。
+
+- [校准锁](../../tools/engineering_gate/flyway.lock.json)固定 Boot 4.0.8、Flyway 11.14.1、PostgreSQL JDBC 42.7.13、PostgreSQL 18.4 与多架构镜像摘要；它们是隔离校准输入，不是产品完整组合的兼容承诺。工具依赖不得补齐应用实际类路径缺失。
+- 独立合同为 `schema: 1`，声明 `application`、`datasource`、`flyway`、`database_schema`、`target_version`、`migrations` 与 `data`。每条 SQL 包含版本、维护路径、编译资源路径和预先固定的 SHA-256；合成表声明列名、原生类型、可空性及有限行值，不接收任意查询。合同不能由本次结果反推。
+- 原生 `MigrationInfo` 的实际物理资源须绑定同次编译资源及独立摘要；相同文件名和版本不能证明来源一致。原生 `validateWithResult()` 负责历史校验和验证；工具不复写 Flyway 校验算法。实际数据源、Schema、版本、执行状态、列结构与行值分别核对，历史成功不替代真实数据结果。
+- 当前只支持独立版本化 SQL、单个声明 Schema、普通编译目录和本地 Unix Docker 中新建的合成数据库。有效 Schema 按原生 `defaultSchema`、首个 `schemas`、实际连接默认 Schema 的顺序核对；多个管理 Schema 尚未校准。连接为仓库外 0600 私有 JSON，固定回环地址，核对精确容器 ID、校准标签、镜像、自动清理、tmpfs 和端口；拒绝隐式 Docker 路由覆盖、宿主挂载及既有卷。只清理本轮创建的容器，不操作现有数据库。其他部署和迁移形式须先补校准，不变成产品禁令。
+- [正反例](../../tools/engineering_gate/test_flyway.py)覆盖空库初始化、合法无变更重启、保留既有行的升级、错误数据源／SQL 路径、关闭迁移、类型／数据漂移、原生历史失败和失败后的已提交状态。整改保留已经应用的正确历史，以新增升级修正，不自动重写历史或清空数据库。缺环境、编译失败和工具失败不能充当目标违规证明。
+- 公开报告不包含凭据、SQL 或行值，只保留输入、环境、原生状态、数量和诊断。合成凭据及其 Base64 出现在实际进程输出时拒绝；运行前后核对源码、合同、编译资源和工具。观察器自身执行注释、格式及数值门禁，五个固定分组覆盖全部用例且与 CI 一致。
+
+本项仅证明启动 SQL 迁移的限定机制，不证明 MyBatis-Plus 读写、领域映射、事务、多数据源、并发、管理员初始化或产品升级已完成；完整持久化门禁继续保留。
+
+依据：[固定 Boot 启动初始化](https://raw.githubusercontent.com/spring-projects/spring-boot/v4.0.8/documentation/spring-boot-docs/src/docs/antora/modules/how-to/pages/data-initialization.adoc)、[原生迁移观察 API](https://raw.githubusercontent.com/flyway/flyway/flyway-11.14.1/flyway-core/src/main/java/org/flywaydb/core/api/MigrationInfo.java)、[原生验证结果](https://raw.githubusercontent.com/flyway/flyway/flyway-11.14.1/flyway-core/src/main/java/org/flywaydb/core/api/output/ValidateResult.java)、[Schema 配置契约](https://raw.githubusercontent.com/flyway/flyway/flyway-11.14.1/flyway-core/src/main/java/org/flywaydb/core/api/configuration/Configuration.java)、[PostgreSQL 模块](https://documentation.red-gate.com/flyway/reference/database-driver-reference/postgresql-database)。资料不代替真实组合校准。
+
+## MyBatis-Plus 与动态数据源校准
+
+[持久化入口](../../tools/engineering_gate/calibrate_persistence.py)在仓库外干净工程中启动真实 Boot 应用，只调用独立合同指定的操作；不补 Mapper、数据源、代理或事务管理器，不实现产品业务。[校准锁](../../tools/engineering_gate/persistence.lock.json)固定 MyBatis-Plus 3.5.17、MyBatis 3.5.19、MyBatis-Spring 4.0.0、dynamic-datasource 4.5.0 和 Spring 7.0.9；Boot、驱动和数据库复用[迁移锁](../../tools/engineering_gate/flyway.lock.json)，不由工具类路径补齐应用依赖。
+
+[路由夹具](../../tools/engineering_gate/ResourceRoutingFixture.java)由测试复制为隔离应用的技术装配源码，用明确方法绑定和 Spring 原生 Advisor 验证先路由后事务；应用只声明 `@Transactional`，观察器不安装该路由。绑定遗漏、顺序反转必须失败，正确装配须由实际连接、提交回滚及路由恢复证明。夹具切面数值不是产品统一规范；产品装配形式与完整运行组合仍待第六层设计。
+
+[回归夹具](../../tools/engineering_gate/test_persistence.py)在技术配置中用原生 `RollbackOn.ALL_EXCEPTIONS` 落实默认异常回滚。工具按当前操作 Bean 的真实代理、原生类过滤和静态方法匹配找到事务 Advice，只读核对固定版本原生切点与 Advice 的来源身份及默认解析器集合，再解析无局部覆盖声明；闲置正确 Advisor 或只测运行时异常不能掩盖漏配。未知匹配／解析回调不额外执行；Advice 或来源子类、自定义解析器、来源错配、动态／引介匹配、多层或不透明代理、反射核对不可用等形式报告校准缺口，不变成产品禁令。探针不实例化、不执行、不安装事务；配置观察仍须结合真实受检异常写入后的回滚验证。显式 `noRollbackFor` 例外按独立声明验证真实提交，遗漏例外也须失败。本项不冒充全部业务失败或嵌套传播合同。
+
+- 独立 JSON 使用 `schema: 1`，包含 `application`、`datasource`、`factory`、`manager`、`data` 与 `operations`。当前校准两个独立临时目标 `master`／`inventory`，固定默认读取、别名读取、提交、回滚、未知别名及恢复默认读取六类场景；声明实际 Bean／无参方法、Mapper 语句、目标、结果与各步数据库状态。它不是产品接口或通用测试 DSL。
+- 原生资源必须来自实际应用，资源盘点单独取得池连接核对地址、默认资源、MyBatis-Plus 配置、会话工厂和事务管理器绑定。语句观察只记录原生 Executor 尝试及 StatementHandler 已取得的连接，不提前取连接、修补异常或重写 SQL。成功场景须有真实语句准备，缓存或手写结果不能冒充本项执行证据；原生 BATCH 见[具体适配](#持久化具体适配)，其他执行器与缓存合同需按实际范围校准，不成为产品禁令。
+- 每步调用结束后，通过独立 JDBC 只读连接查询两个本轮目标的有限行值，核对真实提交／回滚及隔离。提交保留旧行并新增一行，回滚和拒绝不得改变状态；不能把期望改成已经写入、删除拒绝场景或把目标改成主库让门禁变绿。类型化异常链与原生执行完成状态分别核对，不把 SQL 执行失败当作成功写入后的回滚证据。
+- 私有连接文件为 0600 JSON，声明两个精确、不同的临时容器；复用迁移校准的本地 Docker、镜像、tmpfs、挂载与端口边界。不操作既有数据库。路由夹具通过 SQL 准备合成表，不初始化管理员；具体适配另外验证启动迁移到 Mapper 的真实组合，产品联动仍在第六层验收，不改变 Flyway 默认执行决定。
+- [正反例](../../tools/engineering_gate/test_persistence.py)覆盖方法注解覆盖类注解的合法用法，以及错误别名、未知别名回落、遗漏事务、资源错配、自调用、嵌套选库、上下文残留、虚构结果、数据漂移和观察器提前制造拒绝。真实静态检查拒绝应用／领域的 `@DS`，基础设施合法用法通过；降低可见性不豁免。整改保留原始违规证据，使用新的干净工程和本轮新库，不清空用户数据库。
+- 公开报告不包含凭据、SQL、行值或调用返回内容；固定合成凭据及其 Base64 出现在实际输出时拒绝。执行前后核对维护输入、原生产产物、独立合同、工具与环境。观察器自身执行源码质量门禁，固定分组、环境入口及 CI 不遗漏或重复；缺少环境不跳过。
+
+本入口只证明限定实际路由与本地事务机制；映射、分页、并发、批量和迁移联动的具体合同见下一节。两类校准均不证明跨库原子性、任意业务模型或完整产品持久化交付。
+
+依据：[官方 Boot 4 接入](https://baomidou.com/getting-started/install/)、[固定路由实现](https://raw.githubusercontent.com/baomidou/dynamic-datasource/v4.50/dynamic-datasource-spring/src/main/java/com/baomidou/dynamic/datasource/DynamicRoutingDataSource.java)、[原生注解上下文](https://raw.githubusercontent.com/baomidou/dynamic-datasource/v4.50/dynamic-datasource-spring/src/main/java/com/baomidou/dynamic/datasource/aop/DynamicDataSourceAnnotationInterceptor.java)、[原生语句准备](https://raw.githubusercontent.com/mybatis/mybatis-3/mybatis-3.5.19/src/main/java/org/apache/ibatis/executor/statement/StatementHandler.java)、[真实事务桥接](https://raw.githubusercontent.com/mybatis/spring/mybatis-spring-4.0.0/src/main/java/org/mybatis/spring/transaction/SpringManagedTransaction.java)、[Spring 事务切面顺序](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.9/spring-tx/src/main/java/org/springframework/transaction/annotation/EnableTransactionManagement.java)。资料不代替实际校准。
+
+## 持久化具体适配
+
+[具体入口](../../tools/engineering_gate/calibrate_persistence_adapters.py)由 `calibrate_persistence.py --project ... --adapters ... --connections ...` 调用，复用前节的真实构建、版本、隔离资源和输入绑定。分页明确引入 MyBatis-Plus 同版本 `mybatis-plus-jsqlparser`，解析器固定为 5.2；版本与准备仍由同一[持久化锁](../../tools/engineering_gate/persistence.lock.json)管理。迁移分支还直接核对实际应用的 `spring-boot-flyway`、`flyway-core` 和 `flyway-database-postgresql` 与迁移版本锁一致；独立工具目录的版本不能替应用证明依赖完整。
+
+独立 JSON 使用 `schema: 1`，包含 `application`、`bean`、`factory`、`datasource`、`manager` 和 `profile`。五种 `profile` 对应下表固定合成合同；方法、场景序列和预期关系由校准入口定义，不允许调用方删除场景或填写当前结果作为期望。它是第五层具体适配合同，不是任意 SQL 测试 DSL 或产品字段规范。
+
+| 合同 | 实际执行与验收依据 |
+|---|---|
+| `mapping` | `numeric(6,2)` 与 BigDecimal 的边界、正负半入舍入和超限拒绝；LocalDate、LocalDateTime、OffsetDateTime 的日期、本地时间和微秒时间点；空值、存储枚举和重建后的行为；数据库返回 ID、插入后回滚产生的序列间隙。核对 Java 往返、真实列类型／精度及每步独立查询结果 |
+| `pagination` | 原生 PostgreSQL 分页插件、关联分组的真实 COUNT 与稳定记录排序、范围内外数据、绑定的恶意形状值、空页及负数／超量拒绝。本合同最大页长 2 仅用于有限夹具，不是产品全局配置；自定义查询结果不暴露 IPage |
+| `concurrency` | 两个不同数据库会话中的实际 Read Committed 事务读取同一旧版本后竞争；原生版本插件只允许一个更新成功，检查真实行数、版本回写与落库。自定义条件更新、同值更新和未匹配分别解释；两个事务竞争唯一键，由数据库决定一个成功、一个冲突 |
+| `batch` | 原生 BATCH 会话在一个应用事务中按 2 条分批，3 条总量上限；读取实际刷新计数，不累计受理哨兵。首批已刷新后的主键冲突和延迟约束的提交失败均须整体回滚；数量超限在写入前拒绝 |
+| `migration` | 两个别名各有 Flyway Bean、扫描路径与真实历史；校验空库、保留已有数据的重启／升级、第二源升级失败以及恢复。第一源已经提交不会因第二源失败回滚；失败源的事务性脚本回滚后，用更正的未应用脚本恢复，不能调用 repair、clean 或重写已应用脚本 |
+
+`migration` 还要求 `phase`（`initialize`、`restart`、`upgrade`、`failure`、`recovery`）及按 `master`／`inventory` 分别声明的 `migrations`，每条包含固定版本资源路径及独立 SHA-256。入口核对维护 SQL、实际生产资源、原生 Flyway 物理来源、校验结果、执行历史、结构和保留数据；相同字节从错误位置扫描也不能证明声明来源正确。失败阶段额外从原生 `FlywaySqlScriptException` 绑定失败脚本的实际资源与独立摘要，无关启动异常即使 SQLSTATE 相同也不算迁移回滚证据。
+
+[观察器](../../tools/engineering_gate/PersistenceAdapterInventory.java)仅启动真实应用、调用固定操作、透明记录 Executor／StatementHandler／批次刷新和独立读取两个目标；不安装分页、版本或事务实现，不替应用执行 migrate。并发记录按线程隔离，实际物理连接、Executor 逐次影响行数及提交后的独立状态是结果依据；应用固定返回不能掩盖原生零行结果。公开报告只返回状态、计数、类型化诊断及输入摘要，不包含 SQL、行值、调用返回或凭据。
+
+[应用夹具](../../tools/engineering_gate/PersistenceAdapterFixture.java)和[迁移夹具](../../tools/engineering_gate/PersistenceMigrationFixture.java)只复制到仓库外干净工程。`persistence-gate` 运行同一启动应用从两个空库迁移到实际 Mapper 路由、提交与回滚的组合正反例；五类详细反例由[独立分组](../../tools/engineering_gate/test_persistence_adapters.py)执行。技术隔离沿用已有边界校准；字段含义、查询范围合理性和任意业务模型转换仍由实际源码及场景语义评审承担，不用合成对象替代产品业务模型。
+
+具体适配没有增加数据库支持、分布式事务、生产负载或任意框架形式承诺。第六层仍验证真实产品的字段合同、查询和索引、并发负载、故障恢复及消费接入；第五层的自动组合与正反例也不产生整套控制面人工验收。
+
+依据：[原生分页与 COUNT 条件](https://baomidou.com/en/plugins/pagination/)、[乐观锁与自定义方法限制](https://baomidou.com/plugins/optimistic-locker/)、[批处理刷新及结果](https://baomidou.com/en/guides/batch-operation/)、[PostgreSQL 18 时间类型](https://www.postgresql.org/docs/18/datatype-datetime.html)、[隔离与序列语义](https://www.postgresql.org/docs/18/transaction-iso.html)。资料只确定需验证的条件，实际结果保存在任务证据。
+
+## 官方 Wrapper 启动机制校准
+
+[Wrapper 入口](../../tools/engineering_gate/calibrate_wrapper.py)使用[锁定配置](../../tools/engineering_gate/maven-scope.lock.json)中的官方 only-script 发行、脚本和 Maven 分发摘要，不自写下载器或在仓库建立产品工程。
+
+- prepare 写仓库外专用空目录；不覆盖损坏文件。脚本改写、重复／未知属性、地址／摘要偏离及未校准隐式配置拒绝。
+- project 在无构建输出的隔离工程执行 `mvnw --version`，每次新建下载缓存，不加载 Maven rc；核对实际 Maven／JDK 和核心字节，拒绝隐式认证、地址及调试覆盖。
+- [Wrapper 反例](../../tools/engineering_gate/test_maven_wrapper.py)直接使官方脚本拒绝错误摘要，再用新缓存整改；合法 macOS 路径别名允许。
+- `distribution_bootstrapped` 只证明固定分发下载及启动；构建／发布／验收未证明。POSIX 已校准，cmd 仅查发行字节，不称 Windows 已运行。
+
+## 真实 Wrapper 构建生命周期校准
+
+[生命周期入口](../../tools/engineering_gate/calibrate_lifecycle.py)固定在无输出隔离工程执行 `mvnw verify`；不接受任意目标或跳过参数。Surefire、JAR、JUnit 等校准版本只维护于[生命周期锁](../../tools/engineering_gate/maven-lifecycle.lock.json)，不是产品版本基线。
+
+观察器汇总各成功目标的请求、阶段、有效声明、项目／插件类路径、原生约束和主产物，不只取会话末集合。项目约束用原生 DependencyResolutionResult，插件约束用成功 RepositoryEvent 请求链；逐项核对坐标、版本、扩展名、分类及文件摘要。固定最终版本不能掩盖生效范围或时间戳快照。只输出必要身份，不导出任意属性、认证或环境。
+
+必需测试合同独立于当次发现结果：`{"schema":1,"required_tests":["包名.测试类#方法名"]}`。固定字段、非空、唯一且纳入输入摘要。Surefire XML 须对应实际编译测试类，计数与用例一致，无失败／错误／跳过，覆盖全部必需测试；允许额外合法测试。清单充分性和断言准确性仍须评审。
+
+| 必须核对 | 原生成功仍须拒绝的目标反例 |
+|---|---|
+| 固定运行时、核心字节、编译目标及必需插件 | 版本／编译目标偏离、必需目标移出生命周期 |
+| 真实编译与必需测试 | 漏选、无发现、跳过、禁用、忽略失败；原生编译／断言失败保留原始非零 |
+| 有效声明与原生解析约束 | 直接／传递范围、快照、缺图／漏项／错误归属、机器 JAR |
+| 本次主 JAR | 对照全部生产类名称、字节及嵌入坐标，部分漏类拒绝 |
+| 固定输入 | 陈旧输出先拒绝；工程、脚本、合同、工具及环境前后变化失效 |
+
+[生命周期回归](../../tools/engineering_gate/test_maven_lifecycle.py)固定执行、测试覆盖、产物、版本基线、依赖解析、输入六组。隔离依赖用临时命名空间，经真实 Maven 解析；整改用新工程，不覆盖失败现场或用户缓存。报告为 `isolated-wrapper-verify-lifecycle-only`，不证明产品发布、重打包、动态测试名或插件动态运行库完整性。
+
+## 同次构建的源码与架构组合入口
+
+[组合入口](../../tools/engineering_gate/calibrate_engineering.py)复用同一次真实 Maven 编译、职责、模块合同、依赖和方法来源观察，再对该次实际源码执行注释、格式及复杂度检查，不接受外传构建报告。schema 2／3 的可选 `critical_methods` 登记准确内部方法签名，必须属于同模块实际生产声明；缺失、测试方法及错误签名不能产生覆盖。内部方法无需变成公开合同。
+
+[组合反例](../../tools/engineering_gate/test_engineering.py)同时验证无说明关键方法、错误用途／签名、测试源码格式和真实越界依赖；合法修复使用新隔离工程。机械检查可实现不等于语义全部自动化：合同／数据根／关键行为是否漏登、用途与职责是否准确、说明内容和省略是否合理，由当前源码及使用场景评审。未知技术组合继续明确报告校准缺口，动态入口分别由 HTTP、访问、持久化和运行适配观察；不建设任意框架的通用证明器。
+
+## 真实 HTTP 消费具体适配
+
+[消费入口](../../tools/engineering_gate/calibrate_http_consumer.py)通过 JDK HttpClient 请求真实 Boot Servlet，独立期望核对成功、空数据、HTTP 200 业务拒绝、受理、部分完成、协议失败、身份失败、服务故障、畸形 JSON、未知业务码、超时和重定向。HTTP 状态与完成状态分别保留；受理／部分结果保留查询信息；已产生一次副作用的超时不能触发自动重试。计数按有限结果类别，不能只计 HTTP 2xx。
+
+下载、事件流和运维数据按各自协议核对；当前消费夹具验证 AB 字节和完整 SSE 事件内容，Servlet 观察器会缓冲响应，不声称增量到达、心跳、背压或任意二进制消费完整性。原生 HTTP 合同入口仍承担独立原始二进制结构检查。可信观察器固定在工具目录；外传夹具不能替换观察器。原始响应头／体、原生进程输出均检查本轮已知合成凭证及单层标准 Base64 包裹，失败诊断不回传原始日志；不声称任意未知编码识别。[正反例](../../tools/engineering_gate/test_http_consumer.py)覆盖目标误接受与整改。
+
+## 运行装配与权威配置具体适配
+
+[运行入口](../../tools/engineering_gate/calibrate_runtime.py)绑定实际 Spring Boot 条件装配，验证未启用无需输入、默认实现、必要输入缺失、显式不支持实现不回退、用户覆盖及多实现冲突；无关能力仍可调用。默认实现通过原生自动配置的后置条件生效，不靠观察器装配或偶然加载顺序。
+
+[运行锁](../../tools/engineering_gate/runtime.lock.json)固定 Cloud Alibaba 2025.1.0.0、Nacos client／server 3.1.1 与镜像摘要。真实私有 Nacos、标准 ConfigData 与 RefreshScope 验证权威值覆盖本地默认、两个项目环境组隔离、动态应用更新、实际连接中断、应用对象创建失败和有效更新后的恢复。断连必须有已发布但未读取的必需值和实际 Paused 状态；缓存旧值不表示新值已获取。收到更新与应用成功单独观察。有效内容前提不变，不增加自研坏配置审查。该校准证明组级读取隔离，不证明租户 ACL、任意配置热更新或产品注册发现。
+
+工具仅创建本轮随机标识的回环容器、tmpfs 数据与 0600 凭证文件；故障与清理均限本轮容器 ID，清理核对标签、镜像、自动删除及无宿主目录挂载。正反例见[运行回归](../../tools/engineering_gate/test_runtime.py)。依据 [SCA 版本说明](https://sca.aliyun.com/en/docs/2025.x/overview/version-explain/)及 [Nacos Docker 入口](https://nacos-group.github.io/docs/v3.1/quickstart/quick-start-docker/)，实际结果另存当前候选报告。
+
+## 原生观测具体适配
+
+[观测入口](../../tools/engineering_gate/calibrate_observation.py)用 OpenTelemetry Java SDK 实际产生日志、指标和链路，经受限 JSON 导出器送至回环 HTTP 接收端。该传输仅供校准，不是产品 OTLP 或观测平台选型；原生 SDK 版本由运行锁固定。原生父子 span、日志关联、服务／版本／项目／环境身份与有限结果维度均从实际接收数据核对，子节点数量与完整关联不能因改名而漏检。累计指标取同一原生累计序列最大值，不能以后台到达顺序代替采样顺序。
+
+故障场景使接收端延迟并拒绝，原生 SDK 有界队列和有限导出等待保留；100 次业务调用继续完成，本地观测降级及导出失败可见，真实数据缺失不被称作零丢失。恢复操作由可信观察器提供独立新上下文，日志和父子链路必须携带它实际到达，重放旧日志或仅连接恢复不能通过。该有限校准负载不是生产吞吐／时延承诺。请求输入及秘密不进入聚合维度；原文及单层 Base64 包裹的已知校准秘密在成功与失败路径都拒绝。无额外自研缓冲队列或通用秘密治理平台。[反例与整改](../../tools/engineering_gate/test_observation.py)使用真实 SDK 和接收端，依据 [Java SDK 官方说明](https://opentelemetry.io/docs/languages/java/sdk/)。
+
+## 统一执行与证据
+
+从仓库根执行统一任务入口；逐项工具命令用于定向诊断，不代替完整适用验证。
+
+```sh
+python3 -B tools/control_plane/control_plane.py run --task control-plane-verification --review /仓库外当前评审.json
+python3 -B -m unittest discover -s tools/engineering_gate -p 'test_*.py'
+python3 -B tools/engineering_gate/calibrate_source.py --tools /仓库外专用目录 environment
+python3 -B tools/engineering_gate/calibrate_maven.py --prepare /仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_wrapper.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_advisory.py --environment
+python3 -B tools/engineering_gate/calibrate_http.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_http.py --project /仓库外隔离工程 --scenarios /独立场景.json --baseline /已发布合同.json --baseline-sha256 固定摘要
+python3 -B tools/engineering_gate/calibrate_access.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_access.py --project /仓库外隔离工程 --scenarios /独立场景.json --baseline /已发布合同.json --baseline-sha256 固定摘要 --access /凭证场景映射.json
+python3 -B tools/engineering_gate/calibrate_access.py --project /仓库外隔离工程 --scenarios /独立场景.json --baseline /已发布合同.json --baseline-sha256 固定摘要 --access /凭证场景映射.json --policies /独立原生策略合同.json
+python3 -B tools/engineering_gate/calibrate_password.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_password.py --project /仓库外隔离工程 --password /应用与密码Bean.json
+python3 -B tools/engineering_gate/calibrate_flyway.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_flyway.py --project /仓库外隔离工程 --migration /独立迁移合同.json --connection /私有合成连接.json
+python3 -B tools/engineering_gate/calibrate_persistence.py --prepare /另一个仓库外专用空目录
+python3 -B tools/engineering_gate/calibrate_persistence.py --project /仓库外隔离工程 --persistence /独立持久化合同.json --connections /私有合成连接.json
+```
+
+| 环境变量 | 指向 |
+|---|---|
+| DOMAIN_FORGE_GATE_TOOLS | 锁定源码／字节码工具专用目录 |
+| DOMAIN_FORGE_GATE_MAVEN | 已准备的固定 Maven 目录 |
+| DOMAIN_FORGE_GATE_MAVEN_REPOSITORY | 专用依赖仓库；核对固定编译、Surefire、JAR 插件 |
+| DOMAIN_FORGE_GATE_WRAPPER | 固定官方发行 ZIP |
+| DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY | 原生告警插件专用依赖仓库 |
+| DOMAIN_FORGE_GATE_ADVISORY_DATA | 原生资料目录 |
+| DOMAIN_FORGE_GATE_HTTP_TOOLS | 固定 HTTP 库和框架依赖的专用目录；先准备再校验实际字节 |
+| DOMAIN_FORGE_GATE_ACCESS_TOOLS | 固定 Sa-Token Boot 4 校准依赖的专用目录 |
+| DOMAIN_FORGE_GATE_PASSWORD_TOOLS | 固定成熟密码实现的专用目录，不保存生产凭证 |
+| DOMAIN_FORGE_GATE_MIGRATION_TOOLS | 固定 Flyway 与 PostgreSQL 校准依赖目录；不保存数据库凭据 |
+| DOMAIN_FORGE_GATE_PERSISTENCE_TOOLS | 固定 MyBatis-Plus、事务桥接和动态数据源校准依赖目录；不保存凭据 |
+
+缺失、字节不匹配或运行时不符均失败，不跳过。必要环境探针和维护输入在执行前后比较；报告保存命令、退出码、诊断、真实扫描和结果。不修改输入源码，不将显式用途当生产证明，不提供签名、防伪或人工批准。
+
+固定分组是执行组织，不是更多产品质量标准。真实加载器保留实际次数，核对各文件全部用例恰好选择一次，包含分组守卫自身；遗漏、错命令、组内／跨组重复必须失败。本地、[CI](../../.github/workflows/control-plane.yml)及环境预检使用同一分组，必要断言保持不变，不动态少跑；预算按实测负载调整并记录依据。纯加载核对不需要 Java，原生用例必须具备环境。
+
+CI 先按事件精确差异做结构／控制面检查，相关维护变化再运行原生准备与完整校准。使用现有静态矩阵按源码、构建、架构、依赖、职责、方法、HTTP、凭证、权限策略、密码、迁移、持久化路由、持久化状态、运行适配固定分组；每组 20 分钟，`fail-fast: false`。每个登记命令恰好属于一组，每组保留现有公共工具与资料准备；迁移依赖及数据库镜像在迁移、两个持久化和三个访问组准备，持久化依赖在两个持久化组准备，Nacos／原生观测依赖及镜像仅在运行组准备。组名及命令以 [CI 配置](../../.github/workflows/control-plane.yml)为准，不另设调度器或增加质量规则。守卫拒绝漏组、重复、错组、额外跳过和缺少准备；本地耗时记录与远端整组预算验证分开，守卫不代替通用 YAML 语义或远端结果。实际运行状态只在任务与报告维护。
+
+## 其他门禁的前置事实与后续出口
+
+| 责任 | 第五层／第六层边界 |
+|---|---|
+| 构建与依赖告警 | 当前校准真实 Wrapper、限定生命周期及原生扫描；真实产品最终组合、发布、消费和扫描在第六层 |
+| 源码与架构 | 第五层闭合必需具体适配；机械绑定不证明关键行为、省略、职责语义、完整可达合同和动态入口，语义评审责任保留 |
+| HTTP／OpenAPI 与访问 | 第五层针对选定框架的实际注册处理器、有效策略及发布基线核对，并校准合法继承／组合及协议反例；不能仅搜注解或同源重算实现与期望 |
+| 持久化与运行 | 第五层完成迁移与运行装配的必需具体适配及正反例；第六层验证真实产品 PostgreSQL／Redis／Nacos 等场景，源码夹具不产生产品运行结果 |
+| 使用路径与交付 | 四类使用路径及有材料的语义评审须实际完成；普通评审由 Agent 或研发者负责，重大人工决定、实际 Git／CI 对象和整套验收不由结构检查产生 |
+
+未完成项在唯一任务记录和目录检查登记中保持可见；不以产品延期消除当前机制责任。
+
+## 基础 Maven 依赖安全告警
+
+采用 OWASP Dependency-Check Maven 插件；固定版本及基础行为只维护于[插件配置](../../tools/engineering_gate/maven-dependency-check.xml)，唯一要求见[构建规范](../standards/technology-and-build.md#已确认的依赖漏洞门禁原则)。
+
+- 将 XML 合入实际工程 build/plugins，绑定 verify，包含测试作用范围；依赖变更后执行 `./mvnw -B verify`，独立复查用固定插件 check。
+- 原生日志告警及 target 下 HTML／JSON 为结果。漏洞阈值 11 表示分数 0～10 仅告警；分析执行错误仍失败，不把构建成功当作无风险。
+- 保留原生自动更新；不新增漏洞服务账号，关闭要求账号的 OSS Index 分析器。锁定版本使用原生支持的 NVD 2.0 JSON 数据源，不自研下载、导入、评分或上游规则审计。
+- [配置测试](../../tools/engineering_gate/test_maven_advisory.py)与[原生测试](../../tools/engineering_gate/test_advisory_runtime.py)分开。正常扫描核对实际组件及报告，不要求永久零漏洞；漏洞反例须定位目标原生告警，资料缺失以原生 NoDataException 拒绝，新工程整改恢复。
+
+[告警薄入口](../../tools/engineering_gate/calibrate_advisory.py)只提供 update-only 准备、限定 check 校准及环境核对，不接受任意目标或跳过参数。准备用显式仓库外专用目录，原生进程预算 25 分钟，失败／超时保留日志。
+
+校准先拒绝旧输出和偏离配置，将原生数据库复制至临时目录；扫描关闭在线更新及与 Java 夹具无关的 RetireJS，单扫描 30 秒。核对真实 HTML／JSON、组件、版本及输入／配置／环境／原库摘要，原库与失败工程不覆盖。
+
+按[已批准责任](../tasks/control-plane-verification.md#依赖告警当前复验与-ci-前提)，CI 独立准备 job 为 30 分钟，成功后保存资料及插件依赖缓存；运行／重试键唯一，允许恢复同配置缓存但仍更新。常规 job 依赖本轮准备成功并按精确键恢复，缺失失败，预算按实际负载设置。守卫核对已知布局的命令、依赖、预算、缓存失败策略及重复关键配置，不冒充通用 YAML 语义验证。
+
+原生资料可能滞后、限流或不完整；成功更新／扫描不是实时完整或安全保证。NVD 数据源参数见[官方说明](https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html)，插件行为见[官方参数](https://dependency-check.github.io/DependencyCheck/dependency-check-maven/configuration.html)。当前无产品 Maven 工程，产品扫描未执行，不追加安全治理系统或工具细节访谈。

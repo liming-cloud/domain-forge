@@ -1,0 +1,45 @@
+# 当前机制设计索引
+
+<!-- control-plane:generated; edit catalog/task facts, not this view -->
+
+## 正文与按需小节
+
+- [CONTROL-DESIGN](control-plane-mechanism.md)（design）
+  - 按目标定位；不默认加载 → [调用方与不变量](control-plane-mechanism.md#调用方与不变量)
+  - 按目标定位；不默认加载 → [方案比较与选择](control-plane-mechanism.md#方案比较与选择)
+  - 按目标定位；不默认加载 → [最低清单与实际变更](control-plane-mechanism.md#最低清单与实际变更)
+  - 按目标定位；不默认加载 → [任务唯一记录与入口](control-plane-mechanism.md#任务唯一记录与入口)
+  - 按目标定位；不默认加载 → [执行与证据](control-plane-mechanism.md#执行与证据)
+  - 按目标定位；不默认加载 → [公开命令与记录字段](control-plane-mechanism.md#公开命令与记录字段)
+  - Git 候选与验收准备 → [交付证据具体适配](control-plane-mechanism.md#交付证据具体适配)
+  - 按目标定位；不默认加载 → [本轮验证与后续边界](control-plane-mechanism.md#本轮验证与后续边界)
+- [ENGINEERING-DESIGN](engineering-gates.md)（design）
+  - 按目标定位；不默认加载 → [工具选择与支持边界](engineering-gates.md#工具选择与支持边界)
+  - 按目标定位；不默认加载 → [注释与格式的限定校准](engineering-gates.md#注释与格式的限定校准)
+  - 按目标定位；不默认加载 → [方法规模计量决策](engineering-gates.md#方法规模计量决策)
+  - 按目标定位；不默认加载 → [初始上限与校准边界](engineering-gates.md#初始上限与校准边界)
+  - 按目标定位；不默认加载 → [用途与合同识别的落实方案](engineering-gates.md#用途与合同识别的落实方案)
+  - 逻辑模块、公开契约、允许依赖 → [字节码与直接合同的限定校准](engineering-gates.md#字节码与直接合同的限定校准)
+  - 构建检查及隔离夹具 → [真实 Maven 编译范围校准](engineering-gates.md#真实-maven-编译范围校准)
+  - 构建检查及隔离夹具 → [真实编译范围与源码检查绑定](engineering-gates.md#真实编译范围与源码检查绑定)
+  - 构建检查及隔离夹具、逻辑模块、公开契约、允许依赖 → [真实编译与模块合同绑定](engineering-gates.md#真实编译与模块合同绑定)
+  - 依赖、插件、Wrapper、BOM 或构建入口、构建检查及隔离夹具、逻辑模块、公开契约、允许依赖 → [源码依赖声明与能力入口校准](engineering-gates.md#源码依赖声明与能力入口校准)
+  - 持久化验证或规则检查、构建检查及隔离夹具、逻辑模块、公开契约、允许依赖 → [默认职责与技术注解校准](engineering-gates.md#默认职责与技术注解校准)
+  - 方法、构造器、公开合同或关键行为、构建检查及隔离夹具、逻辑模块、公开契约、允许依赖 → [实际合同方法与源码说明](engineering-gates.md#实际合同方法与源码说明)
+  - HTTP 注册、生成、请求响应或兼容机制校准 → [真实 HTTP 合同校准](engineering-gates.md#真实-http-合同校准)
+  - Sa-Token HTTP 凭证渠道与拦截机制校准 → [真实 Sa-Token 凭证校准](engineering-gates.md#真实-sa-token-凭证校准)
+  - Sa-Token HTTP 凭证渠道与拦截机制校准 → [原生访问策略校准](engineering-gates.md#原生访问策略校准)
+  - Argon2id 密码保存与校验机制校准 → [真实 Argon2id 密码校准](engineering-gates.md#真实-argon2id-密码校准)
+  - 真实 Redis、多实例访问状态、资源范围、登录防护与审计具体校准 → [访问控制具体适配](engineering-gates.md#访问控制具体适配)
+  - 启动 SQL 迁移校准机制及反例维护 → [启动 Flyway 迁移校准](engineering-gates.md#启动-flyway-迁移校准)
+  - MyBatis-Plus 与动态数据源运行校准适配及反例维护 → [MyBatis-Plus 与动态数据源校准](engineering-gates.md#mybatis-plus-与动态数据源校准)
+  - MyBatis-Plus 与动态数据源运行校准适配及反例维护 → [持久化具体适配](engineering-gates.md#持久化具体适配)
+  - 构建检查及隔离夹具 → [官方 Wrapper 启动机制校准](engineering-gates.md#官方-wrapper-启动机制校准)
+  - 构建检查及隔离夹具 → [真实 Wrapper 构建生命周期校准](engineering-gates.md#真实-wrapper-构建生命周期校准)
+  - 方法、构造器、公开合同或关键行为 → [同次构建的源码与架构组合入口](engineering-gates.md#同次构建的源码与架构组合入口)
+  - 消费处理、网关及结果统计 → [真实 HTTP 消费具体适配](engineering-gates.md#真实-http-消费具体适配)
+  - Nacos 权威、读取与动态范围、默认装配、必要输入、覆盖与扩展 → [运行装配与权威配置具体适配](engineering-gates.md#运行装配与权威配置具体适配)
+  - 普通观测故障及资源隔离、观测关联、内容与聚合维度 → [原生观测具体适配](engineering-gates.md#原生观测具体适配)
+  - 按目标定位；不默认加载 → [统一执行与证据](engineering-gates.md#统一执行与证据)
+  - 按目标定位；不默认加载 → [其他门禁的前置事实与后续出口](engineering-gates.md#其他门禁的前置事实与后续出口)
+  - Maven 依赖变更、安全告警或整改 → [基础 Maven 依赖安全告警](engineering-gates.md#基础-maven-依赖安全告警)
