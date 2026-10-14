@@ -48,7 +48,7 @@
 
 第一层至第四层基线已获人工确认；第五层[实施路线](docs/tasks/control-plane-verification.md#实施里程碑)已批准，当前保持 Rework。最新目标、前沿、证据及待办只维护于[唯一任务记录](docs/tasks/control-plane-verification.md#唯一任务记录)。
 
-第五层先完成全部具体门禁适配，为此确定必要技术基线与合同；真实产品结果在第六层严格验收，来源见[阶段决定](docs/tasks/control-plane-verification.md#阶段验收责任决定)。整套控制面未经验收，不展开完整产品系统设计或业务代码研发。当前没有提交、推送或远端 CI 操作授权。
+第五层先完成全部具体门禁适配，为此确定必要技术基线与合同；真实产品结果在第六层严格验收，来源见[阶段决定](docs/tasks/control-plane-verification.md#阶段验收责任决定)。整套控制面未经验收，不展开完整产品系统设计或业务代码研发。当前已获第五层候选提交推送与真实 Git／CI 核验授权，范围及来源见[当前任务](docs/tasks/control-plane-verification.md#路线确认记录)；人工验收单独保留。
 
 ## 第二层审阅入口
 

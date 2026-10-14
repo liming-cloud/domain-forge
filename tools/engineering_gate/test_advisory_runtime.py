@@ -117,6 +117,39 @@ class AdvisoryRuntimeCommands(unittest.TestCase):
 
 
 class AdvisoryWorkflowChecks(unittest.TestCase):
+    def test_runner_directories_are_initialized_on_runner_before_consumers(self):
+        """job 解析不支持 runner 上下文；真实 shell 须为后续步骤写出已展开的目录。"""
+        workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")
+        for job, directories in (
+            ("advisory-data", {"DOMAIN_FORGE_GATE_ADVISORY_DATA": "domain-forge-advisory-data",
+                               "DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY": "domain-forge-advisory-repository"}),
+            ("mechanism-checks", {"DOMAIN_FORGE_GATE_TOOLS": "domain-forge-engineering-tools",
+                                  "DOMAIN_FORGE_GATE_ADVISORY_DATA": "domain-forge-advisory-data",
+                                  "DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY": "domain-forge-advisory-repository"}),
+        ):
+            with self.subTest(job=job), tempfile.TemporaryDirectory(prefix="domain-forge-ci-env-") as directory:
+                body = re.search(r"^  " + job + r":\n(.*?)(?=^  [a-z][a-z-]*:|\Z)", workflow, re.M | re.S)[1]
+                header, steps = body.split("    steps:\n", 1)
+                self.assertNotIn("${{ runner.", header, "job 级环境不能引用 runner 上下文")
+                blocks = re.findall(r"^      - (?:name|uses):.*?(?=^      - |\Z)", steps, re.M | re.S)
+                init = [step for step in blocks if "DOMAIN_FORGE_GATE_ADVISORY_DATA=" in step]
+                self.assertEqual(len(init), 1, "原生目录须在 runner 上唯一初始化")
+                self.assertNotRegex(init[0], r"(?m)^        if:", "目录初始化不能跳过")
+                self.assertIn("        shell: bash\n", init[0])
+                consumers = [step for step in blocks if "actions/cache/" in step or "calibrate_source.py prepare" in step]
+                self.assertTrue(all(blocks.index(init[0]) < blocks.index(step) for step in consumers),
+                                "目录初始化必须先于缓存及工具使用")
+                script = re.search(r"^        run: \|\n((?:^          .*\n)+)", init[0], re.M)[1]
+                script = "\n".join(line[10:] for line in script.splitlines())
+                temporary, environment_file = Path(directory) / "runner with spaces", Path(directory) / "github env"
+                process = subprocess.run(["bash", "-e", "-c", script], capture_output=True, text=True, timeout=5,
+                                         env={"PATH": os.environ["PATH"], "RUNNER_TEMP": str(temporary),
+                                              "GITHUB_ENV": str(environment_file)})
+                self.assertEqual(process.returncode, 0, process.stderr)
+                written = dict(line.split("=", 1) for line in environment_file.read_text().splitlines())
+                self.assertEqual(written, {name: str(temporary / suffix) for name, suffix in directories.items()},
+                                 "runner 目录没有正确展开")
+
     def test_fixed_parallel_groups_keep_all_registered_calibration_commands_once(self):
         self.assert_workflow((HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8"))
 

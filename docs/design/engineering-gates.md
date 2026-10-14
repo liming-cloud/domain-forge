@@ -406,4 +406,6 @@ CI 先按事件精确差异做结构／控制面检查，相关维护变化再�
 
 按[已批准责任](../tasks/control-plane-verification.md#依赖告警当前复验与-ci-前提)，CI 独立准备 job 为 30 分钟，成功后保存资料及插件依赖缓存；运行／重试键唯一，允许恢复同配置缓存但仍更新。常规 job 依赖本轮准备成功并按精确键恢复，缺失失败，预算按实际负载设置。守卫核对已知布局的命令、依赖、预算、缓存失败策略及重复关键配置，不冒充通用 YAML 语义验证。
 
+原生目录在 runner 上由 shell 使用 `RUNNER_TEMP` 写入 `GITHUB_ENV`，先于缓存和工具使用；job 级 `env` 不引用不可用的 `runner` 上下文。回归执行真实 shell 核对含空格路径的展开，并拒绝原上下文错误；工作流解析仍须由真实 GitHub Actions 结果核验。
+
 原生资料可能滞后、限流或不完整；成功更新／扫描不是实时完整或安全保证。NVD 数据源参数见[官方说明](https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html)，插件行为见[官方参数](https://dependency-check.github.io/DependencyCheck/dependency-check-maven/configuration.html)。当前无产品 Maven 工程，产品扫描未执行，不追加安全治理系统或工具细节访谈。

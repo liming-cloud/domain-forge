@@ -1263,6 +1263,10 @@ class CurrentCatalogJourneys(unittest.TestCase):
             changed["checks"]["dependency-risk-mechanism"][field][-1] = "wrong-entry"
             invoke(changed, diagnostic=diagnostic)
         for original, replacement, diagnostic in (
+            ("    outputs:\n      cache-key:", "    env:\n      INVALID_RUNNER_PATH: ${{ runner.temp }}\n    outputs:\n      cache-key:",
+             "job 级环境不能引用 runner 上下文"),
+            ('echo "DOMAIN_FORGE_GATE_TOOLS=$RUNNER_TEMP/', 'echo "DOMAIN_FORGE_GATE_TOOLS=literal-runner-temp/',
+             "runner 目录没有正确展开"),
             ("if: needs.scope-checks.outputs.maintenance-required == 'true'", "if: false", "校准条件必须来自本次差异"),
             ("needs: scope-checks", "needs: unrelated", "校准选择缺少前置核对"),
             ('ci-plan --base "$TASK_EVENT_BASE"', 'route --task control-plane-verification', "CI 不得复用长期任务历史范围"),

@@ -5,9 +5,9 @@
 
 ## 活动与待处理
 
-- [control-plane-verification](control-plane-verification.md#目标与输入)：第五层 delivery-evidence 已接入只读原生 Git／GitHub Actions 对象核对及公开入口；本轮固定输入、本地反例、使用路径和语义复核以 .run-artifacts/delivery-evidence 的材料为准。之前工程适配完整执行只证明其原固定输入，未当作本轮重跑结果。尚未进入业务研发或 Git 交付。
-- control-plane-verification 待处理：真实交付候选、对应远端 Git／GitHub Actions 运行及有效人工验收来源仍缺失；delivery-evidence 对缺少查询对象返回非零，协议夹具和来源关联核对不能替代真实 CI、人工真实性或验收
-- control-plane-verification 待处理：整套第五层须在固定交付候选、全部适用结果及 Git/CI 事实齐备后由用户验收；本轮仅完成交付适配本地验证，不重标此前整体输入为当前通过，不提交推送
+- [control-plane-verification](control-plane-verification.md#目标与输入)：第五层已在固定输入 cd335810556e6bc186d6452c14b92b1a29658f4a3f8fe180d1498585782f4ad6 完成本地适用验证与普通语义评审，材料见 .run-artifacts/fifth-layer-local-validation。该候选已按授权提交推送；首次真实 CI 在创建 job 前拒绝 job 级 runner 上下文。本轮限定修复目录初始化并补回归，真实结果按当前提交及其 CI 对象重新核验，不把旧报告重标为新输入完整通过。
+- control-plane-verification 待处理：修复候选仍须对应当前远端 Git、完整 GitHub Actions 运行及 delivery-evidence 实际核验；失败运行保留，不能以总绿灯、协议夹具或旧输入结果代替
+- control-plane-verification 待处理：整套第五层人工验收及验收后记录收尾仍未完成；候选提交推送与 CI 核验授权不产生验收事实，也不授权进入业务研发
 
 ## 归档查询
 

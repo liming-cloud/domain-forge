@@ -44,9 +44,6 @@ jobs:
     if: needs.scope-checks.outputs.maintenance-required == 'true'
     outputs:
       cache-key: ${{ steps.cache-key.outputs.value }}
-    env:
-      DOMAIN_FORGE_GATE_ADVISORY_DATA: ${{ runner.temp }}/domain-forge-advisory-data
-      DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY: ${{ runner.temp }}/domain-forge-advisory-repository
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -58,6 +55,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21.0.12+101.0.LTS'
+      - name: 设置本轮原生告警目录
+        shell: bash
+        run: |
+          echo "DOMAIN_FORGE_GATE_ADVISORY_DATA=$RUNNER_TEMP/domain-forge-advisory-data" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY=$RUNNER_TEMP/domain-forge-advisory-repository" >> "$GITHUB_ENV"
       - name: 当前准备的唯一原生缓存键
         id: cache-key
         shell: bash
@@ -96,10 +98,6 @@ jobs:
       fail-fast: false
       matrix:
         group: [source, build, architecture, dependencies, roles, methods, http, credentials, policies, passwords, migration, persistence-routing, persistence-state, runtime]
-    env:
-      DOMAIN_FORGE_GATE_TOOLS: ${{ runner.temp }}/domain-forge-engineering-tools
-      DOMAIN_FORGE_GATE_ADVISORY_DATA: ${{ runner.temp }}/domain-forge-advisory-data
-      DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY: ${{ runner.temp }}/domain-forge-advisory-repository
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -113,6 +111,12 @@ jobs:
           distribution: temurin
           # 官方 SemVer；实际发行是 21.0.12.1+1，四段版本不是该 Action 的合法输入。
           java-version: '21.0.12+101.0.LTS'
+      - name: 设置本轮原生校准目录
+        shell: bash
+        run: |
+          echo "DOMAIN_FORGE_GATE_TOOLS=$RUNNER_TEMP/domain-forge-engineering-tools" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_GATE_ADVISORY_DATA=$RUNNER_TEMP/domain-forge-advisory-data" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY=$RUNNER_TEMP/domain-forge-advisory-repository" >> "$GITHUB_ENV"
       - name: 获取固定校准工具并核对实际运行时
         run: python -B tools/engineering_gate/calibrate_source.py prepare
       - name: 准备固定 Maven 编译校准环境（不是产品版本基线）
