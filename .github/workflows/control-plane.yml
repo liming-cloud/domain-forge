@@ -311,7 +311,7 @@ jobs:
       - name: 未校准路由及全部跳过请求合同的拒绝反例
         if: matrix.group == 'http'
         run: python -B tools/engineering_gate/test_http_contract.py HttpScopeCommands
-      - name: 原生 Bearer Header、拒绝渠道、前缀及完整分组
+      - name: 原生凭证请求头、拒绝渠道、前缀及完整分组
         if: matrix.group == 'credentials'
         run: python -B tools/engineering_gate/test_sa_access.py AccessTransportCommands AccessPartitionChecks
       - name: 参数和 Cookie 取令牌误配置及真实拒绝反例

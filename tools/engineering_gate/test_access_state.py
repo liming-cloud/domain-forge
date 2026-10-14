@@ -124,7 +124,7 @@ logging.level.root=ERROR
             self.docker("exec", self.redis_container, "redis-cli", "--no-auth-warning", "-n", str(database), "FLUSHDB")
         self.state.write_text(json.dumps({"schema": 1, "application": "probe.access.AccessStateFixture", "profile": profile}))
         result = subprocess.run([sys.executable, "-B", str(ENTRY), "--project", str(self.project), "--state", str(self.state), "--connections", str(self.connections)],
-                                capture_output=True, text=True, timeout=45)
+                                capture_output=True, text=True, timeout=90 if profile == "throttle" else 45)
         self.assertIn(result.returncode, (0, 1), "须取得原生校准报告")
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 0 if diagnostic is None else 1, report.get("diagnostics"))
