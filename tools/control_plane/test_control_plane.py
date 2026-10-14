@@ -1263,6 +1263,8 @@ class CurrentCatalogJourneys(unittest.TestCase):
             changed["checks"]["dependency-risk-mechanism"][field][-1] = "wrong-entry"
             invoke(changed, diagnostic=diagnostic)
         for original, replacement, diagnostic in (
+            (' || { tail -n 200 "$DOMAIN_FORGE_GATE_ADVISORY_DATA/preparation.log" >&2; exit 1; }',
+             '', "原生准备失败日志诊断丢失"),
             ("show-download-progress: true", "show-download-progress: false", "setup-java 不得注入隐式 Maven 参数"),
             ("    outputs:\n      cache-key:", "    env:\n      INVALID_RUNNER_PATH: ${{ runner.temp }}\n    outputs:\n      cache-key:",
              "job 级环境不能引用 runner 上下文"),
@@ -1271,7 +1273,7 @@ class CurrentCatalogJourneys(unittest.TestCase):
             ("if: needs.scope-checks.outputs.maintenance-required == 'true'", "if: false", "校准条件必须来自本次差异"),
             ("needs: scope-checks", "needs: unrelated", "校准选择缺少前置核对"),
             ('ci-plan --base "$TASK_EVENT_BASE"', 'route --task control-plane-verification', "CI 不得复用长期任务历史范围"),
-            ("timeout-minutes: 30", "timeout-minutes: 0", "执行须有唯一正整数预算"),
+            ("timeout-minutes: 50", "timeout-minutes: 0", "执行须有唯一正整数预算"),
             ("timeout-minutes: 20", "timeout-minutes: 0", "执行须有唯一正整数预算"),
             ("timeout-minutes: 20", "timeout-minutes: 20\n    timeout-minutes: 30", "执行须有唯一正整数预算"),
             ("needs: advisory-data", "needs: other-job", "资料准备与校准缺少依赖"),

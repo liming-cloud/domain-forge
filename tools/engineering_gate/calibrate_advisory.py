@@ -90,7 +90,7 @@ def native(home, repository, project, data, operation, log):
             try:
                 result = subprocess.run(argv, cwd=project, env=dict(os.environ, MAVEN_SKIP_RC="true"),
                                         stdout=output, stderr=subprocess.STDOUT,
-                                        timeout=1500 if operation == "update-only" else 30)
+                                        timeout=2700 if operation == "update-only" else 30)
                 code = result.returncode
             except subprocess.TimeoutExpired:
                 code = None

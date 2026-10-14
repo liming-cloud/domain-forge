@@ -117,6 +117,31 @@ class AdvisoryRuntimeCommands(unittest.TestCase):
 
 
 class AdvisoryWorkflowChecks(unittest.TestCase):
+    def test_failed_preparation_exposes_bounded_native_log_without_swallowing_failure(self):
+        """执行实际 CI 命令的成功和失败分支；替身仅表示退出码，不作为原生准备证据。"""
+        workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")
+        commands = re.findall(r"^          (python -B tools/engineering_gate/calibrate_advisory.py --prepare .*)$",
+                              workflow, re.M)
+        self.assertEqual(len(commands), 1)
+        with tempfile.TemporaryDirectory(prefix="domain-forge-ci-log-") as directory:
+            data = Path(directory) / "native data"
+            data.mkdir()
+            (data / "preparation.log").write_text("native-first-line\n" + "progress\n" * 200 +
+                                                 "native-failure-detail\n", encoding="utf-8")
+            for code in (0, 1):
+                with self.subTest(exit_code=code):
+                    result = subprocess.run(["bash", "-e", "-c", 'python() { return "$PREPARE_EXIT"; }\n' + commands[0]],
+                                            capture_output=True, text=True, timeout=5,
+                                            env={"PATH": os.environ["PATH"], "PREPARE_EXIT": str(code),
+                                                 "DOMAIN_FORGE_GATE_ADVISORY_DATA": str(data),
+                                                 "TASK_ADVISORY_MAVEN": str(Path(directory) / "maven")})
+                    self.assertEqual(result.returncode, code, "原生准备失败不能被日志输出吞掉")
+                    if code:
+                        self.assertIn("native-failure-detail", result.stderr, "原生准备失败日志诊断丢失")
+                        self.assertNotIn("native-first-line", result.stderr, "CI 诊断须限制日志范围")
+                    else:
+                        self.assertEqual(result.stderr, "", "成功分支不应回放失败日志")
+
     def test_setup_java_does_not_inject_implicit_maven_arguments(self):
         """固定 setup-java 默认注入 MAVEN_ARGS，须显式保留校准器的参数边界。"""
         workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")

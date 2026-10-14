@@ -39,7 +39,7 @@ jobs:
   advisory-data:
     name: 原生依赖告警资料准备（独立预算，非产品扫描）
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     needs: scope-checks
     if: needs.scope-checks.outputs.maintenance-required == 'true'
     outputs:
@@ -80,7 +80,7 @@ jobs:
           python -B tools/engineering_gate/calibrate_maven.py --prepare "$TASK_MAVEN_ROOT" > "$RUNNER_TEMP/domain-forge-advisory-maven.json" || { cat "$RUNNER_TEMP/domain-forge-advisory-maven.json"; exit 1; }
           TASK_ADVISORY_MAVEN="$(jq -r .maven_home "$RUNNER_TEMP/domain-forge-advisory-maven.json")"
           mkdir -p "$DOMAIN_FORGE_GATE_ADVISORY_DATA" "$DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY"
-          python -B tools/engineering_gate/calibrate_advisory.py --prepare "$DOMAIN_FORGE_GATE_ADVISORY_DATA" --maven-home "$TASK_ADVISORY_MAVEN"
+          python -B tools/engineering_gate/calibrate_advisory.py --prepare "$DOMAIN_FORGE_GATE_ADVISORY_DATA" --maven-home "$TASK_ADVISORY_MAVEN" || { tail -n 200 "$DOMAIN_FORGE_GATE_ADVISORY_DATA/preparation.log" >&2; exit 1; }
           python -B tools/engineering_gate/calibrate_advisory.py --environment --maven-home "$TASK_ADVISORY_MAVEN"
       - name: 仅保存成功准备的原生缓存
         if: success()

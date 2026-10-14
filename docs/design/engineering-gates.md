@@ -400,14 +400,16 @@ CI 先按事件精确差异做结构／控制面检查，相关维护变化再�
 - 保留原生自动更新；不新增漏洞服务账号，关闭要求账号的 OSS Index 分析器。锁定版本使用原生支持的 NVD 2.0 JSON 数据源，不自研下载、导入、评分或上游规则审计。
 - [配置测试](../../tools/engineering_gate/test_maven_advisory.py)与[原生测试](../../tools/engineering_gate/test_advisory_runtime.py)分开。正常扫描核对实际组件及报告，不要求永久零漏洞；漏洞反例须定位目标原生告警，资料缺失以原生 NoDataException 拒绝，新工程整改恢复。
 
-[告警薄入口](../../tools/engineering_gate/calibrate_advisory.py)只提供 update-only 准备、限定 check 校准及环境核对，不接受任意目标或跳过参数。准备用显式仓库外专用目录，原生进程预算 25 分钟，失败／超时保留日志。
+[告警薄入口](../../tools/engineering_gate/calibrate_advisory.py)只提供 update-only 准备、限定 check 校准及环境核对，不接受任意目标或跳过参数。准备用显式仓库外专用目录，原生进程预算 45 分钟，失败／超时保留日志。首次真实 CI 从空缓存准备达到原 25 分钟上限，按[已批准的负载预算原则](../tasks/control-plane-verification.md#执行预算收敛决定)调整；该超时只说明准备未完成，不能推导机制失效或产品质量失败。
 
 校准先拒绝旧输出和偏离配置，将原生数据库复制至临时目录；扫描关闭在线更新及与 Java 夹具无关的 RetireJS，单扫描 30 秒。核对真实 HTML／JSON、组件、版本及输入／配置／环境／原库摘要，原库与失败工程不覆盖。
 
-按[已批准责任](../tasks/control-plane-verification.md#依赖告警当前复验与-ci-前提)，CI 独立准备 job 为 30 分钟，成功后保存资料及插件依赖缓存；运行／重试键唯一，允许恢复同配置缓存但仍更新。常规 job 依赖本轮准备成功并按精确键恢复，缺失失败，预算按实际负载设置。守卫核对已知布局的命令、依赖、预算、缓存失败策略及重复关键配置，不冒充通用 YAML 语义验证。
+按[已批准责任](../tasks/control-plane-verification.md#依赖告警当前复验与-ci-前提)，CI 独立准备 job 为 50 分钟，成功后保存资料及插件依赖缓存；运行／重试键唯一，允许恢复同配置缓存但仍更新。常规 job 依赖本轮准备成功并按精确键恢复，缺失失败，预算按实际负载设置。守卫核对已知布局的命令、依赖、预算、缓存失败策略及重复关键配置，不冒充通用 YAML 语义验证。
 
 原生目录在 runner 上由 shell 使用 `RUNNER_TEMP` 写入 `GITHUB_ENV`，先于缓存和工具使用；job 级 `env` 不引用不可用的 `runner` 上下文。回归执行真实 shell 核对含空格路径的展开，并拒绝原上下文错误；工作流解析仍须由真实 GitHub Actions 结果核验。
 
 固定 `setup-java` 显式设置 `show-download-progress: true`，避免默认注入 `MAVEN_ARGS=-ntp`；校准器继续拒绝隐式 JVM／Maven 参数，不在工具内部静默清除。准备 Maven 失败时回显已保存的 JSON 诊断并保留非零退出，便于区分环境准备与后续断言失败。
+
+原生资料准备失败时，CI 输出专用 `preparation.log` 的末尾 200 行并保持非零退出；成功分支不额外回放日志。失败资料不保存为成功缓存，全部校准、单扫描 30 秒及人工责任保持不变。
 
 原生资料可能滞后、限流或不完整；成功更新／扫描不是实时完整或安全保证。NVD 数据源参数见[官方说明](https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html)，插件行为见[官方参数](https://dependency-check.github.io/DependencyCheck/dependency-check-maven/configuration.html)。当前无产品 Maven 工程，产品扫描未执行，不追加安全治理系统或工具细节访谈。
