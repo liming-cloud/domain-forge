@@ -408,4 +408,6 @@ CI 先按事件精确差异做结构／控制面检查，相关维护变化再�
 
 原生目录在 runner 上由 shell 使用 `RUNNER_TEMP` 写入 `GITHUB_ENV`，先于缓存和工具使用；job 级 `env` 不引用不可用的 `runner` 上下文。回归执行真实 shell 核对含空格路径的展开，并拒绝原上下文错误；工作流解析仍须由真实 GitHub Actions 结果核验。
 
+固定 `setup-java` 显式设置 `show-download-progress: true`，避免默认注入 `MAVEN_ARGS=-ntp`；校准器继续拒绝隐式 JVM／Maven 参数，不在工具内部静默清除。准备 Maven 失败时回显已保存的 JSON 诊断并保留非零退出，便于区分环境准备与后续断言失败。
+
 原生资料可能滞后、限流或不完整；成功更新／扫描不是实时完整或安全保证。NVD 数据源参数见[官方说明](https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html)，插件行为见[官方参数](https://dependency-check.github.io/DependencyCheck/dependency-check-maven/configuration.html)。当前无产品 Maven 工程，产品扫描未执行，不追加安全治理系统或工具细节访谈。

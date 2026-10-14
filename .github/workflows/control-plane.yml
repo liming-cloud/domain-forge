@@ -55,6 +55,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21.0.12+101.0.LTS'
+          show-download-progress: true
       - name: 设置本轮原生告警目录
         shell: bash
         run: |
@@ -76,7 +77,7 @@ jobs:
         shell: bash
         run: |
           TASK_MAVEN_ROOT="$(mktemp -d "$RUNNER_TEMP/domain-forge-advisory-maven.XXXXXX")"
-          python -B tools/engineering_gate/calibrate_maven.py --prepare "$TASK_MAVEN_ROOT" > "$RUNNER_TEMP/domain-forge-advisory-maven.json"
+          python -B tools/engineering_gate/calibrate_maven.py --prepare "$TASK_MAVEN_ROOT" > "$RUNNER_TEMP/domain-forge-advisory-maven.json" || { cat "$RUNNER_TEMP/domain-forge-advisory-maven.json"; exit 1; }
           TASK_ADVISORY_MAVEN="$(jq -r .maven_home "$RUNNER_TEMP/domain-forge-advisory-maven.json")"
           mkdir -p "$DOMAIN_FORGE_GATE_ADVISORY_DATA" "$DOMAIN_FORGE_GATE_ADVISORY_REPOSITORY"
           python -B tools/engineering_gate/calibrate_advisory.py --prepare "$DOMAIN_FORGE_GATE_ADVISORY_DATA" --maven-home "$TASK_ADVISORY_MAVEN"
@@ -111,6 +112,7 @@ jobs:
           distribution: temurin
           # 官方 SemVer；实际发行是 21.0.12.1+1，四段版本不是该 Action 的合法输入。
           java-version: '21.0.12+101.0.LTS'
+          show-download-progress: true
       - name: 设置本轮原生校准目录
         shell: bash
         run: |
@@ -123,7 +125,7 @@ jobs:
         shell: bash
         run: |
           TASK_MAVEN_ROOT="$(mktemp -d "$RUNNER_TEMP/domain-forge-maven.XXXXXX")"
-          python -B tools/engineering_gate/calibrate_maven.py --prepare "$TASK_MAVEN_ROOT" > "$RUNNER_TEMP/domain-forge-maven-runtime.json"
+          python -B tools/engineering_gate/calibrate_maven.py --prepare "$TASK_MAVEN_ROOT" > "$RUNNER_TEMP/domain-forge-maven-runtime.json" || { cat "$RUNNER_TEMP/domain-forge-maven-runtime.json"; exit 1; }
           jq -r '"DOMAIN_FORGE_GATE_MAVEN=\(.maven_home)", "DOMAIN_FORGE_GATE_MAVEN_REPOSITORY=\(.repository)"' "$RUNNER_TEMP/domain-forge-maven-runtime.json" >> "$GITHUB_ENV"
       - name: 准备固定官方 Wrapper 发行（仅隔离机制校准）
         shell: bash

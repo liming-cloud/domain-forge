@@ -1263,6 +1263,7 @@ class CurrentCatalogJourneys(unittest.TestCase):
             changed["checks"]["dependency-risk-mechanism"][field][-1] = "wrong-entry"
             invoke(changed, diagnostic=diagnostic)
         for original, replacement, diagnostic in (
+            ("show-download-progress: true", "show-download-progress: false", "setup-java 不得注入隐式 Maven 参数"),
             ("    outputs:\n      cache-key:", "    env:\n      INVALID_RUNNER_PATH: ${{ runner.temp }}\n    outputs:\n      cache-key:",
              "job 级环境不能引用 runner 上下文"),
             ('echo "DOMAIN_FORGE_GATE_TOOLS=$RUNNER_TEMP/', 'echo "DOMAIN_FORGE_GATE_TOOLS=literal-runner-temp/',

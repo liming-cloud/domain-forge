@@ -117,6 +117,15 @@ class AdvisoryRuntimeCommands(unittest.TestCase):
 
 
 class AdvisoryWorkflowChecks(unittest.TestCase):
+    def test_setup_java_does_not_inject_implicit_maven_arguments(self):
+        """固定 setup-java 默认注入 MAVEN_ARGS，须显式保留校准器的参数边界。"""
+        workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")
+        setup = re.findall(r"^      - uses: actions/setup-java@.*?(?=^      - |\Z)", workflow, re.M | re.S)
+        self.assertEqual(len(setup), 2)
+        for step in setup:
+            self.assertEqual(re.findall(r"^          show-download-progress: (.*)$", step, re.M), ["true"],
+                             "setup-java 不得注入隐式 Maven 参数")
+
     def test_runner_directories_are_initialized_on_runner_before_consumers(self):
         """job 解析不支持 runner 上下文；真实 shell 须为后续步骤写出已展开的目录。"""
         workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")
