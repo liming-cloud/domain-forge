@@ -118,24 +118,40 @@ public final class RuntimeInventory {
       report.put("initial", value(alpha));
       report.put("isolated", value(beta));
       publisher.publishConfig("gate.properties", firstGroup, "probe.value=alpha-2");
-      await(() -> value(alpha).equals("alpha-2"));
+      await("updated", () -> value(alpha).equals("alpha-2"));
       report.put("updated", value(alpha));
       report.put("afterUpdateOther", value(beta));
       disconnected(file, publisher, firstGroup, alpha, report);
-      Files.createFile(failure);
-      publisher.publishConfig("gate.properties", firstGroup, "probe.value=alpha-3");
-      await(() -> "alpha-3".equals(alpha.getEnvironment().getProperty("probe.value")));
-      report.put("applicationFailure", value(alpha));
-      report.put("receivedDuringFailure", alpha.getEnvironment().getProperty("probe.value"));
-      Files.delete(failure);
+      applicationFailure(failure, publisher, firstGroup, alpha, report);
       publisher.publishConfig("gate.properties", firstGroup, "probe.value=alpha-4");
-      await(() -> value(alpha).equals("alpha-4"));
+      await("recovery", () -> value(alpha).equals("alpha-4"));
       report.put("recovered", value(alpha));
       report.put("afterRecoveryOther", value(beta));
     } finally {
       publisher.shutDown();
     }
     return report;
+  }
+
+  /** 配置已到达后观察真实应用依赖故障，移除故障标记供后续恢复。 */
+  private static void applicationFailure(
+      Path failure,
+      ConfigService publisher,
+      String group,
+      ConfigurableApplicationContext alpha,
+      Map<String, Object> report)
+      throws Exception {
+    Files.createFile(failure);
+    if (!publisher.publishConfig("gate.properties", group, "probe.value=alpha-3")) {
+      throw new IllegalStateException("actual-config-publication-rejected");
+    }
+    await(
+        "received-failure",
+        () -> "alpha-3".equals(alpha.getEnvironment().getProperty("probe.value")));
+    await("applied-failure", () -> value(alpha).equals("application-unavailable"));
+    report.put("applicationFailure", value(alpha));
+    report.put("receivedDuringFailure", alpha.getEnvironment().getProperty("probe.value"));
+    Files.delete(failure);
   }
 
   /** 从独立客户端观察未缓存的已存在配置，确认连接故障而非内容不存在。 */
@@ -150,7 +166,7 @@ public final class RuntimeInventory {
       throw new IllegalStateException("required-config-not-published");
     }
     Files.writeString(file.resolveSibling("disconnect.request"), "pause-owned-service");
-    await(() -> Files.exists(file.resolveSibling("disconnect.ready")));
+    await("disconnect", () -> Files.exists(file.resolveSibling("disconnect.ready")));
     boolean unavailable;
     try {
       unavailable = publisher.getConfig("uncached-required.properties", firstGroup, 1500) == null;
@@ -160,7 +176,8 @@ public final class RuntimeInventory {
     report.put("disconnectedFetchUnavailable", unavailable);
     report.put("cachedDuringDisconnect", value(alpha));
     Files.writeString(file.resolveSibling("reconnect.request"), "resume-owned-service");
-    await(() -> Files.exists(file.resolveSibling("reconnect.ready")));
+    await("reconnect", () -> Files.exists(file.resolveSibling("reconnect.ready")));
+    await("reconnect-publisher", () -> "UP".equals(publisher.getServerStatus()));
   }
 
   /** 引导输入只包含必要连接及隔离信息，不覆盖权威发布内容。 */
@@ -186,12 +203,12 @@ public final class RuntimeInventory {
     }
   }
 
-  /** 轮询真实行为，固定观察期限内没有生效即失败。 */
-  private static void await(BooleanSupplier condition) throws InterruptedException {
+  /** 轮询真实行为，固定观察期限内没有生效即报告具体失败阶段。 */
+  private static void await(String stage, BooleanSupplier condition) throws InterruptedException {
     long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
     while (!condition.getAsBoolean()) {
       if (System.nanoTime() > deadline) {
-        throw new IllegalStateException("actual-application-did-not-converge");
+        throw new IllegalStateException("actual-application-did-not-converge:" + stage);
       }
       Thread.sleep(100);
     }

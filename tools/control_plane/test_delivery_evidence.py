@@ -108,6 +108,27 @@ class DeliveryObjectsTests(unittest.TestCase):
         self.assertEqual(before, self.fixture.git("status", "--porcelain=v1"))
         self.assertEqual(self.fixture.git("rev-parse", "HEAD").strip(), self.sha)
 
+    def test_unexpanded_skipped_matrix_name_supports_candidate_and_record_ci(self):
+        # 真实 GitHub 的跳过 job 保留矩阵表达式；这里只重放该协议形态。
+        name = "隔离门禁校准 / ${{ matrix.group }}（非整套验收）"
+        self.jobs[31][-1]["name"] = name
+        self.assertEqual(self.inspect()["technical_status"], "candidate-checked")
+        self.closing()
+        self.jobs[32][-1]["name"] = name
+        self.assertEqual(self.inspect()["technical_status"], "closing-checked")
+
+    def test_unexpanded_matrix_cannot_hide_required_execution_or_wrong_status(self):
+        original = copy.deepcopy(self.jobs[31][-1])
+        name = "隔离门禁校准 / ${{ matrix.group }}（非整套验收）"
+        for status in ("success", "failure", "cancelled"):
+            self.jobs[31][-1] = dict(original, name=name, conclusion=status)
+            self.inspect("CP_DELIVERY_CI_COVERAGE")
+        self.jobs[31][-1] = dict(original, name="隔离门禁校准 / unknown（非整套验收）")
+        self.inspect("CP_DELIVERY_CI_COVERAGE")
+        self.jobs[31][-1] = dict(original, name=name)
+        self.runs[31]["event"] = "workflow_dispatch"
+        self.inspect("CP_DELIVERY_CI_COVERAGE")
+
     def test_dirty_and_hidden_tracked_change_are_rejected_then_repaired(self):
         path = self.root / "README.md"
         old = path.read_bytes()

@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import json
 import os
 import pathlib
+import re
 import secrets
 import socket
 import subprocess
@@ -141,8 +142,11 @@ def execute_probe(args, root, classes, classpath, connection=None, container=Non
     if connection:
         password = next(line.split("=", 1)[1] for line in connection.read_text().splitlines() if line.startswith("password="))
         diagnostic = diagnostic.replace(password, "<redacted>")
+    phase = re.search(r"actual-application-did-not-converge:([a-z-]+)", diagnostic)
+    require("actual-config-publication-rejected" not in diagnostic, "SG_RUNTIME_CONFIGURATION",
+            "真实配置发布未被接受，不能以等待通知代替发布成功")
     require("actual-application-did-not-converge" not in diagnostic, "SG_RUNTIME_CONFIGURATION",
-            "配置已发布但实际应用没有在声明观察期限内生效")
+            "配置观察未在声明期限内收敛，阶段：" + (phase[1] if phase else "unknown"))
     require(process.returncode == 0 and output.is_file(), "SG_RUNTIME_EXECUTION", "真实运行未完成：" + diagnostic[-5000:])
     return calibrate_http.read_json(output), logs
 

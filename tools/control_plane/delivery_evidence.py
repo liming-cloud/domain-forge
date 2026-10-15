@@ -188,8 +188,9 @@ def verify_jobs(api, run, expected):
         require(job.get("run_id") == run["id"] and job.get("head_sha") == run["head_sha"],
                 "CP_DELIVERY_CI_INPUT", "CI job 不属于该次运行／提交")
         spec = expected.get(job["name"])
-        # GitHub 在 job-level if 为 false 时可能不展开矩阵，只返回空 group 的跳过对象。
-        skipped_matrix = job["name"] == "隔离门禁校准 / （非整套验收）" and not any(
+        # GitHub 跳过整个矩阵时可能保留原表达式或空 group；只允许校准不适用的跳过对象。
+        skipped_matrix = job["name"] in ("隔离门禁校准 / （非整套验收）",
+                                       "隔离门禁校准 / ${{ matrix.group }}（非整套验收）") and not any(
             value["required"] for name, value in expected.items() if name.startswith("隔离门禁校准 / "))
         require(spec is not None or skipped_matrix, "CP_DELIVERY_CI_COVERAGE", "出现未识别 CI job")
         if skipped_matrix or not spec["required"]:

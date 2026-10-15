@@ -65,6 +65,33 @@ class RuntimeNacosCommands(RuntimeFixtures):
         self.assertEqual(result["observed"]["applicationFailure"], "application-unavailable")
         self.assertTrue(result["observed"]["disconnectedFetchUnavailable"])
 
+    def test_received_environment_before_scope_refresh_waits_for_application_failure(self):
+        path = self.root / "RuntimeFixture.java"
+        marker = "public static class RemoteConfiguration {"
+        listener = """
+    @Bean
+    public org.springframework.context.ApplicationListener<
+        org.springframework.cloud.context.environment.EnvironmentChangeEvent> delayedRefresh(
+            org.springframework.core.env.Environment environment) {
+      return event -> {
+        if ("alpha-3".equals(environment.getProperty("probe.value"))) {
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(error);
+          }
+        }
+      };
+    }
+"""
+        # 保留真实 Spring 刷新，仅稳定放大环境已更新、作用域尚未刷新的间隔。
+        source = path.read_text()
+        self.assertEqual(source.count(marker), 1)
+        path.write_text(source.replace(marker, marker + listener, 1))
+        result = self.command()
+        self.assertEqual(result["observed"]["applicationFailure"], "application-unavailable")
+
     def test_local_value_cannot_replace_authoritative_applied_value(self):
         self.violation_and_repair('return value;', 'return "local-default";', "SG_RUNTIME_CONFIGURATION")
 
