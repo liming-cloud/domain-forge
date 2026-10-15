@@ -1,0 +1,17 @@
+{
+  "schema": 3,
+  "modules": [
+    {
+      "id": "boot",
+      "package": "org.domainforge.boot",
+      "kind": "assembly",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.boot.DomainForgeApplication"
+      ],
+      "contract_members": [
+        "org.domainforge.boot.DomainForgeApplication.main([Ljava.lang.String;):void"
+      ]
+    }
+  ]
+}

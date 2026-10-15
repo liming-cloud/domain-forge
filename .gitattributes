@@ -1,0 +1,3 @@
+# 官方 Wrapper 按分发原始字节校验，禁止 Git 自动转换换行。
+mvnw -text
+mvnw.cmd -text

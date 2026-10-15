@@ -35,6 +35,9 @@ class DeliveryObjectsTests(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.root = self.fixture.root
+        self.fixture.catalog["classifiers"].append({"glob": ".github/workflows/*.yml",
+                                                    "purpose": "governance", "scopes": ["documentation"]})
+        self.fixture.save_catalog()
         self.fixture.write(delivery.WORKFLOW, (ENTRY.parents[2] / delivery.WORKFLOW).read_text())
         self.fixture.git("remote", "add", "origin", "https://github.com/example/delivery.git")
         self.fixture.render_indices()
@@ -354,10 +357,10 @@ jobs:
             delivery.verify_jobs(ProtocolFixture(), run, expected)
         self.assertEqual(error.exception.diagnostic["code"], "CP_DELIVERY_CI_FAILED")
 
-    def test_actual_workflow_has_sixteen_jobs_and_group_specific_assertions(self):
+    def test_actual_workflow_has_seventeen_jobs_and_group_specific_assertions(self):
         workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
-        plan = delivery.workflow_contract(workflow, True)
-        self.assertEqual(len(plan), 16)
+        plan = delivery.workflow_contract(workflow, True, True)
+        self.assertEqual(len(plan), 17)
         self.assertTrue(all(item["required"] for item in plan.values()))
         runtime = plan["隔离门禁校准 / runtime（非整套验收）"]["steps"]
         self.assertTrue(runtime["runtime-nacos-tests"])
@@ -365,6 +368,43 @@ jobs:
         normal = delivery.workflow_contract(workflow, False)
         self.assertEqual([name for name, value in normal.items() if value["required"]],
                          ["文档一致性与本次变更范围（非任务验收）"])
+
+    def test_product_job_and_steps_are_required_only_when_product_applies(self):
+        workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
+        expected = delivery.workflow_contract(workflow, False, True)
+        run = dict(id=31, run_attempt=1, head_sha="a" * 40)
+        valid = [dict(id=index, run_id=31, head_sha=run["head_sha"], name=name,
+                      status="completed", conclusion="success",
+                      steps=[dict(name=step, status="completed", conclusion="success") for step in spec["steps"]])
+                 for index, (name, spec) in enumerate(expected.items()) if spec["required"]]
+        jobs = copy.deepcopy(valid)
+        class ProductFixture:
+            def get(self, path):
+                return {"total_count": len(jobs), "jobs": jobs}
+        self.assertEqual(len(delivery.verify_jobs(ProductFixture(), run, expected)), 2)
+        for fault in ("missing", "skipped", "failure", "missing-step", "skipped-step"):
+            jobs = copy.deepcopy(valid)
+            product = next(job for job in jobs if job["name"] == "最小真实工程质量与运行验证")
+            if fault == "missing":
+                jobs.remove(product)
+            elif fault in {"skipped", "failure"}:
+                product["conclusion"] = fault
+            elif fault == "missing-step":
+                product["steps"].pop()
+            else:
+                product["steps"][-1]["conclusion"] = "skipped"
+            with self.subTest(fault=fault), self.assertRaises(delivery.Rejected):
+                delivery.verify_jobs(ProductFixture(), run, expected)
+
+    def test_legacy_workflow_remains_readable_but_cannot_prove_product_execution(self):
+        workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
+        import re
+        legacy = re.sub(r"^  product-checks:\n.*?(?=^  advisory-data:)", "", workflow, flags=re.M | re.S)
+        plan = delivery.workflow_contract(legacy, True)
+        self.assertEqual(len(plan), 16)
+        with self.assertRaises(delivery.Rejected) as error:
+            delivery.workflow_contract(legacy, True, True)
+        self.assertEqual(error.exception.diagnostic["code"], "CP_DELIVERY_WORKFLOW")
 
     def test_attempt_specific_pagination_rejects_truncation_duplicate_and_other_input(self):
         run = dict(id=31, run_attempt=2, head_sha="a" * 40)

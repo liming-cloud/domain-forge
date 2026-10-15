@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "scope": "minimal-engineering-product",
+  "java": {
+    "vendor": "Eclipse Adoptium",
+    "runtime_version": "21.0.12.1+1-LTS",
+    "release": 21,
+    "platforms": [
+      "Darwin-arm64",
+      "Linux-x86_64"
+    ],
+    "license": "GPLv2 with Classpath Exception",
+    "source": "https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.12.1%2B1"
+  },
+  "maven": {
+    "version": "3.9.16",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.zip",
+    "sha256": "5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce",
+    "sha512": "ed41650d42485cfc243fad22158caf9cbb5dc408ce7a09ddb94dd42a019de929ca43065bfa450612cf12bf78b5cafa3884b96c090de326ff590448c933454af3",
+    "source": "https://maven.apache.org/docs/history.html",
+    "core_sha256": "5d45c72e3dbfab8b68d15ad4f12777b7d9b5fe4d4adc99c3bd51fb9641fab009"
+  },
+  "wrapper": {
+    "version": "3.3.4",
+    "source": "https://maven.apache.org/tools/wrapper/",
+    "distribution_sha256": "6cb584c2bc907b849a0b931d8266d3ff3214cdd3127115ed4f49fb7176413d36",
+    "scripts": {
+      "mvnw": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
+      "mvnw.cmd": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c"
+    }
+  },
+  "required_tests": [
+    "org.domainforge.boot.ApplicationHealthTest#healthIsUpWithoutExternalServicesAndManagementDetails"
+  ],
+  "sources": {
+    "boot": "https://docs.spring.io/spring-boot/4.0/system-requirements.html",
+    "plugins": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/4.0.8/spring-boot-dependencies-4.0.8.pom"
+  },
+  "boot_version": "4.0.8",
+  "plugins": {
+    "compiler": "3.14.1",
+    "resources": "3.3.1",
+    "surefire": "3.5.6",
+    "jar": "3.4.2"
+  },
+  "python": "3.14.5"
+}

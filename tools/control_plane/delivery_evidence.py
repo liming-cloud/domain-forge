@@ -89,19 +89,21 @@ def repository(root):
     return match[1]
 
 
-def condition(expression, group, calibration):
+def condition(expression, group, calibration, product=False):
     """只解释当前受支持工作流的条件；新增语法须补适配，不能默认视为已执行。"""
-    if expression in (None, "success()"):
+    if expression in (None, "success()", "always()"):
         return True
     if expression == "needs.scope-checks.outputs.maintenance-required == 'true'":
         return calibration
+    if expression == "needs.scope-checks.outputs.product-required == 'true'":
+        return product
     terms = expression.split(" || ")
     matches = [re.fullmatch(r"matrix\.group == '([a-z-]+)'", term) for term in terms]
     require(all(matches), "CP_DELIVERY_WORKFLOW", "未支持的工作流条件")
     return any(match[1] == group for match in matches)
 
 
-def workflow_contract(text, calibration):
+def workflow_contract(text, calibration, product=False):
     """从固定候选工作流读取 job／命名 step；限定当前缩进和单轴矩阵，拒绝歧义。"""
     require("continue-on-error:" not in text, "CP_DELIVERY_WORKFLOW", "交付核对不支持忽略失败")
     require(text.count("\njobs:\n") == 1, "CP_DELIVERY_WORKFLOW", "须有唯一普通 jobs 对象")
@@ -141,15 +143,17 @@ def workflow_contract(text, calibration):
             elif line.startswith("        if: ") and step is not None:
                 require(step["condition"] is None, "CP_DELIVERY_WORKFLOW", "重复 step 条件")
                 step["condition"] = line[12:]
-    require(set(jobs) == {"scope-checks", "advisory-data", "mechanism-checks"},
+    legacy = {"scope-checks", "advisory-data", "mechanism-checks"}
+    require(set(jobs) in (legacy, legacy | {"product-checks"}) and (not product or "product-checks" in jobs),
             "CP_DELIVERY_WORKFLOW", "工作流 job 结构不在当前支持范围")
     expected = {}
     for identifier, job in jobs.items():
         require(job.get("needs") == {"scope-checks": None, "advisory-data": "scope-checks",
-                                     "mechanism-checks": "advisory-data"}[identifier],
+                                     "mechanism-checks": "advisory-data", "product-checks": "scope-checks"}[identifier],
                 "CP_DELIVERY_WORKFLOW", "未支持的 job 依赖")
-        require(job["condition"] == ("needs.scope-checks.outputs.maintenance-required == 'true'"
-                                     if identifier == "advisory-data" else None),
+        required_condition = {"advisory-data": "needs.scope-checks.outputs.maintenance-required == 'true'",
+                              "product-checks": "needs.scope-checks.outputs.product-required == 'true'"}.get(identifier)
+        require(job["condition"] == required_condition,
                 "CP_DELIVERY_WORKFLOW", "job 条件偏离当前校准选择合同")
         require((job["groups"] is not None) == (identifier == "mechanism-checks"),
                 "CP_DELIVERY_WORKFLOW", "矩阵位置不在支持范围")
@@ -158,10 +162,10 @@ def workflow_contract(text, calibration):
             name = job["name"].replace("${{ matrix.group }}", group or "")
             require("${{" not in name, "CP_DELIVERY_WORKFLOW", "不支持动态 job 名称")
             require(name not in expected, "CP_DELIVERY_WORKFLOW", "重复 job 名称")
-            steps = {item["name"]: condition(item["condition"], group, calibration) for item in job["steps"]}
+            steps = {item["name"]: condition(item["condition"], group, calibration, product) for item in job["steps"]}
             require(len(steps) == len(job["steps"]), "CP_DELIVERY_WORKFLOW", "重复 step 名称")
-            required = condition(job["condition"], group, calibration)
-            expected[name] = {"required": required and (calibration or identifier == "scope-checks"), "steps": steps}
+            required = condition(job["condition"], group, calibration, product)
+            expected[name] = {"required": required and (identifier in {"scope-checks", "product-checks"} or calibration), "steps": steps}
     return expected
 
 
@@ -209,7 +213,7 @@ def verify_jobs(api, run, expected):
     return jobs
 
 
-def verify_run(api, root, run_id, sha, branch, calibration):
+def verify_run(api, root, run_id, sha, branch, calibration, product=False):
     """核对固定工作流及最新 attempt，调用末尾再次读取以识别重跑／状态漂移。"""
     require(type(run_id) is int and run_id > 0, "CP_DELIVERY_QUERY", "须提供真实正整数 CI run ID")
     run = api.get(f"actions/runs/{run_id}")
@@ -221,7 +225,9 @@ def verify_run(api, root, run_id, sha, branch, calibration):
     require(type(run.get("run_attempt")) is int and run["run_attempt"] > 0 and
             run.get("status") == "completed" and run.get("conclusion") == "success",
             "CP_DELIVERY_CI_FAILED", "CI 未完成、失败或 attempt 无效")
-    expected = workflow_contract(git(root, "show", f"{sha}:{WORKFLOW}"), calibration or run["event"] == "workflow_dispatch")
+    workflow = git(root, "show", f"{sha}:{WORKFLOW}")
+    expected = workflow_contract(workflow, calibration or run["event"] == "workflow_dispatch",
+                                 product or (run["event"] == "workflow_dispatch" and "  product-checks:" in workflow))
     jobs = verify_jobs(api, run, expected)
     return run, jobs
 
@@ -301,13 +307,18 @@ def inspect_delivery(plane, identifier, query_path=None, api_factory=GitHub):
         calibration = plane.maintenance_changed(
             git(root, "diff", "--name-only", "--no-renames", "-z", task["base"], functional, "--").split("\0"),
             task["base"], read_git=git)
-        observed = [verify_run(api, root, query.get("functional_run_id"), functional, query["branch"], calibration)]
+        product = plane.product_changed(git(root, "diff", "--name-only", "--no-renames", "-z",
+                                            task["base"], functional, "--").split("\0"), task["base"], read_git=git)
+        observed = [verify_run(api, root, query.get("functional_run_id"), functional, query["branch"], calibration, product)]
         if accepted:
             observed.append(verify_run(api, root, query.get("record_run_id"), head, query["branch"], False))
         for run, jobs in observed:
             require(api.get(f"actions/runs/{run['id']}") == run, "CP_DELIVERY_CI_CHANGED", "核对期间 CI 被重跑或状态变化")
-            require(verify_jobs(api, run, workflow_contract(git(root, "show", f"{run['head_sha']}:{WORKFLOW}"),
-                    (calibration if run["head_sha"] == functional else False) or run["event"] == "workflow_dispatch")) == jobs,
+            workflow = git(root, "show", f"{run['head_sha']}:{WORKFLOW}")
+            require(verify_jobs(api, run, workflow_contract(workflow,
+                    (calibration if run["head_sha"] == functional else False) or run["event"] == "workflow_dispatch",
+                    (product if run["head_sha"] == functional else False) or
+                    (run["event"] == "workflow_dispatch" and "  product-checks:" in workflow))) == jobs,
                     "CP_DELIVERY_CI_CHANGED", "核对期间 CI job／step 变化")
         require(api.get(branch_path) == remote and repository(root) == repo and
                 clean_head(root) == head and

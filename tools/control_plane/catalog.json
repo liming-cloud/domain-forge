@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "product_ci": {"inputs":["tools/product_gate/**","tools/engineering_gate/**","tools/control_plane/**",".github/workflows/**"],"checks":["build-gate","dependency-risk-gate","behavior-scenarios","runtime-scenarios","product-scenarios"]},
   "reading_order": ["PRODUCT", "REQUIREMENTS", "SYSTEM", "BUILD", "SOURCE", "PERSISTENCE", "HTTP", "ACCESS", "CONFIG", "FAULT", "VERIFY", "DOCS", "TASKS", "AGENT", "REBUILD"],
   "maintenance": {
     "inputs": ["tools/control_plane/**", "tools/engineering_gate/**", ".github/workflows/**", "docs/standards/**", "docs/workflow/**", "docs/design/control-plane-mechanism.md", "docs/design/engineering-gates.md", "AGENTS.md"],
@@ -209,6 +210,7 @@
     {"id":"product-confirmation-boundary","trigger":"使用产品确认范围","scopes":["baseline"],"refs":["PRODUCT#第一层审阅与后续边界"],"checks":["doc-integrity","semantic-review"]}
   ],
   "classifiers": [
+    {"glob":".gitattributes","purpose":"production","scopes":["build"]},
     {"glob":"tools/engineering_gate/calibrate_engineering.py","purpose":"governance","scopes":["governance","architecture","java-source","java-methods","source-format","source-coverage"]},
     {"glob":"tools/engineering_gate/test_engineering.py","purpose":"governance","scopes":["governance","architecture","java-source","java-methods","source-format","source-coverage"]},
     {"glob":"tools/engineering_gate/calibrate_http_consumer.py","purpose":"governance","scopes":["governance","http","http-consumer","contract"]},
@@ -226,7 +228,6 @@
     {"glob":"tools/engineering_gate/ObservationFixture.java","purpose":"governance","scopes":["governance","observability","failure","runtime"]},
     {"glob":"tools/engineering_gate/ObservationTransport.java","purpose":"governance","scopes":["governance","observability","failure","runtime"]},
     {"glob":"tools/engineering_gate/ObservationInventory.java","purpose":"governance","scopes":["governance","observability","failure","runtime"]},
-
     {"glob":"AGENTS.md","purpose":"documentation","scopes":["documentation"]},
     {"glob":"README.md","purpose":"documentation","scopes":["documentation"]},
     {"glob":"REBUILD.md","purpose":"documentation","scopes":["documentation","planning"]},
@@ -314,7 +315,15 @@
     {"glob":"tools/engineering_gate/PersistenceMigrationFixture.java","purpose":"governance","scopes":["governance","build-gate","persistence","multi-datasource","transaction","data-query","data-write","migration","persistence-gate","persistence-calibration","test-gate"]},
     {"glob":"tools/engineering_gate/test_persistence_adapters.py","purpose":"governance","scopes":["governance","build-gate","persistence","multi-datasource","transaction","data-query","data-write","migration","persistence-gate","persistence-calibration","test-gate","tests"]},
     {"glob":".github/workflows/*.yml","purpose":"governance","scopes":["governance","build-gate","tests"]},
-    {"glob":".gitignore","purpose":"governance","scopes":["governance"]}
+    {"glob":".gitignore","purpose":"governance","scopes":["governance"]},
+    {"glob":"pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":".mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"tools/product_gate/**","purpose":"governance","scopes":["governance","build","dependency-risk","tests","runtime"]}
   ],
   "checks": {
     "doc-integrity": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","check"]},
@@ -396,11 +405,11 @@
     "persistence-observer-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_persistence.py","PersistenceObservationNeutralityCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_persistence.py","--environment"]},
     "persistence-input-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_persistence.py","PersistenceInputCommands","PersistenceDeclarationChecks","PersistenceObservationChecks"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_persistence.py","--environment"]},
     "datasource-isolation-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_persistence.py","DatasourceIsolationCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_roles.py","--environment"]},
-    "product-scenarios": {"kind":"scenario","implemented":false,"stage":"product","mechanism_checks":["control-plane-journeys"],"reason":"第六层真实产品场景；第五层使用路径只验证机制，不证明产品结果"},
+    "product-scenarios": {"kind":"automatic","implemented":true,"stage":"product","mechanism_checks":["control-plane-journeys"],"reason":"首个最小真实工程的固定组合执行；具体证据由同次输入报告逐项核对，不代表后续平台能力","argv":["@python","-B","tools/product_gate/verify.py","--project","."],"environment_argv":["@python","-B","tools/product_gate/verify.py","--project",".","--environment"]},
     "architecture-gate": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_engineering.py","EngineeringArchitectureCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_engineering.py","--environment"],"reason":"第五层同次实际构建的模块合同、职责和依赖组合检查；动态入口由具体运行适配覆盖，语义完整性不由自动检查产生"},
-    "behavior-scenarios": {"kind":"scenario","implemented":false,"stage":"product","mechanism_checks":["control-plane-journeys"],"reason":"第六层按真实功能合同及风险执行场景；控制面行为测试和走查不能代替产品结果"},
-    "build-gate": {"kind":"automatic","implemented":false,"stage":"product","mechanism_checks":["build-mechanism","build-test-coverage-tests","build-artifact-tests","build-version-tests","build-resolution-tests","build-input-tests","maven-scope-tests","maven-wrapper-tests","dependency-declaration-tests","dependency-declaration-source-tests","dependency-declaration-input-tests","role-boundary-tests","role-boundary-usage-tests","role-boundary-ownership-tests","role-boundary-input-tests"],"reason":"第六层真实产品 Wrapper、最终解析组合、构建及发布结果；隔离校准不证明产品可消费"},
-    "dependency-risk-gate": {"kind":"automatic","implemented":false,"stage":"product","mechanism_checks":["dependency-risk-mechanism","maven-advisory-configuration-tests"],"reason":"第六层针对实际产品 Maven 工程解析和扫描依赖；配置测试及隔离接入不能替代产品扫描"},
+    "behavior-scenarios": {"kind":"automatic","implemented":true,"stage":"product","mechanism_checks":["control-plane-journeys"],"reason":"首个最小真实工程的固定组合执行；具体证据由同次输入报告逐项核对，不代表后续平台能力","argv":["@python","-B","tools/product_gate/verify.py","--project","."],"environment_argv":["@python","-B","tools/product_gate/verify.py","--project",".","--environment"]},
+    "build-gate": {"kind":"automatic","implemented":true,"stage":"product","mechanism_checks":["build-mechanism","build-test-coverage-tests","build-artifact-tests","build-version-tests","build-resolution-tests","build-input-tests","maven-scope-tests","maven-wrapper-tests","dependency-declaration-tests","dependency-declaration-source-tests","dependency-declaration-input-tests","role-boundary-tests","role-boundary-usage-tests","role-boundary-ownership-tests","role-boundary-input-tests"],"reason":"首个最小真实工程的固定组合执行；具体证据由同次输入报告逐项核对，不代表后续平台能力","argv":["@python","-B","tools/product_gate/verify.py","--project","."],"environment_argv":["@python","-B","tools/product_gate/verify.py","--project",".","--environment"]},
+    "dependency-risk-gate": {"kind":"automatic","implemented":true,"stage":"product","mechanism_checks":["dependency-risk-mechanism","maven-advisory-configuration-tests"],"reason":"首个最小真实工程的固定组合执行；具体证据由同次输入报告逐项核对，不代表后续平台能力","argv":["@python","-B","tools/product_gate/verify.py","--project","."],"environment_argv":["@python","-B","tools/product_gate/verify.py","--project",".","--environment"]},
     "build-mechanism": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_maven_lifecycle.py","MavenLifecycleExecutionCommands","MavenLifecyclePartitionChecks"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_lifecycle.py","--environment"]},
     "build-test-coverage-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_maven_lifecycle.py","MavenLifecycleTestCoverageCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_lifecycle.py","--environment"]},
     "build-artifact-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_maven_lifecycle.py","MavenLifecycleArtifactCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_lifecycle.py","--environment"]},
@@ -435,7 +444,7 @@
     "access-state-new-hash-secret-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_access_state.py","AccessNewHashSecretCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_access_state.py","--environment"]},
     "access-state-failed-login-secret-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_access_state.py","AccessFailedLoginSecretCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_access_state.py","--environment"]},
     "access-gate": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_access_state.py","AccessResourceCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_access_state.py","--environment"],"reason":"真实数据库、原生 Redis DAO 与三个 JVM 的合成访问组合；具体状态场景由其余访问校准共同覆盖，不是第六层产品 IAM 或人工验收"},
-    "runtime-scenarios": {"kind":"scenario","implemented":false,"stage":"product","mechanism_checks":["runtime-mechanism"],"reason":"第六层按真实能力合同及允许环境执行运行场景；适用时缺少环境不放行"},
+    "runtime-scenarios": {"kind":"automatic","implemented":true,"stage":"product","mechanism_checks":["runtime-mechanism"],"reason":"首个最小真实工程的固定组合执行；具体证据由同次输入报告逐项核对，不代表后续平台能力","argv":["@python","-B","tools/product_gate/verify.py","--project","."],"environment_argv":["@python","-B","tools/product_gate/verify.py","--project",".","--environment"]},
     "runtime-mechanism": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_runtime.py","RuntimeAssemblyCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_runtime.py","--environment"],"reason":"第五层实际 Boot 条件装配、覆盖、冲突与能力隔离"},
     "runtime-nacos-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_runtime.py","RuntimeNacosCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_runtime.py","--environment"],"reason":"真实私有 Nacos、标准配置导入、组隔离、刷新、断连及应用失败恢复"},
     "observation-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_observation.py","ObservationCommands"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_observation.py","--environment"],"reason":"原生 SDK 与真实回环接收验证信号、关联、业务分类、故障隔离及恢复操作的新数据"},

@@ -146,7 +146,7 @@ class AdvisoryWorkflowChecks(unittest.TestCase):
         """固定 setup-java 默认注入 MAVEN_ARGS，须显式保留校准器的参数边界。"""
         workflow = (HERE.parents[1] / ".github/workflows/control-plane.yml").read_text(encoding="utf-8")
         setup = re.findall(r"^      - uses: actions/setup-java@.*?(?=^      - |\Z)", workflow, re.M | re.S)
-        self.assertEqual(len(setup), 2)
+        self.assertEqual(len(setup), 3)
         for step in setup:
             self.assertEqual(re.findall(r"^          show-download-progress: (.*)$", step, re.M), ["true"],
                              "setup-java 不得注入隐式 Maven 参数")

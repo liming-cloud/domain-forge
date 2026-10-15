@@ -5,9 +5,9 @@
 
 ## 活动与待处理
 
-- [minimal-engineering](minimal-engineering.md#目标与输入)：第五层已验收并收尾；本任务仅形成首个真实工程单元的设计提案、范围和 12 项验收标准。源码与真实产品 CI 尚未实现；当前等待设计范围确认，不开展业务实现。
-- minimal-engineering 待处理：审阅并确认最小单工程、运行合同、质量检查和 CI 接入范围及 E01—E12 验收标准
-- minimal-engineering 待处理：设计确认后，实施前核查并固定具体 JDK／Maven／Boot／插件组合及环境，再按该单元依赖顺序实施；当前不写业务代码
+- [minimal-engineering](minimal-engineering.md#目标与输入)：2026-10-15 已按批准设计落地最小真实工程、五项产品检查和产品 CI／delivery 适配；当前候选交付按下表核对精确输入的本地及真实 CI 证据，工程人工验收仍待用户决定。
+- minimal-engineering 待处理：本单元完整验证及真实 Git／CI、delivery 结论以本会话提交的精确候选和本次报告为准，不沿用其他输入绿灯
+- minimal-engineering 待处理：提交精确工程候选供人工验收；设计确认不等于工程验收
 
 ## 归档查询
 

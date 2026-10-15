@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-本稿为第六层首个工程单元的设计提案，待人工确认；本轮不创建产品 POM、Java 业务实现或新 CI 工作流。第五层验收与收尾依据见[第五层唯一记录](../tasks/control-plane-verification.md#唯一任务记录)，不以本设计批准代替工程验收。
+本设计的范围及 E01—E12 已于 2026-10-15 获用户明确确认，确认对象为 `146c154`；当前正在实现和验证首个工程单元，具体进度及证据见[任务记录](../tasks/minimal-engineering.md#唯一任务记录)。工程人工验收尚未获得。第五层验收与收尾依据见[第五层唯一记录](../tasks/control-plane-verification.md#唯一任务记录)，不以本设计批准代替工程验收。
 
 目标：让后续每次真实代码变化都能从同一声明入口构建、验证运行行为、执行适用质量检查，并将本地和真实 CI 的证据绑定到精确输入。首个单元交付可运行的工程基础及质量接入，不宣称身份权限、通用能力、起步模板或整个平台已交付。
 
@@ -10,10 +10,10 @@
 
 ## 已知事实与设计依据
 
-- 仓库当前没有真实产品 Maven 工程；第五层的 Java／Maven 输入均为工具校准。校准版本和结果不能直接成为产品版本或兼容性证明。
+- 设计确认时仓库尚无产品 Maven 工程；当前根目录新增真实单工程。第五层 Java／Maven 输入仍是工具校准，其结果不替代本工程执行。
 - 已确认 Java、Maven、Boot 4.0 配套方向，逻辑模块默认按包划分。无需为尚未出现的业务上下文创建空模块、四层目录或入口接口。
-- `ci-plan` 当前遇到真实 production／test 输入以 `CP_CI_PRODUCT_UNWIRED` 拒绝。现有 delivery 适配器仅识别当前三类 job；新增产品 job 时必须同步适配并验证，不能只追加工作流或删掉拒绝。
-- `build-gate`、`dependency-risk-gate`、`behavior-scenarios`、`product-scenarios`、`runtime-scenarios` 目前均未实现产品执行。第五层校准不能把这些字段改成通过。
+- `ci-plan` 按实际 production／test 及共同检查输入触发 `product-checks`；没有有效产品策略仍以 `CP_CI_PRODUCT_UNWIRED` 拒绝。delivery 同步识别产品 job，并保留旧三类 job 的历史读取。
+- 五项产品检查已接入下述真实工程入口，每次完整执行需要本次原生证据；登记已实现不等于当前检查已通过，更不替代人工验收。
 - 复用源码／职责联合入口、构建生命周期观察和原生依赖告警工具；它们的真实工程输入、产物范围和失败语义仍需首个单元验证。
 
 规范入口：[技术与构建](../standards/technology-and-build.md#已确认的主技术栈)、[系统设计](../standards/system-design.md#逻辑模块与依赖门禁)、[源码质量](../standards/source-quality.md#适用范围与阅读入口)、[配置运行](../standards/configuration-and-runtime.md#已确认的配置与启动原则)、[测试验证](../standards/testing-and-verification.md#执行与证据边界)、[任务流程](../workflow/task-execution.md#已确认的验收后推进原则)。当前范围及确认来源见[设计任务](../tasks/minimal-engineering.md#目标与输入)，具体引用由任务最低清单给出，正文不复制规范。
@@ -32,7 +32,7 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 工程组织与方案比较
 
-推荐根目录单工程：`pom.xml`、官方 `.mvn/wrapper` 和脚本、`src/main/java`、`src/main/resources`、`src/test/java`、`src/test/resources`。根包按项目坐标确定，首个真实类型只承担启动／装配职责；质量声明登记真实类型和允许依赖，不复制工具夹具的示例模型。工程坐标和首个固定版本在实现前登记为实际构建输入，当前无外部发布。
+已确认根目录单工程：`pom.xml`、官方 `.mvn/wrapper` 和脚本、`src/main/java`、`src/main/resources`、`src/test/java`、`src/test/resources`。根包按项目坐标确定，首个真实类型只承担启动／装配职责；质量声明登记真实类型和允许依赖，不复制工具夹具的示例模型。实际坐标为 `org.domainforge:domain-forge:0.1.0`，唯一生产类型 `org.domainforge.boot.DomainForgeApplication` 承担启动装配；当前无外部发布。
 
 | 方案 | 收益与代价 | 结论 |
 |---|---|---|
@@ -43,15 +43,15 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 版本与支持环境
 
-建议首个单元以 Java 21 编译目标、Linux CI 与当前 macOS 本地为支持验证范围，使用稳定版 Maven 3.9 系列和已确认 Boot 4.0 系列。确切 JDK 发行版／补丁、Maven 分发和校验、Boot 与必要插件版本，在编写首个 POM 前核对维护来源并集中固定；不得从隔离工具锁机械复制，或用最新版网页替代解析与运行验证。不同 JDK 发行补丁须声明并各自验证，环境缺失不能报告通过。
+产品版本唯一声明为 `tools/product_gate/baseline.json`，原生输入为 POM 和官方 Wrapper 配置：Temurin 21.0.12.1+1-LTS、Java 21 编译目标、Maven 3.9.16、Wrapper 3.3.4、Spring Boot 4.0.8、Python 3.14.5。支持验证范围为 macOS arm64 与 Ubuntu 24.04 x86_64 CI；不同发行补丁必须另行声明并验证。编写 POM 前已核对官方维护来源、下载散列与实际版本，最终依赖及插件由原生解析结果逐项记录，不用网页代替运行证据。
 
-官方 Wrapper 脚本原样使用，分发校验和必要环境预检由明确配置执行；不重写下载器。Windows 脚本可随官方分发保留，但未经运行验证不承诺 Windows 支持。Shell／Python 质量工具的必要环境也须明确。
+官方 Wrapper 脚本原样使用，`.gitattributes` 保持官方脚本原始字节，避免 Git 换行转换破坏校验；分发校验和必要环境预检由明确配置执行；不重写下载器。Windows 脚本可随官方分发保留，但未经运行验证不承诺 Windows 支持。Shell／Python 质量工具的必要环境也须明确。
 
 版本锁定及与既有工具的适配核对属于实现前常规技术工作；若必须改变已确认框架代际、支持范围或质量规则，再提交相应人工决定。设计批准本身不证明具体版本组合可运行。
 
 ## 最小运行合同
 
-推荐使用 Boot Actuator 的原生健康端点作为首个技术探针；框架运维端点按现行 HTTP 规范无需套业务 JSON 外壳。首个单元的受支持运行方式固定使用回环地址，供本地和 CI 启动核验；不开放公共服务、不引入登录入口。交付验证入口拒绝非回环启动目标；只开放健康读取，关闭健康细节及其他管理端点，测试真实 HTTP 响应及不可访问路径。
+使用 Boot Actuator 的原生健康端点作为首个技术探针；框架运维端点按现行 HTTP 规范无需套业务 JSON 外壳。首个单元的受支持运行方式固定使用回环地址，供本地和 CI 启动核验；不开放公共服务、不引入登录入口。交付验证入口拒绝非回环启动目标；只开放健康读取，关闭健康细节及其他管理端点，测试真实 HTTP 响应及不可访问路径。
 
 | 输入／事件 | 必须观察到的结果 |
 |---|---|
@@ -65,7 +65,7 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 质量检查接入
 
-拟提供固定入口 `python3 -B tools/product_gate/verify.py --project .`，供本地和 CI 调用；这是拟建入口，当前尚不存在。入口读取当前任务及实际工程，协调原生 Wrapper、已有检查器和场景测试；不新建通用任务编排平台。开发者可单独运行快速检查，但交付结果只来自完整适用集合。
+固定入口 `python3 -B tools/product_gate/verify.py --project .` 供本地和 CI 调用。入口绑定当前维护输入与实际工程，协调原生 Wrapper、已有检查器和场景测试；不新建通用任务编排平台。开发者可单独运行快速检查，但交付结果只来自完整适用集合。
 
 | 检查责任 | 首个单元的真实对象与证据 | 必须识别的失败 |
 |---|---|---|
@@ -84,13 +84,28 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 使用路径
 
-以下为设计约定，尚未执行：
+使用者按以下步骤复验。具体一次执行是否通过以本次报告为准：
 
 1. 从精确提交建立干净工作副本，按版本基线选择 JDK 和质量工具环境，核对 Wrapper 分发校验。
-2. 开发期间使用 `./mvnw -B -ntp verify` 运行真实 Maven 生命周期；交付前调用拟建的产品验证入口，包含当前适用源码、架构、构建、扫描和场景责任。入口不得接受历史成功报告作为执行替代。
+2. 开发期间使用 `./mvnw -B -ntp verify` 运行真实 Maven 生命周期；交付前调用产品验证入口，包含当前适用源码、架构、构建、扫描和场景责任。入口不得接受历史成功报告作为执行替代。
 3. 运行场景用 `java -jar` 启动该输入打包出的真实 JAR，传入回环绑定和本次隔离端口，检查健康、失败和停机。具体产物名由有效构建解析，不手写猜测。
 4. 生成输入、环境、命令、范围、场景与诊断报告；完成普通语义评审后按授权提交推送，再使用公开 delivery 命令核对远端与 CI。
 5. 人工验收精确工程单元；后续依次增加选定能力的必要设计、真实实现和验收。
+
+本地需要 Bash、Git、`curl` 或 `wget`、上述固定 JDK／Python，以及 Maven Central、原生漏洞资料服务的网络访问。先设置 `JAVA_HOME` 并把同一 JDK 的 `bin` 放在 `PATH` 首位。以下缓存目录必须位于仓库外；源码工具由既有原生锁校验，不把校准结果用作产品结果：
+
+```bash
+export DOMAIN_FORGE_GATE_TOOLS="$(mktemp -d /tmp/domain-forge-source-tools.XXXXXX)"
+python3 -B tools/engineering_gate/calibrate_source.py prepare
+export DOMAIN_FORGE_GATE_ADVISORY_DATA="$(mktemp -d /tmp/domain-forge-product-advisory.XXXXXX)"
+python3 -B tools/product_gate/verify.py --project . --environment
+python3 -B tools/product_gate/verify.py --project . --prepare-data "$DOMAIN_FORGE_GATE_ADVISORY_DATA"
+python3 -B tools/product_gate/verify.py --project .
+```
+
+可选环境变量 `DOMAIN_FORGE_PRODUCT_REPOSITORY`、`DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE` 指向仓库外缓存；未提供时入口建立全新隔离目录。原生资料准备只更新缓存，不生成产品通过结论。入口完整执行真实构建、源码与架构检查、依赖扫描、JAR 场景和原生拒绝反例；`--check` 仅用于定向诊断，不作为完整交付证明。报告给出临时证据目录，包含原生命令日志、Maven 范围观察和原生 HTML／JSON 告警报告。CI 将该目录保存为 `product-evidence`。
+
+日常开发执行 `./mvnw -B -ntp verify`，构建后可用 `java -jar target/domain-forge-0.1.0.jar --server.port=8081` 在 `127.0.0.1` 启动，检查 `/actuator/health` 后以 Ctrl-C 停止。普通 Maven 构建不等于完整质量入口通过。首个单元的公开验证入口只支持 `127.0.0.1`；额外配置文件、环境覆盖和其他网络目标需要先补支持合同。生成工具的临时目录不写入产品工作树，`target` 仅是普通开发构建的输出。
 
 产品验证入口只承担这个真实工程的固定检查组合；`control_plane.py run` 和 CI 通过受控配置调用它或它的固定检查分组，避免自建另一套任务、审批或规则语言。构建与场景的内部步骤及报告复用必须绑定同一输入和环境；独立运行各检查不能借陈旧产物跳过实际责任。
 
@@ -102,13 +117,13 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 下载／环境准备与断言执行分开记录。Maven 下载超时归为依赖准备或网络环境未完成，允许有界重试及有效原生缓存，不认定代码或断言失效；准备未完成时也不报告完整验证通过。缓存命中、空报告或只执行准备不能代替实际检查。
 
-预算按实际工作量调整：首轮量测依赖准备、编译／测试、源码检查、运行及扫描耗时，分别设置合理上限，必要时拆分原生准备；不把原校准进程上限机械套给完整产品构建。保留必要检查和独立断言，不以降低规则解决慢任务；不新建预算治理子项目。
+实际入口分别记录 Wrapper 准备（300 秒）、构建（600 秒）、原生资料准备（2700 秒）、扫描（900 秒）、反例（240 秒）和运行场景耗时；完整入口在控制面内上限为 1800 秒，产品 CI 的 90 分钟上限覆盖单独资料准备与完整执行。上限是防止挂起的边界，不是正常耗时指标。预算按实际工作量调整：首轮量测依赖准备、编译／测试、源码检查、运行及扫描耗时，分别设置合理上限，必要时拆分原生准备；不把原校准进程上限机械套给完整产品构建。保留必要检查和独立断言，不以降低规则解决慢任务；不新建预算治理子项目。
 
 依赖告警资料准备／扫描失败属于该检查未完成；工具发现漏洞与工具执行失败区分。漏洞告警按既有规范输出和处理，不恢复已撤回的自研评分或高等级自动阻断要求。
 
 ## 验收标准
 
-以下均为待实现、待执行的标准，本稿不把任何一项记为通过。
+以下是已确认的验收标准；实际执行结论及待人工决定项在任务记录中逐项列明，标准本身不自报通过。
 
 | 编号 | 通过条件与必要证据 |
 |---|---|
@@ -127,15 +142,15 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 实施顺序与确认事项
 
-1. 确认本稿的首个单元范围和上述验收标准；本次仅设计，不自动触发实现。
+1. 设计、范围和 E01—E12 已获本轮用户确认，按同一单元实施，不扩大业务范围。
 2. 核对并固定最小版本组合与环境，建立单工程、Wrapper 和最小启动／健康合同；保留参数失败与进程清理的真实验证。
 3. 接入真实输入分类、五项适用产品检查及已有源码／架构机制，补齐受本单元触发的具体适配与有效反例。
 4. 接入真实 CI 和 delivery 的对应 job 合同，验证选择和失败路径，完善复验说明；随后按完整交付单元提交人工验收。
 
 四步是同一工程单元的依赖顺序，不新增每步人工审批。若新事实改变产品目标、框架代际、公开合同或安全责任，仅暂停相关取舍并提交决定。
 
-请确认的核心方案：单个无业务功能的真实 Boot 工程，以回环健康和进程生命周期验证运行，将实际源码、构建、扫描和场景接入同一质量入口及 CI；后续平台能力按独立单元逐步加入。确切工具版本和常规配置由实现前调查及验证确定，不能沿用未验证假设。
+已确认核心方案：单个无业务功能的真实 Boot 工程，以回环健康和进程生命周期验证运行，将实际源码、构建、扫描和场景接入同一质量入口及 CI；后续平台能力按独立单元逐步加入。确切工具版本和常规配置由实现前调查及验证确定，不能沿用未验证假设。
 
 ## 一手资料与证据限制
 
-2026-10-15 查阅：Spring Boot 4.0 的 [Actuator 端点文档](https://docs.spring.io/spring-boot/4.0/reference/actuator/endpoints.html)支持原生健康及端点暴露设计；[Maven Failsafe 使用说明](https://maven.apache.org/surefire/maven-failsafe-plugin/usage.html)支持把集成测试纳入 verify 阶段；[官方 Wrapper 说明](https://maven.apache.org/tools/wrapper/)支持固定分发及校验。以上用于设计依据，未据此宣称本项目已实现或版本组合已验证。
+2026-10-15 查阅：Spring Boot 4.0 的 [Actuator 端点文档](https://docs.spring.io/spring-boot/4.0/reference/actuator/endpoints.html)支持原生健康及端点暴露设计；[Maven Failsafe 使用说明](https://maven.apache.org/surefire/maven-failsafe-plugin/usage.html)支持把集成测试纳入 verify 阶段；[官方 Wrapper 说明](https://maven.apache.org/tools/wrapper/)支持固定分发及校验。版本核对另参照 [Boot 4.0 系统要求](https://docs.spring.io/spring-boot/4.0/system-requirements.html)、[Maven 维护记录](https://maven.apache.org/docs/history.html)和 [Temurin 固定发行](https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.12.1%2B1)。这些来源支持版本选择；项目运行结果仍须以实际证据确认。

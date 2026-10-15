@@ -517,19 +517,40 @@ class ControlPlane:
                     matched.remove(CATALOG)
         return bool(matched)
 
+    def product_changed(self, paths, base=None, read_git=git):
+        """产品输入或共同检查实现变化须选择真实产品执行；尚未接入则明确拒绝。"""
+        policy = self.catalog.get("product_ci")
+        if policy is not None:
+            require(isinstance(policy, dict) and set(policy) == {"inputs", "checks"} and
+                    isinstance(policy["inputs"], list) and policy["inputs"] and
+                    all(isinstance(value, str) and value for value in policy["inputs"]) and
+                    isinstance(policy["checks"], list) and policy["checks"] and
+                    all(name in self.catalog["checks"] and self.catalog["checks"][name]["implemented"] and
+                        self.catalog["checks"][name].get("stage") == "product" for name in policy["checks"]),
+                    "CP_CI_PRODUCT_UNWIRED", "产品 CI 选择合同缺少已实现的产品检查")
+        classified = [(path, self.classify(path)[0]["purpose"]) for path in paths if path]
+        metadata_only = base is not None and any(path == CATALOG for path, _ in classified) and not self.maintenance_changed(
+            [CATALOG], base, read_git=read_git)
+        selected = any(purpose in ("production", "test") or
+                       (not (path == CATALOG and metadata_only) and policy and
+                        any(fnmatch.fnmatchcase(path, pattern) for pattern in policy["inputs"]))
+                       for path, purpose in classified)
+        require(not selected or policy is not None, "CP_CI_PRODUCT_UNWIRED",
+                "真实产品 CI 尚未接入，不能仅以文档／校准检查放行")
+        return bool(selected)
+
     def ci_plan(self, base):
-        """只选择本次 CI 校准范围，不把 CI 选择当作任务交付或人工验收。"""
+        """按实际差异选择校准与产品检查；选择本身不代表交付或人工验收。"""
         require(re.fullmatch(r"[0-9a-f]{40,64}", base), "CP_GIT_INPUT", "CI 起点须为事件精确 SHA")
         paths = (sorted(set(git(self.root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0")) - {""})
                  if set(base) == {"0"} else changed_paths(self.root, base))
-        for path in paths:
-            matches = self.classify(path)
-            require(matches[0]["purpose"] not in ("production", "test"), "CP_CI_PRODUCT_UNWIRED",
-                    f"真实产品 CI 尚未接入，不能仅以文档／校准检查放行：{path}")
+        product = self.product_changed(paths, base)
         selected = self.maintenance["checks"] if self.maintenance_changed(paths, base) else []
         return {"ok": True, "proof_scope": "change-based-ci-selection-only", "base": base,
                 "changed_paths": paths, "maintenance_required": bool(selected),
-                "maintenance_checks": sorted(selected), "human_acceptance": False, "diagnostics": []}
+                "maintenance_checks": sorted(selected), "product_required": product,
+                "product_checks": sorted(self.catalog["product_ci"]["checks"]) if product else [],
+                "human_acceptance": False, "diagnostics": []}
 
     def route(self, identifier):
         """合并任务计划、实际差异与语义补充，保留每条引用的命中原因。"""
@@ -709,6 +730,7 @@ class ControlPlane:
         before, inputs = input_snapshot(self.root)
         environment = self.execution_environment(route["required_checks"])
         results, errors, review_text = [], [], None
+        product_executions = {}
         for check in route["required_checks"]:
             definition = self.catalog["checks"][check]
             if definition["kind"] == "review":
@@ -732,7 +754,15 @@ class ControlPlane:
                 if delivery_path is not None:
                     argv += ["--query", str(delivery_path)]
             try:
-                process = subprocess.run(argv, cwd=self.root, capture_output=True, text=True, timeout=180)
+                product = definition.get("stage") == "product"
+                execution_key = tuple(argv)
+                if product and execution_key in product_executions:
+                    process = product_executions[execution_key]
+                else:
+                    process = subprocess.run(argv, cwd=self.root, capture_output=True, text=True,
+                                             timeout=1800 if product else 180)
+                    if product:
+                        product_executions[execution_key] = process
                 executed = {"id": check, "argv": argv, "exit_code": process.returncode,
                             "stdout": process.stdout, "stderr": process.stderr}
                 results.append(executed)
@@ -748,6 +778,12 @@ class ControlPlane:
                     proof = parse_json(process.stdout, check)
                     if not proof.get("ok") or not proof.get("counts", {}).get("documents"):
                         errors.append({"code": "CP_EMPTY_EXECUTION", "message": check})
+                elif product:
+                    proof = parse_json(process.stdout, check)
+                    if not (proof.get("ok") and proof.get("input") == before and
+                            proof.get("proof_scope") == "minimal-engineering-real-product" and
+                            proof.get("checks", {}).get(check, {}).get("ok") is True):
+                        errors.append({"code": "CP_PRODUCT_EVIDENCE", "message": "缺少当前输入的真实产品检查：" + check})
             except (OSError, subprocess.TimeoutExpired) as error:
                 errors.append({"code": "CP_EXECUTION_UNAVAILABLE", "message": f"{check}: {type(error).__name__}"})
         after, _ = input_snapshot(self.root)

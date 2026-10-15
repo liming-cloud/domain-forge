@@ -1,4 +1,4 @@
-name: 控制面机制与隔离门禁校准
+name: 工程质量与控制面验证
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       maintenance-required: ${{ steps.scope.outputs.maintenance-required }}
+      product-required: ${{ steps.scope.outputs.product-required }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -36,6 +37,75 @@ jobs:
         run: |
           python -B tools/control_plane/control_plane.py ci-plan --base "$TASK_EVENT_BASE" > "$RUNNER_TEMP/domain-forge-ci-plan.json"
           echo "maintenance-required=$(jq -r .maintenance_required "$RUNNER_TEMP/domain-forge-ci-plan.json")" >> "$GITHUB_OUTPUT"
+          echo "product-required=$(jq -r .product_required "$RUNNER_TEMP/domain-forge-ci-plan.json")" >> "$GITHUB_OUTPUT"
+  product-checks:
+    name: 最小真实工程质量与运行验证
+    needs: scope-checks
+    if: needs.scope-checks.outputs.product-required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.14.5'
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21.0.12+101.0.LTS'
+          show-download-progress: true
+      - name: 设置产品验证的隔离环境
+        shell: bash
+        run: |
+          echo "DOMAIN_FORGE_PRODUCT_REPOSITORY=$RUNNER_TEMP/product-repository" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE=$RUNNER_TEMP/product-wrapper" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_GATE_TOOLS=$RUNNER_TEMP/product-tools" >> "$GITHUB_ENV"
+          echo "DOMAIN_FORGE_GATE_ADVISORY_DATA=$RUNNER_TEMP/product-advisory-data" >> "$GITHUB_ENV"
+      - name: 获取实际源码质量工具
+        run: python -B tools/engineering_gate/calibrate_source.py prepare
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ${{ env.DOMAIN_FORGE_PRODUCT_REPOSITORY }}
+            ${{ env.DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE }}
+            ${{ env.DOMAIN_FORGE_GATE_ADVISORY_DATA }}
+          key: ${{ runner.os }}-product-native-${{ hashFiles('pom.xml', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ runner.os }}-product-native-
+      - name: 核对产品实际 JDK 和 Wrapper 基线
+        run: python -B tools/product_gate/verify.py --project . --environment
+      - name: 准备原生漏洞资料（环境准备不代表产品扫描）
+        shell: bash
+        run: |
+          python -B tools/product_gate/verify.py --project . --prepare-data "$DOMAIN_FORGE_GATE_ADVISORY_DATA" > "$RUNNER_TEMP/product-preparation.json" || { cat "$RUNNER_TEMP/product-preparation.json"; exit 1; }
+          cat "$RUNNER_TEMP/product-preparation.json"
+      - name: 真实工程质量及运行场景
+        shell: bash
+        run: |
+          TASK_PRODUCT_EXIT=0
+          python -B tools/product_gate/verify.py --project . > "$RUNNER_TEMP/product-report.json" || TASK_PRODUCT_EXIT=$?
+          cat "$RUNNER_TEMP/product-report.json"
+          TASK_PRODUCT_WORKSPACE=$(jq -r '.workspace // empty' "$RUNNER_TEMP/product-report.json")
+          if [ -n "$TASK_PRODUCT_WORKSPACE" ]; then echo "PRODUCT_EVIDENCE=$TASK_PRODUCT_WORKSPACE/evidence" >> "$GITHUB_ENV"; fi
+          exit "$TASK_PRODUCT_EXIT"
+      - name: 保存产品验证证据
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: product-evidence
+          path: |
+            ${{ runner.temp }}/product-report.json
+            ${{ runner.temp }}/product-preparation.json
+            ${{ env.PRODUCT_EVIDENCE }}
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ${{ env.DOMAIN_FORGE_PRODUCT_REPOSITORY }}
+            ${{ env.DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE }}
+            ${{ env.DOMAIN_FORGE_GATE_ADVISORY_DATA }}
+          key: ${{ runner.os }}-product-native-${{ hashFiles('pom.xml', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
   advisory-data:
     name: 原生依赖告警资料准备（独立预算，非产品扫描）
     runs-on: ubuntu-24.04

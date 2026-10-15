@@ -391,6 +391,32 @@ class ControlPlaneCommands(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertTrue(output["maintenance_required"], "重命名前的工具输入不能被遗漏")
 
+    def test_ci_plan_selects_wired_product_and_shared_inputs_but_not_plain_docs(self):
+        self.catalog["checks"]["product-probe"] = {
+            "kind": "automatic", "implemented": True, "stage": "product",
+            "mechanism_checks": ["doc-integrity"], "reason": "隔离选择合同，非产品执行",
+            "argv": ["@python", "-c", "print('fixture')"]}
+        self.catalog["product_ci"] = {"inputs": ["tools/product_gate/**"], "checks": ["product-probe"]}
+        self.save_catalog()
+        self.git("add", ".")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                 "commit", "--quiet", "-m", "wire simulated product")
+        base = self.git("rev-parse", "HEAD").strip()
+        for path in ("db/change.sql", "tools/product_gate/verify.py"):
+            self.write(path, "fixture\n")
+            code, result = self.command("ci-plan", "--base", base)
+            self.assertEqual(code, 0, result)
+            self.assertTrue(result["product_required"])
+            self.assertEqual(result["product_checks"], ["product-probe"])
+            self.write("unknown/late.input", "must still be classified\n")
+            self.expect_failure("CP_UNKNOWN_FILE", "ci-plan", "--base", base)
+            (self.root / "unknown/late.input").unlink()
+            (self.root / path).unlink()
+        self.write("docs/notes.md", "# 普通说明\n")
+        code, result = self.command("ci-plan", "--base", base)
+        self.assertEqual(code, 0, result)
+        self.assertFalse(result["product_required"])
+
     def test_ci_plan_rejects_unwired_product_inputs_instead_of_document_only_green(self):
         self.maintenance_policy()
         self.render_indices()
@@ -685,7 +711,10 @@ class ControlPlaneCommands(unittest.TestCase):
         code, report = self.command("run", "--task", "fixture")
         self.assertNotEqual(code, 0, report)
         self.assertEqual(next(item["exit_code"] for item in report["checks"] if item["id"] == "product-result"), 7)
-        self.catalog["checks"]["product-result"]["argv"] = ["@python", "-c", "raise SystemExit(0)"]
+        self.catalog["checks"]["product-result"]["argv"] = ["@python", "-c",
+            f"import sys,json;sys.path.insert(0,{str(ENTRY.parent)!r});from control_plane import input_snapshot;"
+            "from pathlib import Path;print(json.dumps({'ok':True,'input':input_snapshot(Path.cwd())[0],"
+            "'proof_scope':'minimal-engineering-real-product','checks':{'product-result':{'ok':True}}}))"]
         self.save_catalog()
         code, report = self.command("run", "--task", "fixture")
         self.assertEqual(code, 0, report)
@@ -706,6 +735,32 @@ class ControlPlaneCommands(unittest.TestCase):
         self.assertEqual(code, 0, plan)
         self.assertEqual(plan.get("verification_phase"), "product")
         self.assertIn("product-result", plan["required_checks"])
+
+    def test_product_bundle_executes_once_per_run_and_rejects_stale_or_partial_proof(self):
+        self.product_responsibility()
+        self.write("product/input.txt", "real route input\n")
+        counter = pathlib.Path(self.temp.name).parent / (self.root.name + "-count")
+        self.addCleanup(lambda: counter.unlink(missing_ok=True))
+        original = (f"import sys,json;sys.path.insert(0,{str(ENTRY.parent)!r});from control_plane import input_snapshot;"
+                    f"from pathlib import Path;p=Path({str(counter)!r});p.write_text(p.read_text()+'1' if p.exists() else '1');"
+                    "print(json.dumps({'ok':True,'input':input_snapshot(Path.cwd())[0],"
+                    "'proof_scope':'minimal-engineering-real-product',"
+                    "'checks':{'product-result':{'ok':True},'product-second':{'ok':True}}}))")
+        self.catalog["checks"]["product-second"] = dict(self.catalog["checks"]["product-result"])
+        self.catalog["routes"][1]["checks"].append("product-second")
+        for code, error in ((original, None),
+                            (original.replace("input_snapshot(Path.cwd())[0]", "'stale'"), "CP_PRODUCT_EVIDENCE"),
+                            (original.replace("'product-second':{'ok':True}", "'product-second':{'ok':False}"), "CP_PRODUCT_EVIDENCE")):
+            for name in ("product-result", "product-second"):
+                self.catalog["checks"][name]["argv"] = ["@python", "-c", code]
+            self.save_catalog()
+            self.render_indices()
+            before = len(counter.read_text()) if counter.exists() else 0
+            status, report = self.command("run", "--task", "fixture")
+            self.assertEqual(len(counter.read_text()), before + 1, "同次固定组合只执行一次，下一次必须重新执行")
+            self.assertEqual(status, 0 if error is None else 1, report)
+            if error:
+                self.assertIn(error, {item["code"] for item in report["diagnostics"]})
 
     def test_product_staged_committed_deleted_and_renamed_paths_keep_responsibility(self):
         self.product_responsibility()
@@ -1072,9 +1127,12 @@ class CurrentCatalogJourneys(unittest.TestCase):
             self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
             return json.loads(process.stdout)
 
-        self.assertFalse(invoke()["maintenance_required"], "普通设计登记不应触发全部 Java 工具校准")
+        routine = invoke()
+        self.assertFalse(routine["maintenance_required"], "普通设计登记不应触发全部 Java 工具校准")
+        self.assertFalse(routine["product_required"], "普通设计登记不应触发真实产品构建")
         catalog["routes"][0]["checks"].append("architecture-gate")
         self.assertTrue(invoke()["maintenance_required"], "真实规则映射变化必须校准")
+        self.assertTrue(invoke()["product_required"], "共同规则映射变化须验证真实产品")
         catalog["routes"][0]["checks"].pop()
         catalog["documents"]["FEATURE"]["kind"] = "rules"
         self.assertTrue(invoke()["maintenance_required"], "新增规则身份不能伪装为普通设计登记")
