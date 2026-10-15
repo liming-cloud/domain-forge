@@ -720,10 +720,9 @@
       "criterion": "本轮实际 Java 观察器及夹具说明、格式和复杂度检查"
     }
   ],
-  "frontier": "上一候选 d5691dd911f99af5457f99921a3a4504016fc8fa 已通过真实 CI 和 delivery-evidence 对象核验，材料见 .run-artifacts/fifth-layer-delivery；人工清单见 .run-artifacts/fifth-layer-acceptance-review/d5691dd-20261015。2026-10-15 按用户授权修正 F01 的过时授权文案，并将后续阶段明确为控制面支撑的持续研发，真实产品结果随适用单元落实。c567ec2 的真实增量 CI 暴露跳过矩阵名称 F02，完整 CI 及其本地复验暴露通知先于对象刷新、重连未就绪时发布失败的观察时序 F03；已补真实回包及受控时序复现、限定适配，检查断言和原观察期限不放宽。本轮原始证据保留于 .run-artifacts/fifth-layer-f01-delivery；F02／F03 后新候选、适用验证、当前评审、Git／CI、delivery 及更新清单另存其中 repair-matrix-name。旧报告不重标为新输入通过；整套人工验收及验收后收尾仍未完成。",
+  "frontier": "2026-10-15 用户确认 ac51477 的第五层验收，并明确批准仅修正新任务模拟 acceptance／closing 状态继承的固定补丁；新候选 f288c133c0f00ee64eb3a561aae24a115bac84b9 已通过完整适用验证和真实 CI 38686927852，符合条件确认，原 ac51477 验收及 F04 红绿证据保留。第五层人工验收已通过，记录提交的必要 Git／CI 收尾待实际核对；完成后进入已授权的第六层设计，不开展业务实现。",
   "pending": [
-    "新候选须完成适用验证、受影响语义评审及精确 Git／CI、delivery 核验；同步人工清单，保留各输入和真实失败来源",
-    "评估持续研发进入条件；第五层人工验收及必要记录收尾仍未完成，后续首个研发单元须先明确必要设计、合同及真实产品检查接入，当前不启动业务实现"
+    "完成一次限定验收记录提交推送，核对其真实远端、文档 CI 和 delivery；通过后进入最小真实工程与质量检查、CI 接入设计"
   ],
   "deferred": [
     "第六层真实产品构建、最终解析组合、发布及依赖扫描；当前无产品 Maven 工程，均未执行，不以配置或隔离校准代替",
@@ -773,7 +772,55 @@
     "TASKS#流程与记录验证",
     "TASKS#已确认的验收后推进原则"
   ],
-  "acceptance": null,
-  "closing": null
+  "acceptance": {
+    "actor": "本会话用户／项目验收责任人",
+    "date": "2026-10-15",
+    "source": "CONTROL-TASK#唯一任务记录",
+    "functional_sha": "f288c133c0f00ee64eb3a561aae24a115bac84b9",
+    "scope": "第五层整套文档控制面，含 F01／F02／F03 修正、全部必需具体适配及适用验证；不包含第六层产品实现或未来产品结果；仅增加用户限定批准的 F04 临时模拟任务验收状态隔离补丁",
+    "source_message": "确认当前候选 ac51477 的第五层人工验收通过，完成验收记录和必要收尾，允许提交推送；随后进入第六层，先明确最小真实工程与质量检查、CI 接入的设计、范围和验收标准，暂不开展业务实现。",
+    "source_conversation": "01a137db-5b64-70c1-9b20-587ab9d0619e",
+    "evidence": {
+      "ci": "https://github.com/liming-cloud/domain-forge/actions/runs/38686927852",
+      "review": ".run-artifacts/fifth-layer-closeout/candidate-review.json",
+      "delivery": ".run-artifacts/fifth-layer-closeout/candidate-delivery.json",
+      "original_checklist": ".run-artifacts/fifth-layer-f01-delivery/repair-matrix-name/acceptance-checklist.md"
+    },
+    "original_acceptance": {
+      "actor": "本会话用户／项目验收责任人",
+      "date": "2026-10-15",
+      "source": "CONTROL-TASK#唯一任务记录",
+      "functional_sha": "ac5147785135e5d6eb598d6954940280cd96a606",
+      "scope": "第五层整套文档控制面，含 F01／F02／F03 修正、全部必需具体适配及适用验证；不包含第六层产品实现或未来产品结果",
+      "source_message": "确认当前候选 ac51477 的第五层人工验收通过，完成验收记录和必要收尾，允许提交推送；随后进入第六层，先明确最小真实工程与质量检查、CI 接入的设计、范围和验收标准，暂不开展业务实现。",
+      "source_conversation": "01a137db-5b64-70c1-9b20-587ab9d0619e",
+      "evidence": {
+        "ci": "https://github.com/liming-cloud/domain-forge/actions/runs/38678899875",
+        "review": ".run-artifacts/fifth-layer-f01-delivery/repair-matrix-name/acceptance-checklist.md",
+        "review_sha256": "54cb4b0296fc1cc6268b99246acc74b4619487c0263c9219e8e615c46cf9983b",
+        "delivery": ".run-artifacts/fifth-layer-f01-delivery/repair-matrix-name/delivery-result.json"
+      }
+    },
+    "conditional_extension": {
+      "date": "2026-10-15",
+      "source_question": "是否批准把这个固定测试补丁纳入验收范围，待新候选的完整适用验证和真实 CI 通过后，将 ac51477 加该补丁的新 SHA 记为验收对象并继续收尾",
+      "source_answer": "批准该固定补丁，验证通过后继续收尾",
+      "base_sha": "ac5147785135e5d6eb598d6954940280cd96a606",
+      "patch_sha256": "2f5478981338f8b3adc92ce4be56077432081c08315001cd2790197027fc70fd",
+      "scope": "仅临时模拟任务 acceptance=None、closing=None 及一行注释",
+      "condition": "完整适用验证及新候选真实 CI 通过；未满足前不记录新 SHA 验收"
+    },
+    "condition_evidence": {
+      "functional_ci": "https://github.com/liming-cloud/domain-forge/actions/runs/38686927852",
+      "candidate_delivery": ".run-artifacts/fifth-layer-closeout/candidate-delivery.json",
+      "review": ".run-artifacts/fifth-layer-closeout/candidate-review.json",
+      "local_tests": ".run-artifacts/fifth-layer-closeout/fixture-fix-full.log"
+    }
+  },
+  "closing": {
+    "status": "pending",
+    "reason": "功能候选已按用户条件确认验收；本次限定记录提交及推送后的真实文档 CI、远端和 delivery 尚待执行，不预写结果。",
+    "functional_run_id": 38686927852
+  }
 }
 ```
