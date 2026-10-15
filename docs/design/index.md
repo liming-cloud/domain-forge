@@ -1,4 +1,4 @@
-# 当前机制设计索引
+# 当前设计索引
 
 <!-- control-plane:generated; edit catalog/task facts, not this view -->
 
@@ -43,3 +43,16 @@
   - 按目标定位；不默认加载 → [统一执行与证据](engineering-gates.md#统一执行与证据)
   - 按目标定位；不默认加载 → [其他门禁的前置事实与后续出口](engineering-gates.md#其他门禁的前置事实与后续出口)
   - Maven 依赖变更、安全告警或整改 → [基础 Maven 依赖安全告警](engineering-gates.md#基础-maven-依赖安全告警)
+- [MINIMAL-ENGINEERING](minimal-engineering.md)（design）
+  - 按目标定位；不默认加载 → [状态与目标](minimal-engineering.md#状态与目标)
+  - 按目标定位；不默认加载 → [已知事实与设计依据](minimal-engineering.md#已知事实与设计依据)
+  - 按目标定位；不默认加载 → [范围与明确后续责任](minimal-engineering.md#范围与明确后续责任)
+  - 按目标定位；不默认加载 → [工程组织与方案比较](minimal-engineering.md#工程组织与方案比较)
+  - 按目标定位；不默认加载 → [版本与支持环境](minimal-engineering.md#版本与支持环境)
+  - 按目标定位；不默认加载 → [最小运行合同](minimal-engineering.md#最小运行合同)
+  - 按目标定位；不默认加载 → [质量检查接入](minimal-engineering.md#质量检查接入)
+  - 按目标定位；不默认加载 → [使用路径](minimal-engineering.md#使用路径)
+  - 按目标定位；不默认加载 → [CI 接入与失败分类](minimal-engineering.md#ci-接入与失败分类)
+  - 按目标定位；不默认加载 → [验收标准](minimal-engineering.md#验收标准)
+  - 按目标定位；不默认加载 → [实施顺序与确认事项](minimal-engineering.md#实施顺序与确认事项)
+  - 按目标定位；不默认加载 → [一手资料与证据限制](minimal-engineering.md#一手资料与证据限制)

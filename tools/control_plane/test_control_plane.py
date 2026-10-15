@@ -1028,7 +1028,8 @@ class CurrentCatalogJourneys(unittest.TestCase):
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text((origin / relative).read_text(encoding="utf-8"), encoding="utf-8")
-        self.task_path = self.root / catalog["documents"][catalog["tasks"][catalog["current_task"]]]["path"]
+        # 校准场景显式复用控制面任务，不从活动指针继承下一单元的验证计划。
+        self.task_path = self.root / catalog["documents"][catalog["tasks"]["control-plane-verification"]]["path"]
         self.prose = self.task_path.read_text(encoding="utf-8")
         block = re.search(r"^```control-plane-task\s*\n(.*?)^```\s*$", self.prose, re.M | re.S)
         self.task = json.loads(block.group(1))

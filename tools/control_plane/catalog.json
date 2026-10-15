@@ -10,7 +10,7 @@
     "product": {"title":"产品与工作入口","index":"docs/product-index.md"},
     "standards": {"title":"系统与工程规范","index":"docs/standards/index.md"},
     "workflow": {"title":"研发与文档流程","index":"docs/workflow/index.md"},
-    "design": {"title":"当前机制设计","index":"docs/design/index.md"},
+    "design": {"title":"当前设计","index":"docs/design/index.md"},
     "tasks": {"title":"活动任务与证据","index":"docs/tasks/index.md","archive":"docs/tasks/archive.md"}
   },
   "documents": {
@@ -31,7 +31,9 @@
     "TASKS": {"path":"docs/workflow/task-execution.md","category":"workflow","kind":"rules"},
     "CONTROL-DESIGN": {"path":"docs/design/control-plane-mechanism.md","category":"design","kind":"design"},
     "ENGINEERING-DESIGN": {"path":"docs/design/engineering-gates.md","category":"design","kind":"design"},
-    "CONTROL-TASK": {"path":"docs/tasks/control-plane-verification.md","category":"tasks","kind":"task"}
+    "CONTROL-TASK": {"path":"docs/tasks/control-plane-verification.md","category":"tasks","kind":"task"},
+    "MINIMAL-ENGINEERING": {"path":"docs/design/minimal-engineering.md","category":"design","kind":"design"},
+    "ENGINEERING-TASK": {"path":"docs/tasks/minimal-engineering.md","category":"tasks","kind":"task"}
   },
   "scopes": {
     "acceptance": "执行者、评审者、决定及单元验收；验收来源、一次记录提交及收尾",
@@ -441,7 +443,7 @@
     "delivery-evidence": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","delivery","--task","@task"]}
   },
   "tasks": {
-    "control-plane-verification": "CONTROL-TASK"
+    "control-plane-verification": "CONTROL-TASK", "minimal-engineering": "ENGINEERING-TASK"
   },
-  "current_task": "control-plane-verification"
+  "current_task": "minimal-engineering"
 }

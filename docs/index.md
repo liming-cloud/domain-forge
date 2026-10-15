@@ -29,9 +29,9 @@ Agent 只读取任务命中的小节；索引存在不代表门禁或人工验�
 - [产品与工作入口](product-index.md)
 - [系统与工程规范](standards/index.md)
 - [研发与文档流程](workflow/index.md)
-- [当前机制设计](design/index.md)
+- [当前设计](design/index.md)
 - [活动任务与证据](tasks/index.md)
 
 ## 当前任务
 
-[control-plane-verification](tasks/control-plane-verification.md#目标与输入)
+[minimal-engineering](tasks/minimal-engineering.md#目标与输入)
