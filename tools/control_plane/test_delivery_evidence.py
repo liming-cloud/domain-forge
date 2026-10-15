@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +20,51 @@ ENTRY = Path(__file__).with_name("control_plane.py")
 
 
 class DeliveryEntryTests(unittest.TestCase):
+    def test_product_preparation_preserves_native_logs_and_exit_status(self):
+        """执行真实工作流 shell；仅准备工具与 jq 输出是协议模拟，不代表扫描通过。"""
+        workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
+        product = workflow.split("  product-checks:\n", 1)[1].split("  advisory-data:\n", 1)[0]
+        prepare = product.split("      - name: 准备原生漏洞资料（环境准备不代表产品扫描）\n", 1)[1]
+        script = textwrap.dedent(prepare.split("        run: |\n", 1)[1].split("      - name:", 1)[0])
+        upload = product.split("      - name: 保存产品验证证据\n", 1)[1].split("      - uses:", 1)[0]
+        self.assertIn("if: always()", upload)
+        patterns = textwrap.dedent(upload.split("          path: |\n", 1)[1]).splitlines()
+        for code in (0, 1):
+            with self.subTest(exit_code=code), tempfile.TemporaryDirectory(prefix="domain-forge-preparation-") as temp:
+                root = Path(temp)
+                binary = root / "bin"
+                binary.mkdir()
+                native = root / "native-evidence" / "advisory-preparation.log"
+                native.parent.mkdir()
+                native.write_text("native failure detail must survive runner cleanup\n")
+                payload = {"ok": code == 0}
+                if code:
+                    payload["diagnostics"] = [{"code": "PG_PREPARATION", "log": str(native)}]
+                else:
+                    payload["execution"] = {"log": str(native)}
+                python = binary / "python"
+                python.write_text("#!" + sys.executable + "\nimport sys\nprint(" + repr(json.dumps(payload)) +
+                                  ")\nsys.exit(" + str(code) + ")\n")
+                python.chmod(0o755)
+                jq = binary / "jq"
+                jq.write_text("#!" + sys.executable + "\nimport json,sys\nd=json.load(open(sys.argv[-1]))\n" +
+                              "print(d.get('execution', {}).get('log') or d.get('diagnostics', [{}])[0].get('log') or '')\n")
+                jq.chmod(0o755)
+                env = dict(os.environ, PATH=str(binary) + os.pathsep + os.environ["PATH"],
+                           RUNNER_TEMP=str(root), DOMAIN_FORGE_GATE_ADVISORY_DATA=str(root / "data"))
+                result = subprocess.run(["bash", "-e", "-c", script], cwd=root, env=env,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, code, result.stderr)
+                retained = []
+                for pattern in patterns:
+                    pattern = pattern.strip().replace("${{ runner.temp }}", str(root))
+                    if not pattern or "${{" in pattern:
+                        continue
+                    path = Path(pattern)
+                    retained.extend(path.rglob("*") if path.is_dir() else [path])
+                self.assertTrue(any(path.is_file() and path.read_bytes() == native.read_bytes()
+                                    for path in retained), "上传路径必须包含原生准备日志，而非仅含摘要或临时路径")
+
     def test_missing_query_is_explicitly_rejected_without_network_or_acceptance(self):
         result = subprocess.run([sys.executable, "-B", str(ENTRY), "delivery", "--task",
                                  "control-plane-verification"], capture_output=True, text=True, timeout=10)
