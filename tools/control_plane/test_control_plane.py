@@ -1129,7 +1129,8 @@ class CurrentCatalogJourneys(unittest.TestCase):
                                      capture_output=True, text=True, timeout=30)
             return process.returncode, json.loads(process.stdout)
 
-        self.task.update(scopes=[], design_refs=[], extra_refs=[],
+        # 四类路径模拟新的交付单元，不继承仓库当前单元的真实验收与收尾。
+        self.task.update(scopes=[], design_refs=[], extra_refs=[], acceptance=None, closing=None,
                          verification=[{"check": "doc-integrity", "criterion": "当前任务入口一致"}])
         goals = self.task["goals"][:]
         for task_type, selected in (("create-project", "PRODUCT#新项目起步交付"),
