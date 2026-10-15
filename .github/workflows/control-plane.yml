@@ -74,6 +74,21 @@ jobs:
             ${{ env.DOMAIN_FORGE_GATE_ADVISORY_DATA }}
           key: ${{ runner.os }}-product-native-${{ hashFiles('pom.xml', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: ${{ runner.os }}-product-native-
+      - name: 读取同配置原生资料缓存（缓存不是检查结果）
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ${{ runner.temp }}/domain-forge-advisory-data
+            ${{ runner.temp }}/domain-forge-advisory-repository
+          key: ${{ runner.os }}-domain-forge-odc-${{ hashFiles('tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ runner.os }}-domain-forge-odc-${{ hashFiles('tools/engineering_gate/maven-dependency-check.xml') }}-
+      - name: 首次准备使用同源原生数据库（仍须更新与扫描）
+        shell: bash
+        run: |
+          if [ ! -f "$DOMAIN_FORGE_GATE_ADVISORY_DATA/odc.mv.db" ] && [ -f "$RUNNER_TEMP/domain-forge-advisory-data/odc.mv.db" ]; then
+            mkdir -p "$DOMAIN_FORGE_GATE_ADVISORY_DATA"
+            cp "$RUNNER_TEMP/domain-forge-advisory-data/odc.mv.db" "$DOMAIN_FORGE_GATE_ADVISORY_DATA/odc.mv.db"
+          fi
       - name: 核对产品实际 JDK 和 Wrapper 基线
         run: python -B tools/product_gate/verify.py --project . --environment
       - name: 准备原生漏洞资料（环境准备不代表产品扫描）

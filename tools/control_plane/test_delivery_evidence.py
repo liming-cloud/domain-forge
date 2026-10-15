@@ -20,6 +20,37 @@ ENTRY = Path(__file__).with_name("control_plane.py")
 
 
 class DeliveryEntryTests(unittest.TestCase):
+    def test_product_seed_copies_only_missing_native_database_without_success_evidence(self):
+        """真实执行资料复制 shell；哨兵文件不代表有效原生数据库或扫描结果。"""
+        workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
+        name = "      - name: 首次准备使用同源原生数据库（仍须更新与扫描）\n"
+        self.assertIn(name, workflow, "首次产品准备应能复用兼容原生资料，而非重复全量下载")
+        step = workflow.split(name, 1)[1].split("      - name:", 1)[0]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+        for seed, existing in ((True, False), (True, True), (False, False)):
+            with self.subTest(seed=seed, existing=existing), tempfile.TemporaryDirectory(prefix="domain-forge-data-seed-") as temp:
+                root = Path(temp)
+                source = root / "domain-forge-advisory-data"
+                source.mkdir()
+                if seed:
+                    (source / "odc.mv.db").write_bytes(b"compatible-native-data-input")
+                (source / "report.json").write_text('{"ok": true}')
+                target = root / "product-advisory-data"
+                target.mkdir()
+                if existing:
+                    (target / "odc.mv.db").write_bytes(b"existing-product-data")
+                result = subprocess.run(["bash", "-e", "-c", script], cwd=root,
+                                        env=dict(os.environ, RUNNER_TEMP=str(root),
+                                                 DOMAIN_FORGE_GATE_ADVISORY_DATA=str(target)),
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if existing or seed:
+                    self.assertEqual((target / "odc.mv.db").read_bytes(),
+                                     b"existing-product-data" if existing else b"compatible-native-data-input")
+                else:
+                    self.assertFalse((target / "odc.mv.db").exists())
+                self.assertFalse((target / "report.json").exists(), "不得复制通过报告替代本次产品检查")
+
     def test_product_preparation_preserves_native_logs_and_exit_status(self):
         """执行真实工作流 shell；仅准备工具与 jq 输出是协议模拟，不代表扫描通过。"""
         workflow = (ENTRY.parents[2] / delivery.WORKFLOW).read_text()
