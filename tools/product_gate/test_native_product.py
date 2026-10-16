@@ -42,7 +42,21 @@ class NativeProductTests(unittest.TestCase):
         result = build.quality(ROOT, self.project, self.observed, self.tools)
         self.assertTrue(result["ok"], result["diagnostics"])
         self.assertGreater(self.observed["tests"]["count"], 0)
+        self.assertEqual(self.observed["reactor"], [".", "verification/boot-smoke"])
         self.assertEqual({item["purpose"] for item in result["bindings"]}, {"production", "test"})
+
+    def test_observed_reactor_cannot_omit_or_add_modules(self):
+        document = ET.parse(self.output / "maven-inventory.xml").getroot()
+        for mutation in ("omitted", "extra"):
+            with self.subTest(mutation=mutation):
+                changed = copy.deepcopy(document)
+                if mutation == "omitted":
+                    changed.remove(changed.findall("project")[0])
+                else:
+                    changed.append(copy.deepcopy(changed.find("project")))
+                with self.assertRaises(environment.ProbeFailure) as error:
+                    build.module_inventory(changed, self.project)
+                self.assertEqual(error.exception.diagnostic["code"], "PG_BUILD_SCOPE")
 
     def test_native_skipped_tests_are_rejected_despite_successful_packaging(self):
         project, output, args = self.fixture()
@@ -81,7 +95,7 @@ class NativeProductTests(unittest.TestCase):
 
     def test_missing_packaged_class_and_resource_are_rejected(self):
         original = Path(self.observed["artifact"]["path"])
-        document = ET.parse(self.output / "maven-inventory.xml").getroot()
+        document = ET.parse(self.output / "module-inventory.xml").getroot()
         for missing in (self.observed["artifact"]["classes"][0], self.observed["artifact"]["resources"][0]):
             with self.subTest(missing=missing):
                 changed = self.project / "target/tampered.jar"
@@ -99,7 +113,7 @@ class NativeProductTests(unittest.TestCase):
         with self.assertRaises(environment.ProbeFailure) as error:
             calibrate_lifecycle.test_results(self.project, self.observed["build"]["compilations"], {"Missing#scenario"})
         self.assertEqual(error.exception.diagnostic["code"], "SG_BUILD_TEST_COVERAGE")
-        document = ET.parse(self.output / "maven-inventory.xml").getroot()
+        document = ET.parse(self.output / "module-inventory.xml").getroot()
         document.find("project/declaredDependency").set("version", "[4.0,5.0)")
         with self.assertRaises(environment.ProbeFailure) as error:
             calibrate_lifecycle.versions_and_artifacts(document, self.repository)

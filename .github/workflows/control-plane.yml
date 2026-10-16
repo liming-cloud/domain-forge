@@ -72,7 +72,7 @@ jobs:
             ${{ env.DOMAIN_FORGE_PRODUCT_REPOSITORY }}
             ${{ env.DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE }}
             ${{ env.DOMAIN_FORGE_GATE_ADVISORY_DATA }}
-          key: ${{ runner.os }}-product-native-${{ hashFiles('pom.xml', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-product-native-${{ hashFiles('code/**/pom.xml', 'code/.mvn/**', 'code/mvnw*', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: ${{ runner.os }}-product-native-
       - name: 读取同配置原生资料缓存（缓存不是检查结果）
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
@@ -128,7 +128,7 @@ jobs:
             ${{ env.DOMAIN_FORGE_PRODUCT_REPOSITORY }}
             ${{ env.DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE }}
             ${{ env.DOMAIN_FORGE_GATE_ADVISORY_DATA }}
-          key: ${{ runner.os }}-product-native-${{ hashFiles('pom.xml', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-product-native-${{ hashFiles('code/**/pom.xml', 'code/.mvn/**', 'code/mvnw*', 'tools/product_gate/baseline.json', 'tools/engineering_gate/maven-dependency-check.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}
   advisory-data:
     name: 原生依赖告警资料准备（独立预算，非产品扫描）
     runs-on: ubuntu-24.04

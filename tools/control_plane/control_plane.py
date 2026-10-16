@@ -531,7 +531,8 @@ class ControlPlane:
         classified = [(path, self.classify(path)[0]["purpose"]) for path in paths if path]
         metadata_only = base is not None and any(path == CATALOG for path, _ in classified) and not self.maintenance_changed(
             [CATALOG], base, read_git=read_git)
-        selected = any(purpose in ("production", "test") or
+        rule_paths = {doc["path"] for doc in self.documents.values() if doc["kind"] == "rules"}
+        selected = any(purpose in ("production", "test") or (policy and path in rule_paths) or
                        (not (path == CATALOG and metadata_only) and policy and
                         any(fnmatch.fnmatchcase(path, pattern) for pattern in policy["inputs"]))
                        for path, purpose in classified)

@@ -15,6 +15,8 @@ ENGINEERING = Path(__file__).resolve().parents[1] / "engineering_gate"
 sys.path.insert(0, str(ENGINEERING))
 from calibrate_source import ProbeFailure, digest, require
 
+MODULE = Path("verification/boot-smoke")
+
 
 def baseline(root):
     return json.loads((root / "tools/product_gate/baseline.json").read_text())
@@ -70,29 +72,40 @@ def runtime(root):
 
 def wrapper(root):
     lock = baseline(root)
+    code = root / "code"
     for name, expected in lock["wrapper"]["scripts"].items():
-        require((root / name).is_file() and not (root / name).is_symlink() and digest(root / name) == expected,
+        require((code / name).is_file() and not (code / name).is_symlink() and digest(code / name) == expected,
                 "PG_WRAPPER", "官方 Wrapper 脚本缺失或被改写：" + name)
-    path = root / ".mvn/wrapper/maven-wrapper.properties"
+    path = code / ".mvn/wrapper/maven-wrapper.properties"
     require(path.is_file() and not path.is_symlink(), "PG_WRAPPER", "缺少普通 Wrapper 配置")
     values = dict(line.split("=", 1) for line in path.read_text().splitlines() if line and not line.startswith("#"))
     expected = {"wrapperVersion": lock["wrapper"]["version"], "distributionType": "only-script",
                 "distributionUrl": lock["maven"]["url"], "distributionSha256Sum": lock["maven"]["sha256"]}
     require(values == expected, "PG_WRAPPER", "Wrapper 分发、版本或校验与产品基线不符")
-    require({p.relative_to(root / ".mvn").as_posix() for p in (root / ".mvn").rglob("*") if p.is_file()} ==
+    require({p.relative_to(code / ".mvn").as_posix() for p in (code / ".mvn").rglob("*") if p.is_file()} ==
             {"wrapper/maven-wrapper.properties"}, "PG_INPUT", "存在尚未支持的隐式 Maven 配置")
 
 
 def sources(root):
-    """只复制声明的工程输入，拒绝链接；测试与资源不会借旧 target 被遗漏。"""
-    paths = [root / "pom.xml", root / "mvnw", root / "mvnw.cmd"]
-    for directory in (root / "src", root / ".mvn"):
+    """覆盖代码区全部维护文件；未支持模块不能被复制清单静默遗漏。"""
+    require(not any((root / name).exists() or (root / name).is_symlink()
+                    for name in ("pom.xml", "src", ".mvn", "mvnw", "mvnw.cmd")),
+            "PG_BUILD_SCOPE", "旧根目录工程输入必须迁入代码区")
+    code = root / "code"
+    for directory in (code, code / MODULE, code / MODULE / "src", code / ".mvn"):
         require(directory.is_dir() and not directory.is_symlink(), "PG_INPUT", "缺少普通工程输入目录")
-        for path in directory.rglob("*"):
-            require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")
-            if path.is_file():
-                paths.append(path)
-    require(all(path.is_file() and not path.is_symlink() for path in paths), "PG_INPUT", "工程输入缺失或为链接")
+    required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
+    paths = []
+    for path in code.rglob("*"):
+        require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")
+        if path.is_relative_to(code / "target") or path.is_relative_to(code / MODULE / "target"):
+            continue
+        if path.is_file():
+            relative = path.relative_to(code)
+            require(relative.as_posix() in required or relative.is_relative_to(MODULE / "src"),
+                    "PG_BUILD_SCOPE", "未登记或未支持的代码输入：" + relative.as_posix())
+            paths.append(path)
+    require(required <= {p.relative_to(code).as_posix() for p in paths}, "PG_INPUT", "缺少必要工程输入")
     return {path.relative_to(root).as_posix(): digest(path) for path in sorted(paths)}
 
 
@@ -103,7 +116,7 @@ def copy_project(root, target, inputs):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / name, destination)
         require(digest(destination) == checksum, "PG_INPUT_CHANGED", "复制期间输入变化")
-    return target
+    return target / "code" / MODULE
 
 
 def bootstrap(root, project, cache, repository, output):
@@ -115,7 +128,7 @@ def bootstrap(root, project, cache, repository, output):
                         '<id>product-central</id><mirrorOf>*</mirrorOf>'
                         '<url>https://repo.maven.apache.org/maven2</url></mirror></mirrors></settings>')
     env = dict(os.environ, MAVEN_USER_HOME=str(cache), MAVEN_SKIP_RC="true")
-    argv = [str(project / "mvnw"), "-B", "-ntp", "-s", str(settings), "-gs", str(settings),
+    argv = [str(project.parents[1] / "mvnw"), "-B", "-ntp", "-s", str(settings), "-gs", str(settings),
             "-Dmaven.repo.local=" + str(repository)]
     execution = command([*argv, "--version"], project, output / "wrapper.log", 300, env, preparation=True)
     text = (output / "wrapper.log").read_text()

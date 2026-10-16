@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
-from environment import command, copy_project, digest, require
+from environment import MODULE, command, copy_project, digest, require
 import calibrate_advisory
 
 
@@ -54,7 +54,7 @@ def scan(root, workspace, inputs, repository, data, argv, env, output, observed)
     project = copy_project(root, workspace / "advisory-project", inputs)
     version = configure(project)
     # 仅增加已确认扫描插件；直接/传递依赖仍来自同一实际工程，报告逐项绑定字节。
-    execution = command([str(project / "mvnw"), *argv[1:], "-DdataDirectory=" + str(isolated_data),
+    execution = command([str(project.parents[1] / "mvnw"), *argv[1:], "-DdataDirectory=" + str(isolated_data),
                          "-DautoUpdate=false", "-DretireJsAnalyzerEnabled=false",
                          "org.owasp:dependency-check-maven:" + version + ":check"],
                         project, output / "advisory.log", 900, env)
@@ -71,7 +71,7 @@ def scan(root, workspace, inputs, repository, data, argv, env, output, observed)
         shutil.copy2(path, target)
         reports[kind] = target
     return {"ok": True, "execution": execution, "engine_version": version, "data_sha256": checksum,
-            "derived_pom_sha256": digest(project / "pom.xml"), "source_pom_sha256": inputs["pom.xml"],
+            "derived_pom_sha256": digest(project / "pom.xml"), "source_pom_sha256": inputs[str(Path("code") / MODULE / "pom.xml")],
             "plugin_configuration_sha256": digest(calibrate_advisory.HERE / "maven-dependency-check.xml"),
             "reports": {kind: {"path": str(path), "sha256": digest(path)} for kind, path in reports.items()},
             "covered_dependency_hashes": sorted(covered),

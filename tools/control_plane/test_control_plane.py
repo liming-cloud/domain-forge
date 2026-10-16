@@ -1144,6 +1144,23 @@ class CurrentCatalogJourneys(unittest.TestCase):
                                             check=True, capture_output=True, text=True).stdout.strip()
         target.write_text(target.read_text(encoding="utf-8") + "\n修改有效规则。\n", encoding="utf-8")
         self.assertTrue(invoke()["maintenance_required"], "规则正文变更按登记身份触发，不只依赖所在目录")
+        self.assertTrue(invoke()["product_required"], "规则正文语义变化必须触发跨区真实产品验证")
+
+    def test_partition_inputs_and_unknown_paths_are_not_document_only_green(self):
+        from control_plane import ControlPlane, Rejected
+        plane = ControlPlane(self.root)
+        for path in ("code/pom.xml", "code/mvnw", "code/.mvn/wrapper/maven-wrapper.properties",
+                     "code/verification/boot-smoke/pom.xml",
+                     "code/verification/boot-smoke/src/main/java/Probe.java",
+                     "code/verification/boot-smoke/src/main/resources/application.properties",
+                     "code/verification/boot-smoke/src/test/java/ProbeTest.java",
+                     "docs/design/minimal-engineering.md", "docs/contracts/access.md"):
+            with self.subTest(path=path):
+                self.assertTrue(plane.product_changed([path]))
+        self.assertFalse(plane.product_changed(["docs/tasks/minimal-engineering.md", "README.md"]))
+        for path in ("code/unknown/input.txt", "docs/hidden/Production.java"):
+            with self.subTest(path=path), self.assertRaises(Rejected):
+                plane.product_changed([path])
 
     def test_real_catalog_four_journeys_load_relevant_sections_not_all_identity_rules(self):
         journeys = [("create-project", "PRODUCT#新项目起步交付"),

@@ -1,6 +1,6 @@
 # 任务规划与执行流程
 
-规范来源与固定输入见[第四层确认记录](../../REBUILD.md#第四层确认记录)；实际实现、验证及未完成项见[当前任务](../tasks/control-plane-verification.md#唯一任务记录)。
+规范来源与固定输入见[第四层确认记录](../product/rebuild.md#第四层确认记录)；实际实现、验证及未完成项见[当前任务](../tasks/control-plane-verification.md#唯一任务记录)。
 
 ## 适用范围与阅读入口
 

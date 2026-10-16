@@ -1,6 +1,6 @@
 # HTTP 接口与结果规范
 
-规范来源与固定输入见[第三层确认记录](../../REBUILD.md#第三层确认记录)；实际实现、验证及未完成项见[当前任务](../tasks/control-plane-verification.md#唯一任务记录)。
+规范来源与固定输入见[第三层确认记录](../product/rebuild.md#第三层确认记录)；实际实现、验证及未完成项见[当前任务](../tasks/control-plane-verification.md#唯一任务记录)。
 
 ## 适用范围与阅读入口
 

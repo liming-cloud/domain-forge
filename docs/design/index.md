@@ -43,6 +43,18 @@
   - 按目标定位；不默认加载 → [统一执行与证据](engineering-gates.md#统一执行与证据)
   - 按目标定位；不默认加载 → [其他门禁的前置事实与后续出口](engineering-gates.md#其他门禁的前置事实与后续出口)
   - Maven 依赖变更、安全告警或整改 → [基础 Maven 依赖安全告警](engineering-gates.md#基础-maven-依赖安全告警)
+- [DEVELOPMENT-STRUCTURE](development-structure.md)（design）
+  - 按目标定位；不默认加载 → [状态与依据](development-structure.md#状态与依据)
+  - 按目标定位；不默认加载 → [DDD 边界与代码映射](development-structure.md#ddd-边界与代码映射)
+  - 按目标定位；不默认加载 → [仓库分区与管理边界](development-structure.md#仓库分区与管理边界)
+  - 按目标定位；不默认加载 → [产品交付单元与依赖](development-structure.md#产品交付单元与依赖)
+  - 按目标定位；不默认加载 → [身份权限部署与调用方案](development-structure.md#身份权限部署与调用方案)
+  - 按目标定位；不默认加载 → [模板与版本消费方案](development-structure.md#模板与版本消费方案)
+  - 按目标定位；不默认加载 → [分别检查与关联验证](development-structure.md#分别检查与关联验证)
+  - 按目标定位；不默认加载 → [研发顺序与当前迁移](development-structure.md#研发顺序与当前迁移)
+  - 按目标定位；不默认加载 → [推荐决定与待确认事项](development-structure.md#推荐决定与待确认事项)
+  - 按目标定位；不默认加载 → [结构验收条件](development-structure.md#结构验收条件)
+  - 按目标定位；不默认加载 → [资料核对与结论范围](development-structure.md#资料核对与结论范围)
 - [MINIMAL-ENGINEERING](minimal-engineering.md)（design）
   - 按目标定位；不默认加载 → [状态与目标](minimal-engineering.md#状态与目标)
   - 按目标定位；不默认加载 → [已知事实与设计依据](minimal-engineering.md#已知事实与设计依据)

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 import zipfile
 
-from environment import baseline, command, digest, require
+from environment import MODULE, baseline, command, digest, require, sources
 import calibrate_architecture
 import calibrate_lifecycle
 import calibrate_maven
@@ -19,6 +19,14 @@ import role_boundaries
 
 
 def model(root, project):
+    aggregate = ET.parse(project.parents[1] / "pom.xml").getroot()
+    expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "domain-forge-build",
+                "version": "0.1.0", "packaging": "pom"}
+    require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) == sorted([*expected, "modules"]) and
+            all(aggregate.findtext("{*}" + key) == value for key, value in expected.items()) and
+            [x.text for x in aggregate.findall("./{*}modules/{*}module")] == [MODULE.as_posix()] and
+            len(aggregate.find("{*}modules")) == 1,
+            "PG_BUILD_SCOPE", "聚合必须只包含已支持的真实探针，不接受空目标、额外模块或隐式配置")
     document = ET.parse(project / "pom.xml")
     parent = document.find("./{*}parent")
     require(parent is not None and parent.findtext("{*}groupId") == "org.springframework.boot" and
@@ -47,15 +55,19 @@ def model(root, project):
 
 def lifecycle(root, project, argv, env, home, repository, output):
     require(not (project / "target").exists(), "PG_DIRTY_BUILD", "产品交付从无旧输出副本执行")
+    source_inputs = sources(project.parents[2])
     model(root, project)
     inputs = calibrate_maven.project_inputs(project)
     extension = calibrate_maven.observer(home, output)
     inventory = output / "maven-inventory.xml"
-    execution = command([*argv, "-Dmaven.ext.class.path=" + str(extension),
+    execution = command([*argv, "-f", str(project.parents[1] / "pom.xml"), "-Dmaven.ext.class.path=" + str(extension),
                          "-Ddomainforge.scope.output=" + str(inventory), "verify"],
                         project, output / "verify.log", 600, env)
     require(inventory.is_file(), "PG_BUILD_OBSERVER", "缺少本次真实 Maven 观察结果")
     document = ET.parse(inventory).getroot()
+    document = module_inventory(document, project)
+    module_path = output / "module-inventory.xml"
+    ET.ElementTree(document).write(module_path)
     lock = baseline(root)
     require(Path(document.attrib["mavenHome"]).resolve() == home and
             document.attrib["javaVersion"] == lock["java"]["runtime_version"].split("+")[0],
@@ -83,10 +95,33 @@ def lifecycle(root, project, argv, env, home, repository, output):
              "direct_dependencies": calibrate_maven.direct_dependencies(document)}
     artifact = packaged(document, project, build, dependencies)
     calibrate_maven_source.unchanged_build(build, project)
+    require(sources(project.parents[2]) == source_inputs, "PG_INPUT_CHANGED", "聚合或模块输入在构建期间变化")
     return {"build": build, "execution": execution, "goals": goals, "tests": tests, "artifact": artifact,
             "dependencies": dependencies, "plugin_dependencies": plugin_dependencies,
             "constraints": constraints, "plugin_constraints": plugin_constraints, "resolved": resolved,
-            "inventory": {"path": str(inventory), "sha256": digest(inventory)}}
+            "inventory": {"path": str(inventory), "sha256": digest(inventory)},
+            "module_inventory": {"path": str(module_path), "sha256": digest(module_path)},
+            "reactor": [".", MODULE.as_posix()]}
+
+
+def module_inventory(document, project):
+    """先核对原生 reactor 全量覆盖，再复用单 JAR 的既有严格检查。"""
+    projects = document.findall("project")
+    code = project.parents[1]
+    require(len(projects) == 2 and {x.get("path") for x in projects} == {str(code), str(project)},
+            "PG_BUILD_SCOPE", "实际 reactor 遗漏或增加了未经覆盖的模块")
+    aggregate = next(x for x in projects if x.get("path") == str(code))
+    require(aggregate.get("packaging") == "pom" and aggregate.get("artifact") == "domain-forge-build" and
+            not any(aggregate.findall(tag) for tag in ("declaredDependency", "resolvedDependency")),
+            "PG_BUILD_SCOPE", "内部聚合不能包含未验证的产品依赖")
+    require(all(x.get("project") == str(project) for tag in ("compilation", "execution") for x in document.findall(tag)),
+            "PG_BUILD_SCOPE", "聚合或未知模块执行了未支持的编译／插件")
+    document.remove(aggregate)
+    for node in list(document.findall("dependencyResolution")):
+        if all(node.get(key) == aggregate.get(key) for key in ("group", "artifact", "version")):
+            require(len(node) == 0, "PG_BUILD_SCOPE", "聚合出现未覆盖的原生依赖图")
+            document.remove(node)
+    return document
 
 
 def packaged(document, project, build, dependencies):
