@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "candidate_version": "0.1.0-r2.1",
+  "tools": {
+    "flatten": {
+      "group": "org.codehaus.mojo",
+      "artifact": "flatten-maven-plugin",
+      "version": "1.8.0",
+      "source": "https://www.mojohaus.org/flatten-maven-plugin/flatten-mojo.html",
+      "files": {
+        "pom": {
+          "url": "https://repo.maven.apache.org/maven2/org/codehaus/mojo/flatten-maven-plugin/1.8.0/flatten-maven-plugin-1.8.0.pom",
+          "sha256": "8945be02e365285ec1a8aecb0d29a3135d4d4d42b508a82465a5ea1af9cfea50",
+          "repository_sha1": "363302c51791b75addaedbd0fad3df5714773216"
+        },
+        "jar": {
+          "url": "https://repo.maven.apache.org/maven2/org/codehaus/mojo/flatten-maven-plugin/1.8.0/flatten-maven-plugin-1.8.0.jar",
+          "sha256": "3a4d52a2288da77daf68120d1c3234a96c67970988f2856ab5a4cf9c3b707125",
+          "repository_sha1": "8aedb5e02790a8475bafa7ca2877f1e9f760d6b5"
+        }
+      }
+    },
+    "deploy": {
+      "group": "org.apache.maven.plugins",
+      "artifact": "maven-deploy-plugin",
+      "version": "3.1.4",
+      "source": "https://maven.apache.org/plugins/maven-deploy-plugin/",
+      "files": {
+        "pom": {
+          "url": "https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-deploy-plugin/3.1.4/maven-deploy-plugin-3.1.4.pom",
+          "sha256": "b81d54db3ae12c9d0986313aa5f754b26a76b595a295a55cf02618027f66f89c",
+          "repository_sha1": "420d755495ffcf2e9802bd2e3fab4f1cdd20a584"
+        },
+        "jar": {
+          "url": "https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-deploy-plugin/3.1.4/maven-deploy-plugin-3.1.4.jar",
+          "sha256": "3be1d369703884116300b57abda1c46b8c712faf9a3778960d21dd27af73b650",
+          "repository_sha1": "c951c876f74ac5fc7a6355957b3383f23648ade9"
+        }
+      }
+    },
+    "openapi_annotations": {
+      "group": "io.swagger.core.v3",
+      "artifact": "swagger-annotations-jakarta",
+      "version": "2.2.47",
+      "source": "https://repo.maven.apache.org/maven2/org/springdoc/springdoc-openapi/3.0.3/springdoc-openapi-3.0.3.pom",
+      "files": {
+        "pom": {
+          "url": "https://repo.maven.apache.org/maven2/io/swagger/core/v3/swagger-annotations-jakarta/2.2.47/swagger-annotations-jakarta-2.2.47.pom",
+          "sha256": "c833fa17b017660a7fa76fcba7e1a61cb06bb3d07719e7a97846f40918d8585d",
+          "repository_sha1": "c616d3844be0600af4fbb89c23762c6ebe01f596"
+        },
+        "jar": {
+          "url": "https://repo.maven.apache.org/maven2/io/swagger/core/v3/swagger-annotations-jakarta/2.2.47/swagger-annotations-jakarta-2.2.47.jar",
+          "sha256": "9b30b319f1c31993e6128d22e12652be9a688589e30c67819ed84e95b96e7f88",
+          "repository_sha1": "a4e49cd45a337ad6b9111c5e12b2573d39790051"
+        }
+      }
+    }
+  }
+}

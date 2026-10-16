@@ -5,12 +5,12 @@
 - [产品定义与首版范围](docs/product/product-definition.md#产品目的)
 - [当前恢复点与确认记录](docs/product/rebuild.md#当前恢复点)
 - [整体研发结构](docs/design/development-structure.md)
-- [当前任务及 R1 迁移清单](docs/tasks/minimal-engineering.md#r1-迁移清单与验证范围)
+- [当前 R2 组件实现任务](docs/tasks/reusable-web-component.md#目标与输入)
 - [文档总索引](docs/index.md) · [Agent 入口](AGENTS.md)
 
 ## 开发与验证入口
 
-当前代码只有最小 Boot 技术探针，位于 `code/verification/boot-smoke/`。固定环境与完整使用步骤见[工程使用说明](docs/design/minimal-engineering.md#使用路径)。
+当前包含最小 Boot 技术探针、`web-support` 组件、平台 BOM 和两个独立消费验证工程。固定环境见[工程使用说明](docs/design/minimal-engineering.md#使用路径)，组件获取与接入见[R2 使用路径](docs/design/reusable-web-component.md#两个独立消费项目与使用路径)。
 
 ```bash
 # 仓库根执行；先按工程说明选择固定 JDK 和工具环境。
@@ -19,4 +19,4 @@ python3 -B tools/control_plane/control_plane.py check
 python3 -B tools/product_gate/verify.py --project .
 ```
 
-`code/` 管理工程源码及可执行资源，`docs/` 管理文档正文，`tools/` 管理质量工具。普通 Maven 构建不替代完整质量验证；当前探针不表示平台能力或业务模板已经交付。
+`code/` 管理工程源码及可执行资源，`docs/` 管理文档正文，`tools/` 管理质量工具。普通 Maven 构建不替代完整质量验证；R2-01 当前候选的验证及待人工验收状态见[任务记录](docs/tasks/reusable-web-component.md#唯一任务记录)，不表示整个 R2 或业务模板已经交付。

@@ -13,6 +13,7 @@ from environment import ProbeFailure, require
 import advisory
 import build
 import runtime
+import web_verify
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control_plane"))
 from control_plane import input_snapshot
@@ -50,6 +51,7 @@ def verify(args):
         quality = build.quality(root, project, observed, args.tools)
         result["quality"] = quality
         require(quality["ok"], "PG_SOURCE_QUALITY", "源码／架构检查失败，详见 quality.diagnostics")
+        result["web"] = web_verify.inspect(root, project, observed, argv, env, home, repository, cache, workspace, output, args)
         result["checks"]["build-gate"] = {"ok": True, "actual_test_count": observed["tests"]["count"]}
         if args.check in ("all", "dependency-risk-gate"):
             result["advisory"] = advisory.scan(root, workspace, inputs, repository, args.advisory_data,
@@ -64,7 +66,7 @@ def verify(args):
                             DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE=str(cache), DOMAIN_FORGE_GATE_TOOLS=str(args.tools))
             result["counterexamples"] = environment.command(
                 [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tools/product_gate", "-p", "test_*.py"],
-                root, output / "counterexamples.log", 240, test_env)
+                root, output / "counterexamples.log", 600, test_env)
             test_output = (output / "counterexamples.log").read_text()
             count = re.search(r"Ran ([1-9][0-9]*) tests?\b", test_output)
             require(count and not re.search(r"skipped=[1-9]", test_output), "PG_TEST_COVERAGE", "产品反例没有完整执行")
@@ -75,6 +77,8 @@ def verify(args):
         result["ok"] = True
     except ProbeFailure as failure:
         result["diagnostics"].append(failure.diagnostic)
+    except (OSError, ValueError, KeyError) as failure:
+        result["diagnostics"].append({"code": "PG_INPUT", "message": type(failure).__name__ + ": " + str(failure)})
     (output / "report.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     result["report_path"] = str(output / "report.json")
     return result
@@ -88,6 +92,7 @@ def main():
     parser.add_argument("--repository", default=os.environ.get("DOMAIN_FORGE_PRODUCT_REPOSITORY"))
     parser.add_argument("--wrapper-cache", default=os.environ.get("DOMAIN_FORGE_PRODUCT_WRAPPER_CACHE"))
     parser.add_argument("--tools", default=os.environ.get("DOMAIN_FORGE_GATE_TOOLS"))
+    parser.add_argument("--http-tools", default=os.environ.get("DOMAIN_FORGE_GATE_HTTP_TOOLS"))
     parser.add_argument("--advisory-data", default=os.environ.get("DOMAIN_FORGE_GATE_ADVISORY_DATA"))
     parser.add_argument("--prepare-data", metavar="DIRECTORY")
     parser.add_argument("--environment", action="store_true")

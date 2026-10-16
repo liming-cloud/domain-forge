@@ -59,18 +59,23 @@ def framework_pom():
 
 def prepare(args):
     """固定成熟库由真实 Maven 准备；工具与应用分开解析，避免污染实际应用类路径。"""
+    home, _ = calibrate_maven.runtime(args.maven_home)
+    return prepare_with_home(args, home, validate_maven=True)
+
+
+def prepare_with_home(args, home, validate_maven=False):
+    """共用依赖准备；产品调用方须先独立核验自己的 Wrapper Maven。"""
     target = pathlib.Path(args.prepare)
     require(target.is_dir() and not target.is_symlink() and not any(target.iterdir()) and
             not target.resolve().is_relative_to(HERE.parents[1]), "SG_HTTP_TOOLS", "准备需要仓库外专用空目录")
-    home, _ = calibrate_maven.runtime(args.maven_home)
     repository = pathlib.Path(args.repository or "")
     require(args.repository and repository.is_dir() and not repository.is_symlink(), "SG_HTTP_TOOLS", "准备需要专用 Maven 仓库")
     lock = baseline()
     settings = target / "settings.xml"
     settings.write_text('<settings><mirrors><mirror><id>isolated-public-central</id><mirrorOf>*</mirrorOf>'
                         '<url>https://repo.maven.apache.org/maven2</url></mirror></mirrors></settings>', encoding="utf-8")
-    libraries = "<dependencies>" + "".join(dependency(**lock[key]) for key in ("validator", "diff")) + "</dependencies>"
-    for name, body in (("tools", libraries), ("framework", framework_pom())):
+    library_dependencies = "<dependencies>" + "".join(dependency(**lock[key]) for key in ("validator", "diff")) + "</dependencies>"
+    for name, body in (("tools", library_dependencies), ("framework", framework_pom())):
         project = target / name
         project.mkdir()
         pom = project / "pom.xml"
@@ -92,10 +97,14 @@ def prepare(args):
     manifest = {"schema": 1, "lock_sha256": digest(HERE / "http-contract.lock.json"), "artifacts": artifacts}
     (target / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     args.http_tools = str(target)
-    return environment(args)
+    return environment(args) if validate_maven else libraries(args)
 
 
 def environment(args):
+    return dict(libraries(args), maven=calibrate_maven.environment(args)["environment"])
+
+
+def libraries(args):
     target = pathlib.Path(args.http_tools or "")
     require(args.http_tools and target.is_dir() and not target.is_symlink() and (target / "manifest.json").is_file(),
             "SG_HTTP_TOOLS", "缺少实际准备的 HTTP 合同工具，不能跳过")
@@ -111,7 +120,7 @@ def environment(args):
         require("tools/dependencies/" + item["artifact"] + "-" + item["version"] + ".jar" in observed,
                 "SG_HTTP_TOOLS", "缺少固定成熟校验库")
     return {"ok": True, "proof_scope": "isolated-http-environment-only", "http_tools": str(target.resolve()),
-            "artifacts": observed, "maven": calibrate_maven.environment(args)["environment"], "diagnostics": []}
+            "artifacts": observed, "diagnostics": []}
 
 
 def scenarios(path):
@@ -224,11 +233,15 @@ def capture(args, build, definition, cases, temporary, observer="HttpInventory")
     return ET.parse(observed).getroot(), output
 
 
-def observations(document, output, definition, cases):
+def observations(document, output, definition, cases, operation_paths=()):
     require(document.get("boot") == baseline()["boot_version"] and document.get("spring") == baseline()["spring_version"],
             "SG_HTTP_CALIBRATION", "实际启动框架版本不属于已校准组合")
     require(not document.findall("unscanned"), "SG_HTTP_ROUTE_SCOPE",
             "实际注册包含尚未校准的非注解路由：" + str([dict(item.attrib) for item in document.findall("unscanned")]))
+    operations = document.findall("operations")
+    require({x.get("path") for x in operations} == set(operation_paths) and
+            all(x.get("methods") == "[GET]" and x.get("params") == "[]" and x.get("headers") == "[]" for x in operations),
+            "SG_HTTP_OPERATIONS_SCOPE", "实际运维注册不符独立允许范围，不能静默忽略")
     registered = []
     for node in document.findall("registered"):
         item = dict(node.attrib)

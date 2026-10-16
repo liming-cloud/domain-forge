@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "product_ci": {"inputs":["docs/contracts/**","docs/design/minimal-engineering.md","docs/design/development-structure.md","tools/product_gate/**","tools/engineering_gate/**","tools/control_plane/**",".github/workflows/**"],"checks":["build-gate","dependency-risk-gate","behavior-scenarios","runtime-scenarios","product-scenarios"]},
+  "product_ci": {"inputs":["docs/contracts/**","docs/design/minimal-engineering.md","docs/design/development-structure.md","docs/design/reusable-web-component.md","tools/product_gate/**","tools/engineering_gate/**","tools/control_plane/**",".github/workflows/**"],"checks":["build-gate","dependency-risk-gate","behavior-scenarios","runtime-scenarios","product-scenarios"]},
   "reading_order": ["PRODUCT", "REQUIREMENTS", "SYSTEM", "BUILD", "SOURCE", "PERSISTENCE", "HTTP", "ACCESS", "CONFIG", "FAULT", "VERIFY", "DOCS", "TASKS", "AGENT", "REBUILD", "REPO"],
   "maintenance": {
     "inputs": ["tools/control_plane/**", "tools/engineering_gate/**", ".github/workflows/**", "docs/standards/**", "docs/workflow/**", "docs/design/control-plane-mechanism.md", "docs/design/engineering-gates.md", "AGENTS.md"],
@@ -36,7 +36,9 @@
     "CONTROL-TASK": {"path":"docs/tasks/control-plane-verification.md","category":"tasks","kind":"task"},
     "DEVELOPMENT-STRUCTURE": {"path":"docs/design/development-structure.md","category":"design","kind":"design"},
     "MINIMAL-ENGINEERING": {"path":"docs/design/minimal-engineering.md","category":"design","kind":"design"},
-    "ENGINEERING-TASK": {"path":"docs/tasks/minimal-engineering.md","category":"tasks","kind":"task"}
+    "ENGINEERING-TASK": {"path":"docs/tasks/minimal-engineering.md","category":"tasks","kind":"task"},
+    "REUSABLE-WEB": {"path":"docs/design/reusable-web-component.md","category":"design","kind":"design"},
+    "REUSABLE-WEB-TASK": {"path":"docs/tasks/reusable-web-component.md","category":"tasks","kind":"task"}
   },
   "scopes": {
     "acceptance": "执行者、评审者、决定及单元验收；验收来源、一次记录提交及收尾",
@@ -333,6 +335,27 @@
     {"glob":"code/verification/boot-smoke/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
     {"glob":"code/verification/boot-smoke/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
     {"glob":"code/verification/boot-smoke/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"docs/contracts/web-support/0.1.0-r2.1/*.json","purpose":"documentation","scopes":["http","contract","build-gate"]},
+    {"glob":"code/components/web-support/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"code/components/web-support/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"code/components/web-support/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"code/components/web-support/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/app/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/app/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/app/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/app/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"code/platform-bom/pom.xml","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/pom.xml","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-a/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"code/verification/consumers/project-b/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"tools/product_gate/**","purpose":"governance","scopes":["governance","build","dependency-risk","tests","runtime"]}
   ],
   "checks": {
@@ -462,7 +485,7 @@
     "delivery-evidence": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","delivery","--task","@task"]}
   },
   "tasks": {
-    "control-plane-verification": "CONTROL-TASK", "minimal-engineering": "ENGINEERING-TASK"
+    "control-plane-verification": "CONTROL-TASK", "minimal-engineering": "ENGINEERING-TASK", "reusable-web-component": "REUSABLE-WEB-TASK"
   },
-  "current_task": "minimal-engineering"
+  "current_task": "reusable-web-component"
 }

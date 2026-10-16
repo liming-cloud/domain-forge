@@ -1,0 +1,17 @@
+{
+  "schema": 3,
+  "modules": [
+    {
+      "id": "consumer-b",
+      "package": "example.consumer",
+      "kind": "assembly",
+      "depends_on": [],
+      "contract_types": [
+        "example.consumer.b.ConsumerApplication"
+      ],
+      "contract_members": [
+        "example.consumer.b.ConsumerApplication.main([Ljava.lang.String;):void"
+      ]
+    }
+  ]
+}

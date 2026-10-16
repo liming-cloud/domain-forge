@@ -217,11 +217,8 @@
       "criterion": "依首个单元 E01—E12 对实际工程执行并核对证据，不借校准结果代证"
     }
   ],
-  "frontier": "2026-10-16 用户明确验收 R1 精确候选 6f6cea347e77dd4b6e6e9077a6086a77effa1a55；原始确认、S01—S06／E01—E12 范围及证据见本记录 acceptance。当前只完成一次限定验收记录提交与真实 Git／CI／delivery 收尾；收尾通过后进入 R2 设计，组件、平台 BOM 与两个独立消费项目须先明确设计、范围及验收标准，暂不实现业务。此前正文为对应时点的历史过程，不覆盖本唯一记录。",
-  "pending": [
-    "核对本次限定 doc: 记录提交的实际远端、对应 CI 和 delivery；未取得结果不预写 closing 通过",
-    "收尾完成后按本次授权细化 R2 设计；R2 实施仍须确认具体设计、范围与验收标准"
-  ],
+  "frontier": "R1 精确功能候选 6f6cea347e77dd4b6e6e9077a6086a77effa1a55 已获用户人工验收；记录提交 dabc66c9e2d1d40bbe920a2d3f3fb360b582e32c 已完成真实 Git／CI 与 delivery 收尾。2026-10-16 起进入 R2-01 设计任务 reusable-web-component，尚不实施。本文前面的过程及待验收措辞仅保留对应历史时点，不覆盖本唯一记录。",
+  "pending": [],
   "deferred": [
     "IAM、Nacos、数据库和其余首版通用能力按后续单元实现",
     "外部制品发布、独立消费项目、部署升级及性能尚未执行"
@@ -248,10 +245,16 @@
     ]
   },
   "closing": {
-    "status": "pending",
-    "reason": "本记录提交尚未生成、推送及核对真实 CI；结果按实际 Git／CI 对象与公开 delivery 查询，不预写通过。",
+    "status": "passed",
+    "record_sha": "dabc66c9e2d1d40bbe920a2d3f3fb360b582e32c",
+    "remote_sha": "dabc66c9e2d1d40bbe920a2d3f3fb360b582e32c",
+    "ci_sha": "dabc66c9e2d1d40bbe920a2d3f3fb360b582e32c",
+    "source": "ENGINEERING-TASK#唯一任务记录",
     "functional_run_id": 38833920539,
-    "evidence_directory": ".run-artifacts/r1-close/"
+    "record_run_id": 38855253430,
+    "ci_url": "https://github.com/liming-cloud/domain-forge/actions/runs/38855253430",
+    "delivery_evidence": ".run-artifacts/r1-close/delivery-final.json",
+    "scope": "R1 一次限定记录提交已推送，文档／流程 CI 通过；公开 delivery 对实际 Git／CI 对象返回 closing-checked。此事实随下一单元设计登记，不另建 CI 回填提交。"
   }
 }
 ```

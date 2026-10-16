@@ -16,6 +16,9 @@ sys.path.insert(0, str(ENGINEERING))
 from calibrate_source import ProbeFailure, digest, require
 
 MODULE = Path("verification/boot-smoke")
+JAVA_MODULES = (MODULE, Path("components/web-support"), Path("verification/consumers/project-a"), Path("verification/consumers/project-b/app"))
+REACTOR = (MODULE, Path("components/web-support"), Path("platform-bom"))
+CONSUMERS = (Path("verification/consumers/project-a"), Path("verification/consumers/project-b"))
 
 
 def baseline(root):
@@ -70,9 +73,9 @@ def runtime(root):
             "python": platform.python_version(), "platform": platform.platform()}
 
 
-def wrapper(root):
+def wrapper(root, code=None):
     lock = baseline(root)
-    code = root / "code"
+    code = code or root / "code"
     for name, expected in lock["wrapper"]["scripts"].items():
         require((code / name).is_file() and not (code / name).is_symlink() and digest(code / name) == expected,
                 "PG_WRAPPER", "官方 Wrapper 脚本缺失或被改写：" + name)
@@ -92,17 +95,19 @@ def sources(root):
                     for name in ("pom.xml", "src", ".mvn", "mvnw", "mvnw.cmd")),
             "PG_BUILD_SCOPE", "旧根目录工程输入必须迁入代码区")
     code = root / "code"
-    for directory in (code, code / MODULE, code / MODULE / "src", code / ".mvn"):
+    for directory in (code, code / ".mvn", *(code / module / "src" for module in JAVA_MODULES)):
         require(directory.is_dir() and not directory.is_symlink(), "PG_INPUT", "缺少普通工程输入目录")
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
+    required.update(str(module / "pom.xml") for module in (*REACTOR, *JAVA_MODULES, *CONSUMERS))
+    required.update(str(consumer / name) for consumer in CONSUMERS for name in ("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties"))
     paths = []
     for path in code.rglob("*"):
         require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")
-        if path.is_relative_to(code / "target") or path.is_relative_to(code / MODULE / "target"):
+        if any(path.is_relative_to(code / module / "target") for module in (Path("."), *REACTOR, *JAVA_MODULES, *CONSUMERS)):
             continue
         if path.is_file():
             relative = path.relative_to(code)
-            require(relative.as_posix() in required or relative.is_relative_to(MODULE / "src"),
+            require(relative.as_posix() in required or any(relative.is_relative_to(module / "src") for module in JAVA_MODULES),
                     "PG_BUILD_SCOPE", "未登记或未支持的代码输入：" + relative.as_posix())
             paths.append(path)
     require(required <= {p.relative_to(code).as_posix() for p in paths}, "PG_INPUT", "缺少必要工程输入")

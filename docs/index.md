@@ -35,4 +35,4 @@ Agent 只读取任务命中的小节；索引存在不代表门禁或人工验�
 
 ## 当前任务
 
-[minimal-engineering](tasks/minimal-engineering.md#目标与输入)
+[reusable-web-component](tasks/reusable-web-component.md#目标与输入)

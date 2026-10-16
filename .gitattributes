@@ -1,3 +1,5 @@
 # 官方 Wrapper 按分发原始字节校验，禁止 Git 自动转换换行。
 code/mvnw -text
 code/mvnw.cmd -text
+code/verification/consumers/**/mvnw -text
+code/verification/consumers/**/mvnw.cmd -text

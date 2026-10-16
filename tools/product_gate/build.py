@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 import zipfile
 
-from environment import MODULE, baseline, command, digest, require, sources
+from environment import MODULE, REACTOR, baseline, command, digest, require, sources
 import calibrate_architecture
 import calibrate_lifecycle
 import calibrate_maven
@@ -26,9 +26,9 @@ def model(root, project):
     require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) ==
             sorted([*expected, "modules", "properties", "dependencyManagement", "build"]) and
             all(aggregate.findtext("{*}" + key) == value for key, value in expected.items()) and
-            [x.text for x in aggregate.findall("./{*}modules/{*}module")] == [MODULE.as_posix()] and
-            len(aggregate.find("{*}modules")) == 1,
-            "PG_BUILD_SCOPE", "聚合必须只包含已支持的真实探针，不接受空目标、额外模块或隐式配置")
+            [x.text for x in aggregate.findall("./{*}modules/{*}module")] == [item.as_posix() for item in REACTOR] and
+            len(aggregate.find("{*}modules")) == len(REACTOR),
+            "PG_BUILD_SCOPE", "聚合必须精确包含已登记的真实产品模块，不接受空目标、额外模块或隐式配置")
     parent_management(root, aggregate)
     compiler_model(aggregate, project)
     document = ET.parse(project / "pom.xml").getroot()
@@ -66,6 +66,7 @@ def parent_management(root, document):
     versions = {("org.apache.maven.plugins", "maven-" + name + "-plugin"): version
                 for name, version in lock["plugins"].items()}
     versions[("org.springframework.boot", "spring-boot-maven-plugin")] = "${spring-boot.version}"
+    versions[("org.codehaus.mojo", "flatten-maven-plugin")] = json.loads((root / "tools/product_gate/web-baseline.json").read_text())["tools"]["flatten"]["version"]
     actual = {(x.findtext("{*}groupId"), x.findtext("{*}artifactId")): x.findtext("{*}version") for x in plugins}
     require(len(plugins) == len(versions) and actual == versions, "PG_BASELINE", "内部插件管理偏离固定版本或覆盖范围")
     require(all({x.tag.rsplit("}", 1)[-1] for x in plugin} <=
@@ -145,27 +146,61 @@ def lifecycle(root, project, argv, env, home, repository, output):
             "constraints": constraints, "plugin_constraints": plugin_constraints, "resolved": resolved,
             "inventory": {"path": str(inventory), "sha256": digest(inventory)},
             "module_inventory": {"path": str(module_path), "sha256": digest(module_path)},
-            "reactor": [".", MODULE.as_posix()]}
+            "reactor": [".", *[item.as_posix() for item in REACTOR]]}
 
 
 def module_inventory(document, project):
-    """先核对原生 reactor 全量覆盖，再复用单 JAR 的既有严格检查。"""
-    projects = document.findall("project")
+    """核对全部真实 reactor，再选择当前 JAR 的原生观察，不丢弃未知执行。"""
     code = project.parents[1]
-    require(len(projects) == 2 and {x.get("path") for x in projects} == {str(code), str(project)},
+    projects = document.findall("project")
+    expected = {str(code), *(str(code / item) for item in REACTOR)}
+    require(len(projects) == len(expected) and {x.get("path") for x in projects} == expected,
             "PG_BUILD_SCOPE", "实际 reactor 遗漏或增加了未经覆盖的模块")
     aggregate = next(x for x in projects if x.get("path") == str(code))
     require(aggregate.get("packaging") == "pom" and aggregate.get("artifact") == "domain-forge-build" and
             not any(aggregate.findall(tag) for tag in ("declaredDependency", "resolvedDependency")),
             "PG_BUILD_SCOPE", "内部聚合不能包含未验证的产品依赖")
-    require(all(x.get("project") == str(project) for tag in ("compilation", "execution") for x in document.findall(tag)),
+    allowed = {str(code / item) for item in REACTOR}
+    require(all(x.get("project") in allowed for tag in ("compilation", "execution") for x in document.findall(tag)),
             "PG_BUILD_SCOPE", "聚合或未知模块执行了未支持的编译／插件")
-    document.remove(aggregate)
-    for node in list(document.findall("dependencyResolution")):
-        if all(node.get(key) == aggregate.get(key) for key in ("group", "artifact", "version")):
-            require(len(node) == 0, "PG_BUILD_SCOPE", "聚合出现未覆盖的原生依赖图")
-            document.remove(node)
-    return document
+    bom = next(x for x in projects if x.get("path") == str(code / "platform-bom"))
+    require(bom.get("packaging") == "pom" and not any(bom.findall(tag) for tag in ("declaredDependency", "resolvedDependency"))
+            and not any(x.get("project") == str(code / "platform-bom") for x in document.findall("compilation"))
+            and all(x.get("group") == "org.codehaus.mojo" and x.get("artifact") == "flatten-maven-plugin" and
+                    x.get("goal") == "flatten" for x in document.findall("execution") if x.get("project") == str(code / "platform-bom")),
+            "PG_BUILD_SCOPE", "平台 BOM 只能生成消费 POM，不能包含直接依赖、编译或额外执行")
+    return select_inventory(document, project)
+
+
+def select_inventory(document, project):
+    """按精确路径和坐标选择单模块；其他模块由入口全量覆盖检查单独验证。"""
+    declarations = [node for model in document.findall("project") for tag in
+                    ("declaredDependency", "declaredPlugin", "declaredPluginDependency") for node in model.findall(tag)]
+    require(all(calibrate_lifecycle.fixed_version(node.get("version")) for node in [*document.findall("project"), *declarations]),
+            "SG_BUILD_VERSION", "全 reactor 有效项目、依赖或插件声明包含浮动版本")
+    fields = ("group", "artifact", "version", "extension", "classifier")
+    identity_of = lambda item: tuple(item.get(key) for key in fields)
+    constraints = document.findall("pluginConstraint")
+    require({identity_of(x) for x in constraints} == {identity_of(x) for x in document.findall("execution/pluginDependency")},
+            "SG_BUILD_RESOLUTION", "全 reactor 插件约束与执行对象不一致")
+    require(all(calibrate_lifecycle.fixed_version(x.get("constraint")) for x in constraints),
+            "SG_BUILD_VERSION", "全 reactor 插件约束包含浮动版本")
+    result = copy.deepcopy(document)
+    selected = [x for x in result.findall("project") if x.get("path") == str(project)]
+    require(len(selected) == 1, "PG_BUILD_SCOPE", "模块原生观察缺失或重复")
+    identity = selected[0].attrib
+    for node in list(result):
+        if node.tag == "project" and node.get("path") != str(project):
+            result.remove(node)
+        elif node.tag in ("compilation", "execution") and node.get("project") != str(project):
+            result.remove(node)
+        elif node.tag == "dependencyResolution" and any(node.get(key) != identity.get(key) for key in ("group", "artifact", "version")):
+            result.remove(node)
+    used = {identity_of(x) for x in result.findall("execution/pluginDependency")}
+    for node in list(result.findall("pluginConstraint")):
+        if identity_of(node) not in used:
+            result.remove(node)
+    return result
 
 
 def packaged(document, project, build, dependencies):
@@ -207,12 +242,12 @@ def packaged(document, project, build, dependencies):
             "resources": sorted(resources), "dependencies": sorted(jars), "metadata_starters": metadata_starters}
 
 
-def quality(root, project, observed, tools):
+def quality(root, project, observed, tools, declaration="modules.json"):
     """直接使用观察器的真实对象执行必要源码、依赖、合同与职责检查。"""
     build = observed["build"]
     paths, tool_environment = calibrate_source.toolchain(tools)
     groups, implementations, diagnostics = calibrate_maven_source.source_checks(SimpleNamespace(tools=tools), build, paths)
-    modules = calibrate_architecture.declaration(root / "tools/product_gate/modules.json", schema=3)
+    modules = calibrate_architecture.declaration(root / "tools/product_gate" / declaration, schema=3)
     roots, inputs, expected = calibrate_architecture.bytecode_inputs([item["output"] for item in build["compilations"]])
     require(inputs == build["artifacts"], "PG_SOURCE_BINDING", "导入类产物不属于同次构建")
     types = calibrate_architecture.inventory(paths, roots, expected, list(build["classpath_artifacts"]))

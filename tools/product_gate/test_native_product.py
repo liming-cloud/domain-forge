@@ -42,7 +42,7 @@ class NativeProductTests(unittest.TestCase):
         result = build.quality(ROOT, self.project, self.observed, self.tools)
         self.assertTrue(result["ok"], result["diagnostics"])
         self.assertGreater(self.observed["tests"]["count"], 0)
-        self.assertEqual(self.observed["reactor"], [".", "verification/boot-smoke"])
+        self.assertEqual(self.observed["reactor"], [".", "verification/boot-smoke", "components/web-support", "platform-bom"])
         self.assertEqual({item["purpose"] for item in result["bindings"]}, {"production", "test"})
 
     def test_observed_reactor_cannot_omit_or_add_modules(self):

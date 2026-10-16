@@ -32,6 +32,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.function.support.RouterFunctionMapping;
 import org.springframework.web.servlet.handler.AbstractUrlHandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 import org.w3c.dom.Element;
@@ -184,8 +185,35 @@ public final class HttpInventory {
         }
       } else if (mapping instanceof AbstractUrlHandlerMapping url) {
         urlMappings(context, output, url);
+      } else if (mapping instanceof RequestMappingInfoHandlerMapping operations
+          && Set.of(
+                  "org.springframework.boot.webmvc.actuate.endpoint.web.AdditionalHealthEndpointPathsWebMvcHandlerMapping",
+                  "org.springframework.boot.webmvc.actuate.endpoint.web.WebMvcEndpointHandlerMapping")
+              .contains(mapping.getClass().getName())) {
+        operations(output, operations);
       } else {
         unscanned(output, mapping, "unknown-handler-mapping");
+      }
+    }
+  }
+
+  /**
+   * 保留精确 Boot 运维注册，调用方仍须提供独立允许范围和真实请求验证。
+   *
+   * @param output 原生注册记录
+   * @param mapping 实际运维映射
+   * @throws Exception 输出失败时终止
+   */
+  private static void operations(XMLStreamWriter output, RequestMappingInfoHandlerMapping mapping)
+      throws Exception {
+    for (var entry : mapping.getHandlerMethods().entrySet()) {
+      for (String path : entry.getKey().getPatternValues()) {
+        output.writeEmptyElement("operations");
+        output.writeAttribute("path", path);
+        output.writeAttribute("methods", entry.getKey().getMethodsCondition().toString());
+        output.writeAttribute("params", entry.getKey().getParamsCondition().toString());
+        output.writeAttribute("headers", entry.getKey().getHeadersCondition().toString());
+        output.writeAttribute("mapping", mapping.getClass().getName());
       }
     }
   }
