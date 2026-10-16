@@ -217,16 +217,41 @@
       "criterion": "依首个单元 E01—E12 对实际工程执行并核对证据，不借校准结果代证"
     }
   ],
-  "frontier": "R1 原候选 235a2c0 已通过真实 CI 和 delivery 技术核验，人工验收未获得。2026-10-16 用户确认内部 parent＋Boot BOM；当前据此修正 POM、设计与守卫，完成固定输入验证后沿用 R1 交付授权。新候选 Git／CI／delivery 及逐项材料统一记入 .run-artifacts/r1-parent/acceptance-checklist.md；原候选结果不代证新输入。不进入 R2 或业务扩展。",
+  "frontier": "2026-10-16 用户明确验收 R1 精确候选 6f6cea347e77dd4b6e6e9077a6086a77effa1a55；原始确认、S01—S06／E01—E12 范围及证据见本记录 acceptance。当前只完成一次限定验收记录提交与真实 Git／CI／delivery 收尾；收尾通过后进入 R2 设计，组件、平台 BOM 与两个独立消费项目须先明确设计、范围及验收标准，暂不实现业务。此前正文为对应时点的历史过程，不覆盖本唯一记录。",
   "pending": [
-    "核对内部 parent＋Boot BOM 新候选的本地复验、真实 CI 及公开 delivery 结果；缺失或失败不得记为通过，原 ce20ca6／235a2c0 结果不代证",
-    "对精确 R1 候选完成人工验收后，方可按 R2 单元设计继续；当前 acceptance／closing 为空"
+    "核对本次限定 doc: 记录提交的实际远端、对应 CI 和 delivery；未取得结果不预写 closing 通过",
+    "收尾完成后按本次授权细化 R2 设计；R2 实施仍须确认具体设计、范围与验收标准"
   ],
   "deferred": [
     "IAM、Nacos、数据库和其余首版通用能力按后续单元实现",
     "外部制品发布、独立消费项目、部署升级及性能尚未执行"
   ],
-  "acceptance": null,
-  "closing": null
+  "acceptance": {
+    "actor": "本会话用户／项目验收责任人",
+    "date": "2026-10-16",
+    "source": "ENGINEERING-TASK#唯一任务记录",
+    "functional_sha": "6f6cea347e77dd4b6e6e9077a6086a77effa1a55",
+    "scope": "R1 代码与文档分区迁移、最小真实工程及质量／CI 接入，包含内部 Maven parent＋Boot BOM 修正；对应 S01—S06 与 E01—E12。不包含 R2 组件／平台 BOM／独立消费实现、外部制品发布或业务功能。",
+    "source_message": "确认当前候选 6f6cea3 的 R1 人工验收通过，完成验收记录和必要收尾，允许提交推送；随后进入 R2，先明确首个可复用组件、平台 BOM 和两个独立消费项目验证的设计、范围及验收标准，暂不开展业务实现。",
+    "source_conversation": "01a137db-5b64-70c1-9b20-587ab9d0619e",
+    "evidence": {
+      "ci": "https://github.com/liming-cloud/domain-forge/actions/runs/38833920539",
+      "ci_attempt": 1,
+      "checklist": ".run-artifacts/r1-parent/acceptance-checklist.md",
+      "review": ".run-artifacts/r1-parent/review-final.json",
+      "delivery": ".run-artifacts/r1-parent/delivery-final.json",
+      "input": "719630146d559f4dc17b94089f771695d680f76740a5da36af52dd64e0d17fb5"
+    },
+    "limitations": [
+      "Tomcat 11.0.24 的 11 项原生漏洞告警依既有告警政策保留，不代表生产放行",
+      "后续实际组件、独立消费、IAM、部署升级恢复与性能仍按后续单元验证"
+    ]
+  },
+  "closing": {
+    "status": "pending",
+    "reason": "本记录提交尚未生成、推送及核对真实 CI；结果按实际 Git／CI 对象与公开 delivery 查询，不预写通过。",
+    "functional_run_id": 38833920539,
+    "evidence_directory": ".run-artifacts/r1-close/"
+  }
 }
 ```
