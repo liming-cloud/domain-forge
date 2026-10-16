@@ -38,6 +38,7 @@
 - 实施起点：`ce20ca6232db07315d11a72ecf612872e3c47845` 加本轮已确认的未提交结构设计。任务 `base` 保留原工程起点用于完整责任选择，不抹去前序实现；R1 比较与迁移证据单独存放 `.run-artifacts/r1-migration/`。
 - 2026-10-15 的确认是设计与实施授权，不是 R1 实现验收；当时禁止提交推送。`acceptance`、`closing` 继续为空，不进入 R2。
 - 2026-10-16 交付授权，用户原文：“继续推进，先处理 NVD 资料更新 404 并完成复验，保留必要检查和断言；验证通过后允许提交推送 R1 候选，补齐真实 Git／CI 和 delivery-evidence 核验，更新人工验收清单，暂不写入验收通过、不进入 R2 或扩展业务功能。”本条更新当前 Git 操作边界，不改写前次确认输入或人工验收状态。
+- 2026-10-16 Maven 结构纠正：用户指出“maven聚合结构还需要调整，parent不应该直接是springboot 4”，随后明确选择“采用内部 parent＋Boot BOM（推荐）”。确认内容为 `code/pom.xml` 同时承担内部 parent 与聚合，导入 Boot 4.0.8 BOM 并显式管理构建插件，探针继承内部 parent，外部消费项目仍可使用自己的 parent。此次修正从 `235a2c023a45b905199655d091366d05e09a604a` 开始，属于 R1 构建结构收敛；既有 R1 验证后交付授权继续适用，人工验收不由设计确认代替。
 
 ## R1 迁移清单与验证范围
 
@@ -47,7 +48,7 @@
 |---|---|
 | 文档正文 | `README.md` 产品正文 → `docs/product/product-definition.md`；`REBUILD.md` → `docs/product/rebuild.md`。保留 PRODUCT／REBUILD 稳定 ID、原确认摘要与来源；根 README 改为导航，AGENTS 链接及全部相关相对引用同步更新，索引由公开命令生成 |
 | 真实探针 | 根 `pom.xml`、`src/` → `code/verification/boot-smoke/`，字节对照；不改名为 IAM 或业务模板，不增加空组件／服务／模板 |
-| 构建入口 | Wrapper 原样迁入 `code/`；新增只聚合实际探针的 `code/pom.xml`，不被探针或消费者继承。固定聚合范围，拒绝空模块、遗漏模块、未支持配置或链接；真实 reactor verify 的观察对象必须精确对应聚合和探针 |
+| 构建入口 | 原迁移将 Wrapper 原样迁入 `code/`，新增仅聚合实际探针且不被继承的 POM；2026-10-16 另行确认改为内部 parent＋聚合及 Boot BOM。固定聚合范围，拒绝空模块、遗漏模块、未支持配置或链接；真实 reactor verify 的观察对象必须精确对应聚合和探针。外部消费项目不被要求继承内部 parent |
 | 输入与原生适配 | `tools/product_gate/{environment,build,advisory}.py` 适配仓库根、代码聚合根与实际模块；保留原编译／类型／依赖／JAR／测试覆盖校验及原生扫描，不复制另一套质量规则 |
 | 路由与 CI | `catalog.json`、必要选择逻辑、工作流缓存输入及 `.gitattributes`／`.gitignore` 适配；旧路径仅保留删除差异的分类责任，不接受继续使用。文档普通修改单独检查，规则／合同／共享工具改变触发产品与适用机制检查；未知路径明确拒绝 |
 | 使用与回归 | 更新设计中的真实命令。先以新增定向反例证明新目录、聚合遗漏及跨区漏检会失败，再修正适配；迁移只做字节对照，不为搬运新增镜像测试。完整运行控制面与 delivery 机制测试、工作流守卫及产品入口（含全部既有反例）；必要校准按实际变更选择 |
@@ -56,6 +57,10 @@
 执行入口保持仓库根 `python3 -B tools/control_plane/control_plane.py check` 与 `python3 -B tools/product_gate/verify.py --project .` 分别承担文档和产品责任；开发构建使用 `code/mvnw -f code/pom.xml verify`。当前聚合只包含一个真实探针；后续增加实际模块必须同时扩展登记和原生验证范围，不由 R1 推定已支持任意多模块产品。
 
 ## R1 本地结果与剩余责任
+
+`235a2c023a45b905199655d091366d05e09a604a` 已完成原 R1 候选交付，[CI 38828454659](https://github.com/liming-cloud/domain-forge/actions/runs/38828454659) 的 17 个 job 通过，公开 delivery 为 `candidate-checked`，人工验收仍为空；原材料保留在 `.run-artifacts/r1-delivery/`。本轮内部 parent＋Boot BOM 修正改变构建输入，原 CI 与七个文件字节一致的迁移证据只证明原候选，不能代证新候选。
+
+本次修正清单：同步上述设计与确认记录；先增加直接 Boot parent 被拒绝的失败用例；修改内部 parent、探针继承和产品模型守卫；复用全部既有反例并补父级编译配置、BOM／插件漂移及漏重新打包覆盖；实际验证聚合构建、子模块直接构建、依赖组合和原运行合同。完成后运行完整产品入口、文档和适用控制面回归，再按已有授权提交推送并核验精确 Git／CI／delivery。新证据集中于 `.run-artifacts/r1-parent/`，人工清单仍覆盖 S01—S06 与 E01—E12，不进入 R2。
 
 2026-10-15 已按清单完成物理迁移及适配；本地完整产品入口五项检查通过，21 项产品门禁测试及 1 项真实 HTTP JUnit 通过，控制面／delivery 机制 144 项回归通过（其中 7 项为 delivery 协议检查，不能与独立工作流守卫混称）。该次固定输入复验与逐项语义结论保留于 `.run-artifacts/r1-migration/verification-summary.md`。2026-10-16 补做的独立工作流守卫 7 项、资料配置检查 3 项均通过，新一轮候选证据集中于 `.run-artifacts/r1-delivery/`。
 
@@ -212,9 +217,9 @@
       "criterion": "依首个单元 E01—E12 对实际工程执行并核对证据，不借校准结果代证"
     }
   ],
-  "frontier": "R1 已完成分区迁移及检查适配；2026-10-16 同一官方NVD地址恢复，原生更新已成功。现按授权完成固定输入复验后提交推送候选，精确Git／CI／delivery及逐项材料统一记入 .run-artifacts/r1-delivery/acceptance-checklist.md；候选提交前不预记远端通过。人工验收保持待确认，不进入R2或业务扩展。",
+  "frontier": "R1 原候选 235a2c0 已通过真实 CI 和 delivery 技术核验，人工验收未获得。2026-10-16 用户确认内部 parent＋Boot BOM；当前据此修正 POM、设计与守卫，完成固定输入验证后沿用 R1 交付授权。新候选 Git／CI／delivery 及逐项材料统一记入 .run-artifacts/r1-parent/acceptance-checklist.md；原候选结果不代证新输入。不进入 R2 或业务扩展。",
   "pending": [
-    "核对候选清单中固定输入本地复验、真实CI及公开delivery结果；缺失或失败不得记为通过，原 ce20ca6 结果不代证",
+    "核对内部 parent＋Boot BOM 新候选的本地复验、真实 CI 及公开 delivery 结果；缺失或失败不得记为通过，原 ce20ca6／235a2c0 结果不代证",
     "对精确 R1 候选完成人工验收后，方可按 R2 单元设计继续；当前 acceptance／closing 为空"
   ],
   "deferred": [

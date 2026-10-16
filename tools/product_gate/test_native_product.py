@@ -60,13 +60,45 @@ class NativeProductTests(unittest.TestCase):
 
     def test_native_skipped_tests_are_rejected_despite_successful_packaging(self):
         project, output, args = self.fixture()
-        pom = project / "pom.xml"
+        pom = project.parents[1] / "pom.xml"
         pom.write_text(pom.read_text().replace("<failIfNoTests>true</failIfNoTests>",
                                              "<failIfNoTests>true</failIfNoTests><skipTests>true</skipTests>"))
         with self.assertRaises(environment.ProbeFailure) as error:
             build.lifecycle(ROOT, project, *args, self.repository, output)
         self.assertEqual(error.exception.diagnostic["code"], "SG_BUILD_TESTS")
         self.assertIn("Tests are skipped", (output / "verify.log").read_text())
+
+    def test_module_build_uses_repository_parent_without_install(self):
+        project, output, args = self.fixture()
+        argv, env, home = args
+        self.assertFalse((self.repository / "org/domainforge/domain-forge-build").exists())
+        extension = calibrate_maven.observer(home, output)
+        inventory = output / "direct-module.xml"
+        environment.command([*argv, "-f", project / "pom.xml", "-Dmaven.ext.class.path=" + str(extension),
+                             "-Ddomainforge.scope.output=" + str(inventory), "verify"],
+                            project, output / "direct-module.log", 600, env)
+        document = ET.parse(inventory).getroot()
+        self.assertEqual([x.get("path") for x in document.findall("project")], [str(project)])
+        compilations = calibrate_maven.compilation_inventory(document, project,
+                                                            calibrate_maven.project_inputs(project), self.repository)
+        tests = calibrate_lifecycle.test_results(project, compilations, set(environment.baseline(ROOT)["required_tests"]))
+        self.assertGreater(tests["count"], 0)
+        artifact = Path(document.find("project").get("artifactFile"))
+        with zipfile.ZipFile(artifact) as archive:
+            self.assertIn("Main-Class: org.springframework.boot.loader.launch.JarLauncher",
+                          archive.read("META-INF/MANIFEST.MF").decode())
+        self.assertFalse((self.repository / "org/domainforge/domain-forge-build").exists())
+
+    def test_missing_explicit_boot_repackage_is_rejected(self):
+        project, output, args = self.fixture()
+        pom = project / "pom.xml"
+        document = ET.parse(pom)
+        plugin = document.find("./{*}build/{*}plugins/{*}plugin")
+        plugin.remove(plugin.find("{*}executions"))
+        document.write(pom)
+        with self.assertRaises(environment.ProbeFailure) as error:
+            build.lifecycle(ROOT, project, *args, self.repository, output)
+        self.assertEqual(error.exception.diagnostic["code"], "PG_BUILD_ARTIFACT")
 
     def test_zero_tests_and_real_failed_assertion_are_not_green(self):
         for mutation in ("zero", "assertion"):

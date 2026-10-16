@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import xml.etree.ElementTree as ET
 
 import environment
 import build
@@ -47,6 +48,46 @@ class ProductInputTests(unittest.TestCase):
                 pom.write_text(altered)
                 self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
         pom.write_text(original)
+
+    def test_boot_parent_cannot_replace_repository_parent(self):
+        pom = self.project / "pom.xml"
+        document = ET.parse(pom)
+        parent = document.find("./{*}parent")
+        for key, value in {"groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent",
+                           "version": environment.baseline(ROOT)["boot_version"], "relativePath": ""}.items():
+            parent.find("{*}" + key).text = value
+        document.write(pom)
+        self.reject("PG_BASELINE", build.model, ROOT, self.project)
+
+    def test_parent_path_and_bom_import_cannot_drift(self):
+        pom = self.project / "pom.xml"
+        original = pom.read_text()
+        pom.write_text(original.replace("../../pom.xml", "../../../pom.xml"))
+        self.reject("PG_BASELINE", build.model, ROOT, self.project)
+        pom.write_text(original)
+        parent = self.code / "pom.xml"
+        parent.write_text(parent.read_text().replace("<scope>import</scope>", "<scope>compile</scope>"))
+        self.reject("PG_BASELINE", build.model, ROOT, self.project)
+
+    def test_parent_cannot_inject_dependencies_or_aggregate_plugin_execution(self):
+        pom = self.code / "pom.xml"
+        original = pom.read_text()
+        for altered in (original.replace("</project>", "<dependencies/></project>"),
+                        original.replace("</project>", "<parent/></project>"),
+                        original.replace("</pluginManagement>", "</pluginManagement><plugins/>"),
+                        original.replace("</plugin>", "<executions/></plugin>")):
+            with self.subTest(altered=altered):
+                pom.write_text(altered)
+                self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
+
+    def test_parent_managed_compiler_and_plugin_versions_are_checked(self):
+        pom = self.code / "pom.xml"
+        original = pom.read_text()
+        pom.write_text(original.replace("<parameters>true</parameters>",
+                                        "<parameters>true</parameters><fork>true</fork>"))
+        self.reject("SG_BUILD_CLASSPATH", build.model, ROOT, self.project)
+        pom.write_text(original.replace("<version>3.14.1</version>", "<version>3.14.2-SNAPSHOT</version>"))
+        self.reject("PG_BASELINE", build.model, ROOT, self.project)
 
     def test_legacy_root_and_linked_code_partition_are_rejected(self):
         legacy = self.root / "pom.xml"
@@ -100,9 +141,10 @@ class ProductInputTests(unittest.TestCase):
         self.reject("PG_INPUT", environment.wrapper, self.root)
 
     def test_changed_boot_or_non_loopback_configuration_cannot_pass_preflight(self):
-        pom = self.project / "pom.xml"
+        pom = self.code / "pom.xml"
         original = pom.read_text()
-        pom.write_text(original.replace("<version>4.0.8</version>", "<version>4.0.9-SNAPSHOT</version>"))
+        pom.write_text(original.replace("<spring-boot.version>4.0.8</spring-boot.version>",
+                                        "<spring-boot.version>4.0.9-SNAPSHOT</spring-boot.version>"))
         self.reject("PG_BASELINE", build.model, ROOT, self.project)
         pom.write_text(original)
         config = self.project / "src/main/resources/application.properties"

@@ -32,9 +32,13 @@ IAM、Nacos 配置与发现、数据库迁移、缓存等平台能力、外部�
 
 ## 工程组织与方案比较
 
-原候选 `ce20ca6` 的根目录单工程按已确认的[整体研发结构](development-structure.md#仓库分区与管理边界)迁入 `code/verification/boot-smoke/`。`code/pom.xml` 只聚合该实际模块，`code/.mvn/wrapper` 与官方脚本作为构建入口；探针继续使用 Boot parent，不继承内部聚合。探针源码、坐标 `org.domainforge:domain-forge:0.1.0` 和运行合同保持原样，唯一生产类型 `org.domainforge.boot.DomainForgeApplication` 承担启动装配；当前无外部发布。
+原候选 `ce20ca6` 的根目录单工程按已确认的[整体研发结构](development-structure.md#仓库分区与管理边界)迁入 `code/verification/boot-smoke/`。2026-10-16 用户进一步确认内部 parent＋Boot BOM，替代 `235a2c0` 中探针直接继承 Boot parent 的设计：`code/pom.xml` 同时作为内部 parent 和聚合入口，只聚合该实际模块；探针继承 `org.domainforge:domain-forge-build:0.1.0`，通过 `../../pom.xml` 解析仓库父 POM。`code/.mvn/wrapper` 与官方脚本作为构建入口。探针源码、坐标 `org.domainforge:domain-forge:0.1.0` 和运行合同保持原样，唯一生产类型 `org.domainforge.boot.DomainForgeApplication` 承担启动装配；当前无外部发布。
 
-真实入口核对代码区全部维护文件、固定聚合模块与原生 reactor 两个项目的对应关系，拒绝空目标、额外模块、隐式聚合配置和未覆盖输入；再对实际 JAR 模块复用既有编译、源码、依赖、测试与打包校验。原始 reactor 清单及派生模块清单均保留。不由当前适配宣称任意多模块、模板或服务已经支持。
+内部 parent 不继承其他 parent，以 `dependencyManagement` 导入 `spring-boot-dependencies:4.0.8`，依赖版本和 Boot 插件共用该 Boot 版本属性。内部构建统一 Java 21 release、UTF-8、编译参数名和可重现打包时间；在 `pluginManagement` 显式管理当前实际使用的 compiler、resources、surefire、jar 及 Boot 插件版本。必需测试保持 `failIfNoTests=true`；探针显式启用 Boot 插件的 `repackage` 与 `includeTools=false`。应用配置按原始字节打包，不引入 Maven 资源过滤或新的运行配置来源。
+
+方案比较：内部 parent 继续继承 Boot 能减少配置维护，但仍继承其插件、资源过滤及其他默认约定；已确认方案采用内部 parent 导入 Boot BOM，由本仓库显式维护实际需要的构建约定。[Boot 4.0 官方说明](https://docs.spring.io/spring-boot/4.0/maven-plugin/using.html)明确 BOM import 只提供依赖管理，不提供插件管理。保留现有版本组合，不复制尚未使用的 Kotlin、native、war 或发布配置。
+
+真实入口核对代码区全部维护文件、内部继承与 BOM、固定聚合模块及原生 reactor 两个项目的对应关系，拒绝空目标、额外模块、隐式聚合配置和未覆盖输入；父级编译配置同样接受既有守卫。再对实际 JAR 模块复用编译、源码、依赖、测试与打包校验，保留原始 reactor 及派生模块清单。聚合入口和直接选择子模块的构建都须实际验证，父 POM 不依赖提前 install。当前适配不宣称任意多模块、模板或服务已经支持。
 
 | 方案 | 收益与代价 | 结论 |
 |---|---|---|

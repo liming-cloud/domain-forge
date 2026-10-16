@@ -3,20 +3,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.8</version>
-    <relativePath/>
+    <groupId>org.domainforge</groupId>
+    <artifactId>domain-forge-build</artifactId>
+    <version>0.1.0</version>
+    <relativePath>../../pom.xml</relativePath>
   </parent>
-  <groupId>org.domainforge</groupId>
   <artifactId>domain-forge</artifactId>
-  <version>0.1.0</version>
   <name>Domain Forge</name>
   <description>最小真实工程与质量接入；尚未提供业务或平台能力。</description>
-  <properties>
-    <java.version>21</java.version>
-    <project.build.outputTimestamp>2026-10-15T00:00:00Z</project.build.outputTimestamp>
-  </properties>
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -62,13 +56,14 @@
         <configuration>
           <includeTools>false</includeTools>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <failIfNoTests>true</failIfNoTests>
-        </configuration>
+        <executions>
+          <execution>
+            <id>repackage</id>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

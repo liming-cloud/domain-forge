@@ -2,7 +2,7 @@
 
 ## 状态与依据
 
-2026-10-15 用户指出“顺序有问题，脚手架整体的研发结构需要定义好，将代码和文档分开管理”，随后明确选择“同一仓库分目录管理，分别设置检查入口”。本轮进一步要求明确组件、服务、模板、身份权限部署及研发顺序，并核对 DDD 与已有规范的实际作用。分区原则和先设计后实施的顺序已确认；D01—D04 推荐方案及 S01—S06 已获用户确认，确认来源与精确输入见[结构确认与 R1 授权](../tasks/minimal-engineering.md#结构确认与-r1-授权)。本轮执行 R1 分区迁移及本地适用验证，不扩展业务功能、不提交推送。
+2026-10-15 用户指出“顺序有问题，脚手架整体的研发结构需要定义好，将代码和文档分开管理”，随后明确选择“同一仓库分目录管理，分别设置检查入口”。本轮进一步要求明确组件、服务、模板、身份权限部署及研发顺序，并核对 DDD 与已有规范的实际作用。分区原则和先设计后实施的顺序已确认；D01—D04 推荐方案及 S01—S06 已获用户确认，确认来源与精确输入见[结构确认与 R1 授权](../tasks/minimal-engineering.md#结构确认与-r1-授权)。当前仍处 R1；2026-10-16 已获验证后提交推送授权，随后确认内部 parent＋Boot BOM 的继承修正；不扩展业务功能，人工验收另行记录。
 
 依据为[产品目的](../product/product-definition.md#产品目的)、[版本化复用边界](../product/product-definition.md#已确认的产品边界)、[起步交付](../product/product-definition.md#新项目起步交付)、[模块组织原则](../standards/system-design.md#逻辑模块与依赖门禁)和[制品与独立消费](../standards/technology-and-build.md#制品与独立消费)。本设计先确定研发结构，不新增首版功能，不提前填写未确定的框架、服务商或业务合同。
 
@@ -75,7 +75,7 @@ domain-forge/
 ├── README.md                 # 简短导航与工作入口
 ├── AGENTS.md                 # Agent 入口
 ├── code/                     # 产品与可执行验证工程
-│   ├── pom.xml               # 仓库内部构建聚合，不强制消费项目继承
+│   ├── pom.xml               # 仓库内部 parent 与聚合，不强制消费项目继承
 │   ├── .mvn/、mvnw、mvnw.cmd # 官方 Wrapper 与产品构建入口
 │   ├── platform-bom/         # 已交付平台制品的版本组合
 │   ├── components/           # 按能力交付的可复用组件
@@ -187,6 +187,8 @@ IAM 负责账号状态、会话有效性、角色／操作权限和授权范围�
 推荐首版采用一条平台兼容发布线：本次发布的组件、BOM、服务与模板用同一版本标识，BOM 只列实际交付并验证的坐标，发布清单记录精确制品散列和文档提交。内部 parent／聚合配置不成为消费项目必须继承的 parent；消费项目显式导入 BOM 并选择依赖，也可以按兼容矩阵独立安排升级。统一版本不等于强制所有项目同步发布，未实现组件不占用发布坐标。
 
 依赖管理 import 和构建 parent 是不同机制；BOM 的用途参考 [Maven 官方依赖管理说明](https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#bill-of-materials-bom-poms)。最终 POM、插件与服务协议仍须实际消费验证，不能只凭 BOM 版本号认定整个组合兼容。
+
+2026-10-16 用户确认内部 parent＋Boot BOM：`code/pom.xml` 同时承担当前仓库的父 POM 与实际模块聚合，坐标保留 `org.domainforge:domain-forge-build:0.1.0`，不再继承 Spring Boot parent。它通过 `dependencyManagement` 导入 Boot BOM，集中管理 Java、编码和构建插件；仅管理版本与构建约定，不向子模块自动加入 Web、数据库或安全依赖。可执行模块显式启用 Boot 插件及重新打包，普通组件不因继承而变成 Boot 应用。独立消费验证工程仍应使用消费方自己的 parent，不能通过内部继承替代独立消费。当前探针的具体 POM 与验证合同见[最小工程设计](minimal-engineering.md#工程组织与方案比较)；对外 `platform-bom` 仍待 R2 的真实制品，不在本次创建空模块。
 
 ## 分别检查与关联验证
 

@@ -1,5 +1,6 @@
 """将原生生命周期、源码和架构观察绑定到同一真实产品构建。"""
 
+import copy
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,35 +23,78 @@ def model(root, project):
     aggregate = ET.parse(project.parents[1] / "pom.xml").getroot()
     expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "domain-forge-build",
                 "version": "0.1.0", "packaging": "pom"}
-    require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) == sorted([*expected, "modules"]) and
+    require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) ==
+            sorted([*expected, "modules", "properties", "dependencyManagement", "build"]) and
             all(aggregate.findtext("{*}" + key) == value for key, value in expected.items()) and
             [x.text for x in aggregate.findall("./{*}modules/{*}module")] == [MODULE.as_posix()] and
             len(aggregate.find("{*}modules")) == 1,
             "PG_BUILD_SCOPE", "聚合必须只包含已支持的真实探针，不接受空目标、额外模块或隐式配置")
-    document = ET.parse(project / "pom.xml")
+    parent_management(root, aggregate)
+    compiler_model(aggregate, project)
+    document = ET.parse(project / "pom.xml").getroot()
     parent = document.find("./{*}parent")
-    require(parent is not None and parent.findtext("{*}groupId") == "org.springframework.boot" and
-            parent.findtext("{*}artifactId") == "spring-boot-starter-parent" and
-            parent.findtext("{*}version") == baseline(root)["boot_version"], "PG_BASELINE", "工程父版本偏离已验证 Boot 基线")
+    require(parent is not None and len(parent) == 4 and
+            all(parent.findtext("{*}" + key) == expected[key] for key in ("groupId", "artifactId", "version")) and
+            parent.findtext("{*}relativePath") == "../../pom.xml",
+            "PG_BASELINE", "探针必须通过仓库路径继承已验证的内部 parent")
     require(not any(document.find(path) is not None for path in ("./{*}modules", "./{*}profiles",
                 "./{*}build/{*}directory", "./{*}build/{*}outputDirectory", "./{*}build/{*}testOutputDirectory")),
             "PG_BUILD_SCOPE", "本单元仅支持默认输出的单工程")
-    # 复用对编译器、类路径和隐式 fork 参数的守卫；已验证的父 POM 单独核对。
-    document.getroot().remove(parent)
-    temporary = project / "model-check"
-    temporary.mkdir()
-    document.write(temporary / "pom.xml")
-    try:
-        calibrate_maven.validate_model(temporary)
-    finally:
-        (temporary / "pom.xml").unlink()
-        temporary.rmdir()
+    compiler_model(document, project)
     properties = project / "src/main/resources/application.properties"
     config = dict(line.split("=", 1) for line in properties.read_text().splitlines() if line and not line.startswith("#"))
     require(config.get("server.address") == "127.0.0.1", "PG_RUNTIME_TARGET", "默认监听须保持回环")
     require(not any(p.suffix in {".properties", ".yml", ".yaml"} and p != properties
                     for p in (project / "src/main/resources").rglob("*")),
             "PG_BUILD_SCOPE", "额外运行配置来源须先定义并验证覆盖合同")
+
+
+def parent_management(root, document):
+    """内部 parent 仅提供已支持的管理项；不混入依赖或聚合插件执行。"""
+    lock = baseline(root)
+    bom = document.findall("./{*}dependencyManagement/{*}dependencies/{*}dependency")
+    expected = {"groupId": "org.springframework.boot", "artifactId": "spring-boot-dependencies",
+                "version": "${spring-boot.version}", "type": "pom", "scope": "import"}
+    require(document.findtext("./{*}properties/{*}spring-boot.version") == lock["boot_version"] and
+            len(bom) == 1 and len(bom[0]) == len(expected) and
+            all(bom[0].findtext("{*}" + key) == value for key, value in expected.items()),
+            "PG_BASELINE", "内部 parent 须导入固定 Boot BOM，不以父继承或额外版本覆盖替代")
+    require([x.tag.rsplit("}", 1)[-1] for x in document.find("{*}build")] == ["pluginManagement"] and
+            [x.tag.rsplit("}", 1)[-1] for x in document.find("./{*}build/{*}pluginManagement")] == ["plugins"],
+            "PG_BUILD_SCOPE", "内部 parent 只管理插件，不启用聚合执行或覆盖输出")
+    plugins = document.findall("./{*}build/{*}pluginManagement/{*}plugins/{*}plugin")
+    versions = {("org.apache.maven.plugins", "maven-" + name + "-plugin"): version
+                for name, version in lock["plugins"].items()}
+    versions[("org.springframework.boot", "spring-boot-maven-plugin")] = "${spring-boot.version}"
+    actual = {(x.findtext("{*}groupId"), x.findtext("{*}artifactId")): x.findtext("{*}version") for x in plugins}
+    require(len(plugins) == len(versions) and actual == versions, "PG_BASELINE", "内部插件管理偏离固定版本或覆盖范围")
+    require(all({x.tag.rsplit("}", 1)[-1] for x in plugin} <=
+                {"groupId", "artifactId", "version", "configuration"} for plugin in plugins),
+            "PG_BUILD_SCOPE", "内部 parent 不隐式注入插件执行、扩展或插件依赖")
+
+
+def compiler_model(document, project):
+    """分别检查两层配置；管理中的编译配置也复用既有类路径与 fork 守卫。"""
+    document = copy.deepcopy(document)
+    for name in ("parent", "modules"):
+        node = document.find("{*}" + name)
+        if node is not None:
+            document.remove(node)
+    managed = document.findall("./{*}build/{*}pluginManagement/{*}plugins/{*}plugin")
+    if managed:
+        build = document.find("{*}build")
+        active = build.find("{*}plugins")
+        if active is None:
+            active = ET.SubElement(build, "plugins")
+        active.extend(managed)
+    temporary = project / "model-check"
+    temporary.mkdir()
+    ET.ElementTree(document).write(temporary / "pom.xml")
+    try:
+        calibrate_maven.validate_model(temporary)
+    finally:
+        (temporary / "pom.xml").unlink()
+        temporary.rmdir()
 
 
 def lifecycle(root, project, argv, env, home, repository, output):
