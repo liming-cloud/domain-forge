@@ -25,9 +25,10 @@ class ControlPlaneCommands(unittest.TestCase):
         self.write("tools/control_plane/control_plane.py", ENTRY.read_text(encoding="utf-8"))
         self.catalog = {
             "schema": 1,
-            "categories": {"product": {"title": "产品", "index": "docs/product-index.md"},
-                           "standards": {"title": "规范", "index": "docs/standards-index.md"},
-                           "tasks": {"title": "任务", "index": "docs/tasks/index.md"}},
+            "index": "docs/00-文档导航.md",
+            "categories": {"product": {"title": "产品"},
+                           "standards": {"title": "规范"},
+                           "tasks": {"title": "任务"}},
             "documents": {
                 "PRODUCT": {"path": "README.md", "category": "product", "kind": "rules"},
                 "RULES": {"path": "docs/rules.md", "category": "standards", "kind": "rules"},
@@ -245,7 +246,7 @@ class ControlPlaneCommands(unittest.TestCase):
         self.save_catalog()
         code, output = self.command("index")
         self.assertEqual(code, 0, output)
-        guide = output["files"]["docs/index.md"]
+        guide = output["files"]["docs/00-文档导航.md"]
         self.assertIn("## 人工阅读顺序", guide)
         self.assertIn("1. [01 · PRODUCT · 产品](../README.md)", guide)
         self.assertIn("2. [02 · RULES · 规范](rules.md)", guide)
@@ -253,6 +254,23 @@ class ControlPlaneCommands(unittest.TestCase):
         code, route = self.command("route", "--task", "fixture")
         self.assertEqual(code, 0, route)
         self.assertEqual({item["ref"] for item in route["rules"]}, {"PRODUCT#目标", "RULES#文档"})
+
+    def test_single_navigation_rejects_parallel_index_configuration_and_stale_file(self):
+        code, output = self.command("index", "--write")
+        self.assertEqual(code, 0, output)
+        self.assertEqual(output["generated"], ["docs/00-文档导航.md"])
+        self.write("docs/index.md", "# 旧派生入口\n")
+        self.expect_failure("CP_UNINDEXED_DOCUMENT", "check")
+        (self.root / "docs/index.md").unlink()
+        self.catalog["categories"]["tasks"]["index"] = "docs/tasks/index.md"
+        self.save_catalog()
+        self.expect_failure("CP_CATEGORY", "index")
+
+    def test_navigation_cannot_overwrite_registered_body(self):
+        self.catalog["index"] = "docs/rules.md"
+        self.save_catalog()
+        self.expect_failure("CP_CATEGORY", "index", "--write")
+        self.assertIn("只引用唯一正文", (self.root / "docs/rules.md").read_text())
 
     def test_human_reading_order_cannot_omit_duplicate_or_add_unrelated_documents(self):
         for order in (["PRODUCT"], ["PRODUCT", "RULES", "RULES"],
@@ -592,7 +610,7 @@ class ControlPlaneCommands(unittest.TestCase):
 
     def test_generated_index_cannot_be_hand_edited_into_another_state(self):
         self.render_indices()
-        self.write("docs/tasks/index.md", "# 自称已验收\n")
+        self.write("docs/00-文档导航.md", "# 自称已验收\n")
         self.expect_failure("CP_INDEX_DRIFT", "check")
 
     def test_acceptance_requires_human_source_and_exact_functional_sha(self):
@@ -608,9 +626,9 @@ class ControlPlaneCommands(unittest.TestCase):
         self.save_task()
         code, output = self.command("index")
         self.assertEqual(code, 0, output)
-        index = output["files"]["docs/tasks/index.md"]
+        index = output["files"]["docs/00-文档导航.md"]
         self.assertIn("收尾待处理", index)
-        self.assertIn("归档", index)
+        self.assertIn("## 按需验收依据", index)
         self.assertIn("CI 尚未核对", index)
 
     def test_rule_and_goal_reference_cannot_escape_repository(self):
@@ -848,10 +866,10 @@ class ControlPlaneCommands(unittest.TestCase):
         self.expect_failure("CP_UNSAFE_PATH", "check")
 
     def test_index_generator_does_not_overwrite_manual_text_or_git_metadata(self):
-        self.write("docs/product-index.md", "# 人工设计\n")
+        self.write("docs/00-文档导航.md", "# 人工设计\n")
         self.expect_failure("CP_INDEX_OWNERSHIP", "index", "--write")
-        self.assertEqual((self.root / "docs/product-index.md").read_text(encoding="utf-8"), "# 人工设计\n")
-        self.catalog["categories"]["product"]["index"] = ".git/forbidden.md"
+        self.assertEqual((self.root / "docs/00-文档导航.md").read_text(encoding="utf-8"), "# 人工设计\n")
+        self.catalog["index"] = ".git/forbidden.md"
         self.save_catalog()
         self.expect_failure("CP_UNSAFE_PATH", "index", "--write")
         self.assertFalse((self.root / ".git/forbidden.md").exists())
@@ -953,7 +971,7 @@ class ControlPlaneCommands(unittest.TestCase):
         self.save_task()
         code, output = self.command("index")
         self.assertEqual(code, 0, output)
-        self.assertIn("另有待解决的合法问题", output["files"]["docs/tasks/index.md"])
+        self.assertIn("另有待解决的合法问题", output["files"]["docs/00-文档导航.md"])
         self.task["pending"] = []
         self.save_task()
         self.expect_failure("CP_TASK_POINTER", "check")
@@ -967,8 +985,7 @@ class ControlPlaneCommands(unittest.TestCase):
         self.assertEqual(output["generated"], [])
 
     def test_generated_indices_have_one_terminal_newline_with_or_without_history(self):
-        self.catalog["categories"]["tasks"]["archive"] = "docs/tasks/archive.md"
-        self.catalog["categories"]["design"] = {"title": "设计", "index": "docs/design/index.md"}
+        self.catalog["categories"]["design"] = {"title": "设计"}
         for history in (False, True):
             with self.subTest(history=history):
                 if history:
@@ -1046,15 +1063,14 @@ class ControlPlaneCommands(unittest.TestCase):
         self.expect_failure("CP_ENVIRONMENT_CHANGED", "run", "--task", "fixture")
 
     def test_replaced_rules_leave_default_index_but_remain_queryable_in_archive(self):
-        self.catalog["categories"]["tasks"]["archive"] = "docs/tasks/archive.md"
         self.catalog["documents"]["OLD-RULES"] = {"path": "docs/old-rules.md", "category": "standards",
                                                     "kind": "rules", "replaced_by": "RULES"}
         self.write("docs/old-rules.md", "# 旧规范\n\n## 旧正文\n\n仅作历史输入。\n")
         self.save_catalog()
         code, output = self.command("index")
         self.assertEqual(code, 0, output)
-        self.assertNotIn("[OLD-RULES]", output["files"]["docs/standards-index.md"])
-        self.assertIn("../old-rules.md", output["files"]["docs/tasks/archive.md"])
+        self.assertNotIn("OLD-RULES", output["files"]["docs/00-文档导航.md"].split("## 按需验收依据")[0])
+        self.assertIn("old-rules.md", output["files"]["docs/00-文档导航.md"])
 
     def test_changed_file_reasons_are_not_copied_into_every_rule(self):
         for number in range(10):
@@ -1113,11 +1129,24 @@ class CurrentCatalogJourneys(unittest.TestCase):
             self.assertNotEqual(process.returncode, 0)
             self.assertIn("CP_MAINTENANCE_POLICY", [item["code"] for item in json.loads(process.stdout)["diagnostics"]])
 
+    def test_derived_navigation_only_is_light_but_rule_body_still_requires_full_checks(self):
+        from control_plane import ControlPlane
+        plane = ControlPlane(self.root)
+        plane.write_indices()
+        self.assertFalse(plane.maintenance_changed([plane.index], self.task["base"]))
+        self.assertFalse(plane.product_changed([plane.index]))
+        rule_path = plane.documents["SYSTEM"]["path"]
+        self.assertTrue(plane.maintenance_changed([rule_path], self.task["base"]))
+        self.assertTrue(plane.product_changed([rule_path]))
+        navigation = self.root / plane.index
+        navigation.write_text(navigation.read_text() + "\n伪造导航结论\n")
+        self.assertIn("CP_INDEX_DRIFT", [item["code"] for item in plane.check()["diagnostics"]])
+
     def test_design_registration_is_routine_but_rule_mapping_change_requires_calibration(self):
         path = self.root / "tools/control_plane/catalog.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
-        catalog["documents"]["FEATURE"] = {"path": "docs/design/feature.md", "category": "design", "kind": "design"}
-        target = self.root / "docs/design/feature.md"
+        catalog["documents"]["FEATURE"] = {"path": "docs/architecture/99-功能设计.md", "category": "design", "kind": "design"}
+        target = self.root / "docs/architecture/99-功能设计.md"
         target.write_text("# 业务需求设计\n\n## 合同\n\n当前用例合同，不新增通用规则。\n", encoding="utf-8")
 
         def invoke():
@@ -1136,7 +1165,7 @@ class CurrentCatalogJourneys(unittest.TestCase):
         catalog["routes"][0]["checks"].pop()
         catalog["documents"]["FEATURE"]["kind"] = "rules"
         self.assertTrue(invoke()["maintenance_required"], "新增规则身份不能伪装为普通设计登记")
-        for args in [("add", "tools/control_plane/catalog.json", "docs/design/feature.md"),
+        for args in [("add", "tools/control_plane/catalog.json", "docs/architecture/99-功能设计.md"),
                      ("-c", "user.name=Current Catalog Fixture", "-c", "user.email=fixture@example.invalid",
                       "commit", "--quiet", "-m", "register fixture rule")]:
             subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True)
@@ -1154,7 +1183,7 @@ class CurrentCatalogJourneys(unittest.TestCase):
                      "code/verification/boot-smoke/src/main/java/Probe.java",
                      "code/verification/boot-smoke/src/main/resources/application.properties",
                      "code/verification/boot-smoke/src/test/java/ProbeTest.java",
-                     "docs/design/minimal-engineering.md", "docs/contracts/access.md"):
+                     "docs/design/minimal-engineering.md", "docs/architecture/02-工程基线.md", "docs/contracts/access.md"):
             with self.subTest(path=path):
                 self.assertTrue(plane.product_changed([path]))
         self.assertFalse(plane.product_changed(["docs/tasks/minimal-engineering.md", "README.md"]))
@@ -1263,7 +1292,11 @@ class CurrentCatalogJourneys(unittest.TestCase):
                 self.assertFalse(resumed["semantic_review_proven"])
 
     def test_real_catalog_stage_split_keeps_unfinished_mechanisms_required(self):
-        self.task["scopes"] = ["architecture", "java-types", "dependency-risk", "build-gate", "tests"]
+        # 历史验收依据已收敛；用实际规范变化触发校准，不再借用历史全量计划。
+        from control_plane import ControlPlane
+        rules = self.root / ControlPlane(self.root).documents["BUILD"]["path"]
+        rules.write_text(rules.read_text() + "\n本场景核对规范维护的校准责任。\n")
+        self.task["scopes"] = ["architecture", "java-types", "dependency-risk", "build-gate", "runtime", "tests"]
         self.task["extra_refs"] = []
         code, plan = self.route()
         self.assertEqual(code, 0, plan)
@@ -1476,6 +1509,9 @@ class CurrentCatalogJourneys(unittest.TestCase):
         invoke(original, baseline)
 
     def test_advisory_scope_does_not_restore_retired_security_approval_suites(self):
+        from control_plane import ControlPlane
+        rules = self.root / ControlPlane(self.root).documents["BUILD"]["path"]
+        rules.write_text(rules.read_text() + "\n本场景核对依赖规范维护的校准责任。\n")
         self.task["scopes"] = ["dependency-risk"]
         self.task["extra_refs"] = []
         code, output = self.route()

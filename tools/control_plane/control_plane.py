@@ -147,12 +147,13 @@ class ControlPlane:
             require(doc["kind"] in ("rules", "entry", "design", "task", "evidence"), "CP_SCHEMA", f"未知内容类型：{identifier}")
             self.texts[identifier] = read_text(safe_path(self.root, relative))
             self.headings[identifier] = markdown(self.texts[identifier])[0]
+        self.index = self.catalog.get("index")
+        require(isinstance(self.index, str), "CP_CATEGORY", "须登记唯一文档导航")
+        safe_path(self.root, self.index)
+        require(self.index not in seen, "CP_CATEGORY", "派生导航不能覆盖正文")
         for category in self.catalog["categories"].values():
-            safe_path(self.root, category["index"])
-            require(category["index"] not in seen and category["index"] != "docs/index.md",
-                    "CP_CATEGORY", "派生索引不能覆盖正文或总索引")
-            if category.get("archive"):
-                safe_path(self.root, category["archive"])
+            require(set(category) == {"title"} and isinstance(category["title"], str) and
+                    category["title"].strip(), "CP_CATEGORY", "分类只登记名称，不另设索引或归档文件")
         self.validate_routes()
         self.validate_maintenance()
         self.validate_reference_inputs()
@@ -337,82 +338,48 @@ class ControlPlane:
         return f"[{label or ref}]({relative}#{anchor})"
 
     def indices(self):
-        """从身份、触发和唯一任务事实派生索引，不保存另一份任务状态。"""
-        files = {}
-        root_index = "docs/index.md"
+        """在单一导航内派生现行入口与按需依据，不保存另一份任务状态。"""
+        path = self.index
         core = [key for key, doc in self.documents.items()
                 if doc["kind"] in ("rules", "entry") and not doc.get("replaced_by")]
         order = self.catalog.get("reading_order", core)
         require(isinstance(order, list) and all(isinstance(key, str) for key in order) and
                 len(order) == len(set(order)) and set(order) == set(core),
                 "CP_READING_ORDER", "人工阅读顺序须恰好覆盖有效产品、规范与工作入口，不混入任务或历史")
-        summary = ["# 文档总索引", "", MARKER, "", "Agent 只读取任务命中的小节；索引存在不代表门禁或人工验收通过。", "",
-                   "## 人工阅读顺序", "", "首次通读按编号阅读；编号是阅读顺序，文档 ID 才是稳定身份。后续设计和当前进度从分类及任务入口补读。此顺序不扩大 Agent 的最低阅读清单。", ""]
+        lines = ["# 文档导航", "", MARKER, "",
+                 "Agent 用 context 按任务加载必要小节；导航存在不表示门禁或人工验收通过。", "",
+                 "## 当前任务", ""]
+        current = self.catalog.get("current_task")
+        lines.append(self.link(path, self.tasks[current]["unit"], current) if current else "无当前活动任务。")
+        lines += ["", "## 活动与待处理", ""]
+        for identifier, task in self.tasks.items():
+            if not task["acceptance"]:
+                lines.append(f"- {self.link(path, task['unit'], identifier)}：{task['frontier']}")
+            elif not task.get("closing") or task["closing"]["status"] != "passed":
+                reason = (task.get("closing") or {}).get("reason", "必要收尾尚未完成")
+                lines.append(f"- {self.link(path, task['unit'], identifier)}：收尾待处理；{reason}")
+            lines += [f"- {identifier} 待处理：{pending}" for pending in task["pending"]]
+        lines += ["", "## 人工阅读顺序", "",
+                  "首次通读按编号阅读；稳定身份由文档 ID 表达。此顺序不扩大 Agent 的最低阅读清单。", ""]
         for number, identifier in enumerate(order, 1):
             doc = self.documents[identifier]
-            relative = os.path.relpath(self.root / doc["path"], (self.root / root_index).parent).replace(os.sep, "/")
+            relative = os.path.relpath(self.root / doc["path"], (self.root / path).parent).replace(os.sep, "/")
             title = self.headings[identifier][0]["title"]
-            summary.append(f"{number}. [{number:02d} · {identifier} · {title}]({relative})")
-        summary += ["", "## 分类入口", ""]
-        for name, category in self.catalog["categories"].items():
-            path = category["index"]
-            relative = os.path.relpath(self.root / path, (self.root / root_index).parent).replace(os.sep, "/")
-            summary.append(f"- [{category['title']}]({relative})")
-            lines = [f"# {category['title']}索引", "", MARKER, ""]
-            if name != "tasks":
-                lines += ["## 正文与按需小节", ""]
-            for identifier, doc in self.documents.items():
-                if doc["category"] != name or doc.get("replaced_by"):
-                    continue
-                if name == "tasks":
-                    continue  # 默认入口只派生活动及待办；历史证据另有按需入口。
-                relative = os.path.relpath(self.root / doc["path"], (self.root / path).parent).replace(os.sep, "/")
-                lines.append(f"- [{identifier}]({relative})（{doc['kind']}）")
-                for section in self.headings[identifier]:
-                    if section["level"] != 2:
-                        continue
-                    ref = identifier + "#" + section["anchor"]
-                    triggers = sorted({route.get("trigger", "、".join(route["scopes"])) for route in self.catalog["routes"] if ref in route["refs"]})
-                    caption = "、".join(triggers) if triggers else "按目标定位；不默认加载"
-                    lines.append(f"  - {caption} → {self.link(path, ref, section['title'])}")
-            if name == "tasks":
-                lines += ["", "## 活动与待处理", ""]
-                for identifier, task in self.tasks.items():
-                    if not task["acceptance"]:
-                        lines.append(f"- {self.link(path, task['unit'], identifier)}：{task['frontier']}")
-                    elif not task.get("closing") or task["closing"]["status"] != "passed":
-                        reason = (task.get("closing") or {}).get("reason", "必要收尾尚未完成")
-                        lines.append(f"- {self.link(path, task['unit'], identifier)}：收尾待处理；{reason}")
-                    for pending in task["pending"]:
-                        lines.append(f"- {identifier} 待处理：{pending}")
-                lines += ["", "## 归档查询", ""]
-                if category.get("archive"):
-                    archive_path = category["archive"]
-                    relative = os.path.relpath(self.root / archive_path, (self.root / path).parent).replace(os.sep, "/")
-                    lines.append(f"[按需查询归档任务与历史证据]({relative})；默认不加载。")
-                    archive = ["# 归档任务与历史证据", "", MARKER, "", "## 已登记验收的任务", ""]
-                    accepted = [task for task in self.tasks.values() if task["acceptance"]]
-                    archive += [f"- {self.link(archive_path, task['unit'], task['id'])}：验收输入 `{task['acceptance']['functional_sha']}`；来源及收尾须独立核对。" for task in accepted] or ["暂无已获人工验收的交付单元。"]
-                    archive += ["", "## 按需证据", ""]
-                    archive += [f"- {self.link(archive_path, key + '#' + self.headings[key][0]['anchor'], key)}" for key, doc in self.documents.items() if doc["kind"] == "evidence"]
-                    replaced = [(key, doc) for key, doc in self.documents.items() if doc.get("replaced_by")]
-                    if replaced:
-                        archive += ["", "## 被替代正文", ""]
-                        archive += [f"- {self.link(archive_path, key + '#' + self.headings[key][0]['anchor'], key, historical=True)}：由 {doc['replaced_by']} 替代，不能作为新任务现行规则。" for key, doc in replaced]
-                    files[archive_path] = "\n".join(archive).rstrip("\n") + "\n"
-                else:
-                    lines.append("按所属任务检索验收来源与证据；来源真实性及收尾仍须独立核对。")
-            files[path] = "\n".join(lines).rstrip("\n") + "\n"
-        current = self.catalog.get("current_task")
-        summary += ["", "## 当前任务", ""]
-        if current:
-            summary.append(self.link(root_index, self.tasks[current]["unit"], current))
-        else:
-            summary.append("无当前活动任务。")
-        files[root_index] = "\n".join(summary).rstrip("\n") + "\n"
-        require(len(files) == len(self.catalog["categories"]) + 1 + sum(bool(item.get("archive")) for item in self.catalog["categories"].values()),
-                "CP_CATEGORY", "分类或归档索引路径重复")
-        return files
+            lines.append(f"{number}. [{number:02d} · {identifier} · {title}]({relative})")
+        lines += ["", "## 现行设计", ""]
+        for identifier, doc in self.documents.items():
+            if doc["kind"] == "design" and not doc.get("replaced_by"):
+                title = self.headings[identifier][0]
+                lines.append(f"- {self.link(path, identifier + '#' + title['anchor'], identifier + ' · ' + title['title'])}")
+        lines += ["", "## 按需验收依据", "", "仅追溯所列精确对象，不加载历史全文，不代替新输入验收。", ""]
+        accepted = [task for task in self.tasks.values() if task["acceptance"]]
+        lines += [f"- {self.link(path, task['unit'], task['id'])}：验收输入 `{task['acceptance']['functional_sha']}`；来源及收尾须独立核对。"
+                  for task in accepted] or ["暂无已获人工验收的交付单元。"]
+        for key, doc in self.documents.items():
+            if doc.get("replaced_by") or doc["kind"] == "evidence":
+                suffix = f"：由 {doc['replaced_by']} 替代，不能作为新任务现行规则。" if doc.get("replaced_by") else ""
+                lines.append(f"- {self.link(path, key + '#' + self.headings[key][0]['anchor'], key, historical=True)}{suffix}")
+        return {path: "\n".join(lines).rstrip("\n") + "\n"}
 
     def write_indices(self):
         """仅机械生成已登记的索引；已有非派生内容不覆盖，不触碰正文和 Git。"""
@@ -507,7 +474,7 @@ class ControlPlane:
                     return True
 
                 def governance(catalog):
-                    metadata = {"documents", "tasks", "current_task", "categories", "reading_order"}
+                    metadata = {"documents", "tasks", "current_task", "categories", "reading_order", "index"}
                     result = {key: value for key, value in catalog.items() if key not in metadata}
                     result["rule_documents"] = {key: value for key, value in catalog.get("documents", {}).items()
                                                 if value.get("kind") == "rules"}
