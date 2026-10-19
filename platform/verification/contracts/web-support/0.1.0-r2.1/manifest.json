@@ -51,8 +51,8 @@
     "platform/verification/smoke/boot-smoke/src/main/resources/application.properties": "562282701648bbbf8267c1cc86176220b7d0c3c94621020e9acae54d205093e8",
     "platform/verification/smoke/boot-smoke/src/test/java/org/domainforge/boot/ApplicationHealthTest.java": "a373ce069731fe346edd6efc17812f02d58749e84e2f79605bbc1b697152986c",
     "platform/verification/smoke/pom.xml": "b339316dfba6cfd453aec540224f6310e21ae6e6d22d0db159a40796b0de3460",
-    "tools/product_gate/consumer-a-scenarios.json": "c28e42539efec68e246b06ab8fcc3f968a810f182a5ee1d3c5f614716271dc82",
-    "tools/product_gate/consumer-b-scenarios.json": "cf5a6b676b0810ff732069ff3f62c9ed85b18b2bad8545843bdb46e3f748e2a9"
+    "harness/product_gate/consumer-a-scenarios.json": "c28e42539efec68e246b06ab8fcc3f968a810f182a5ee1d3c5f614716271dc82",
+    "harness/product_gate/consumer-b-scenarios.json": "cf5a6b676b0810ff732069ff3f62c9ed85b18b2bad8545843bdb46e3f748e2a9"
   },
   "contracts": {
     "a": {

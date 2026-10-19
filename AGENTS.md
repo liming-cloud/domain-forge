@@ -1,6 +1,6 @@
 # Agent 工作入口
 
-先读[产品目的](docs/product/01-产品定义.md#产品目的)与[当前恢复点](docs/product/02-研发路线.md#当前恢复点)，由[唯一导航](docs/00-文档导航.md#当前任务)定位活动任务。运行 `python3 -B tools/control_plane/control_plane.py context --task <任务 ID>` 取得最低目录，再用 `--ref '文档ID#小节'` 按当前步骤加载必要正文。未加载不表示规则不适用；不默认读取历史全文。
+先读[产品目的](docs/product/01-产品定义.md#产品目的)与[当前恢复点](docs/product/02-研发路线.md#当前恢复点)，由[唯一导航](docs/00-文档导航.md#当前任务)定位活动任务。运行 `./dev context --task <任务 ID>` 取得最低目录，再用 `--ref '文档ID#小节'` 按当前步骤加载必要正文。仓库外可使用入口绝对路径；直接 Python 用法见[控制面机制](docs/workflow/03-研发控制机制.md#公开命令与记录字段)。未加载不表示规则不适用；不默认读取历史全文。
 
 ## 当前边界
 
