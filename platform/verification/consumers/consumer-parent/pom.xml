@@ -6,7 +6,7 @@
   <version>1.0.0</version>
   <packaging>pom</packaging>
   <modules>
-    <module>app</module>
+    <module>consumer-b</module>
   </modules>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>

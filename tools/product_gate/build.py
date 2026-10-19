@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 import zipfile
 
-from environment import MODULE, REACTOR, baseline, command, digest, require, sources, product_root
+from environment import (AGGREGATES, CONSUMER_AGGREGATE, CONSUMERS, JAVA_MODULES, MODULE, REACTOR,
+                         baseline, command, digest, require, sources, product_root)
 import calibrate_architecture
 import calibrate_lifecycle
 import calibrate_maven
@@ -21,22 +22,18 @@ import role_boundaries
 
 def model(root, project):
     aggregate = ET.parse(product_root(project) / "pom.xml").getroot()
-    expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "domain-forge-build",
+    expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "platform",
                 "version": "0.1.0", "packaging": "pom"}
     require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) ==
             sorted([*expected, "modules", "properties", "dependencyManagement", "build"]) and
             all(aggregate.findtext("{*}" + key) == value for key, value in expected.items()) and
-            [x.text for x in aggregate.findall("./{*}modules/{*}module")] == [item.as_posix() for item in REACTOR] and
-            len(aggregate.find("{*}modules")) == len(REACTOR),
+            [x.text for x in aggregate.findall("./{*}modules/{*}module")] == list(AGGREGATES[Path(".")]) and
+            len(aggregate.find("{*}modules")) == len(AGGREGATES[Path(".")]),
             "PG_BUILD_SCOPE", "聚合必须精确包含已登记的真实产品模块，不接受空目标、额外模块或隐式配置")
     parent_management(root, aggregate)
     compiler_model(aggregate, project)
+    hierarchy(product_root(project))
     document = ET.parse(project / "pom.xml").getroot()
-    parent = document.find("./{*}parent")
-    require(parent is not None and len(parent) == 4 and
-            all(parent.findtext("{*}" + key) == expected[key] for key in ("groupId", "artifactId", "version")) and
-            parent.findtext("{*}relativePath") == "../../../pom.xml",
-            "PG_BASELINE", "探针必须通过仓库路径继承已验证的内部 parent")
     require(not any(document.find(path) is not None for path in ("./{*}modules", "./{*}profiles",
                 "./{*}build/{*}directory", "./{*}build/{*}outputDirectory", "./{*}build/{*}testOutputDirectory")),
             "PG_BUILD_SCOPE", "本单元仅支持默认输出的单工程")
@@ -47,6 +44,39 @@ def model(root, project):
     require(not any(p.suffix in {".properties", ".yml", ".yaml"} and p != properties
                     for p in (project / "src/main/resources").rglob("*")),
             "PG_BUILD_SCOPE", "额外运行配置来源须先定义并验证覆盖合同")
+
+
+def hierarchy(code):
+    """核对逐层继承和直接子模块；独立消费聚合不改变 A/B 的父 POM 合同。"""
+    paths = {Path("."), *REACTOR, CONSUMER_AGGREGATE, *CONSUMERS, *JAVA_MODULES}
+    for relative in sorted(paths):
+        directory = code / relative
+        document = ET.parse(directory / "pom.xml").getroot()
+        require(document.findtext("{*}artifactId") == directory.name,
+                "PG_MODULE_NAME", "模块目录名必须与 artifactId 一致：" + str(relative))
+        if relative in REACTOR:
+            parent = document.find("{*}parent")
+            expected = {"groupId": "org.domainforge", "artifactId": directory.parent.name,
+                        "version": "0.1.0", "relativePath": "../pom.xml"}
+            require(parent is not None and len(parent) == len(expected) and
+                    all(parent.findtext("{*}" + key) == value for key, value in expected.items()),
+                    "PG_BASELINE", "内部模块须直接继承所在层级 parent：" + str(relative))
+        if relative in AGGREGATES and relative != Path("."):
+            require(sorted(x.tag.rsplit("}", 1)[-1] for x in document) ==
+                    sorted(["modelVersion", "parent", "artifactId", "packaging", "modules"]) and
+                    document.findtext("{*}modelVersion") == "4.0.0" and
+                    document.findtext("{*}packaging") == "pom" and
+                    [x.text for x in document.findall("./{*}modules/{*}module")] == list(AGGREGATES[relative]) and
+                    len(document.find("{*}modules")) == len(AGGREGATES[relative]),
+                    "PG_BUILD_SCOPE", "中间聚合只管理直接子模块，不注入依赖、属性或执行：" + str(relative))
+    consumer = ET.parse(code / CONSUMER_AGGREGATE / "pom.xml").getroot()
+    expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge.verification",
+                "artifactId": "consumers", "version": "0.1.0", "packaging": "pom"}
+    require(sorted(x.tag.rsplit("}", 1)[-1] for x in consumer) == sorted([*expected, "modules"]) and
+            all(consumer.findtext("{*}" + key) == value for key, value in expected.items()) and
+            [x.text for x in consumer.findall("./{*}modules/{*}module")] == [p.name for p in CONSUMERS] and
+            len(consumer.find("{*}modules")) == len(CONSUMERS),
+            "PG_CONSUMER_SCOPE", "消费聚合只管理 A/B，不继承平台或注入配置")
 
 
 def parent_management(root, document):
@@ -156,18 +186,19 @@ def module_inventory(document, project):
     expected = {str(code), *(str(code / item) for item in REACTOR)}
     require(len(projects) == len(expected) and {x.get("path") for x in projects} == expected,
             "PG_BUILD_SCOPE", "实际 reactor 遗漏或增加了未经覆盖的模块")
-    aggregate = next(x for x in projects if x.get("path") == str(code))
-    require(aggregate.get("packaging") == "pom" and aggregate.get("artifact") == "domain-forge-build" and
-            not any(aggregate.findall(tag) for tag in ("declaredDependency", "resolvedDependency")),
-            "PG_BUILD_SCOPE", "内部聚合不能包含未验证的产品依赖")
-    allowed = {str(code / item) for item in REACTOR}
+    for relative in AGGREGATES:
+        aggregate = next(x for x in projects if x.get("path") == str(code / relative))
+        require(aggregate.get("packaging") == "pom" and aggregate.get("artifact") == (code / relative).name and
+                not any(aggregate.findall(tag) for tag in ("declaredDependency", "resolvedDependency")),
+                "PG_BUILD_SCOPE", "内部聚合不能包含未验证的产品依赖")
+    allowed = {str(code / item) for item in REACTOR if item not in AGGREGATES}
     require(all(x.get("project") in allowed for tag in ("compilation", "execution") for x in document.findall(tag)),
             "PG_BUILD_SCOPE", "聚合或未知模块执行了未支持的编译／插件")
-    bom = next(x for x in projects if x.get("path") == str(code / "bom"))
+    bom = next(x for x in projects if x.get("path") == str(code / "domain-forge-bom"))
     require(bom.get("packaging") == "pom" and not any(bom.findall(tag) for tag in ("declaredDependency", "resolvedDependency"))
-            and not any(x.get("project") == str(code / "bom") for x in document.findall("compilation"))
+            and not any(x.get("project") == str(code / "domain-forge-bom") for x in document.findall("compilation"))
             and all(x.get("group") == "org.codehaus.mojo" and x.get("artifact") == "flatten-maven-plugin" and
-                    x.get("goal") == "flatten" for x in document.findall("execution") if x.get("project") == str(code / "bom")),
+                    x.get("goal") == "flatten" for x in document.findall("execution") if x.get("project") == str(code / "domain-forge-bom")),
             "PG_BUILD_SCOPE", "平台 BOM 只能生成消费 POM，不能包含直接依赖、编译或额外执行")
     return select_inventory(document, project)
 

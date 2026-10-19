@@ -3,14 +3,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.domainforge</groupId>
-  <artifactId>domain-forge-build</artifactId>
+  <artifactId>platform</artifactId>
   <version>0.1.0</version>
   <packaging>pom</packaging>
   <!-- 仓库内部 parent 与聚合；外部消费项目无需继承。 -->
   <modules>
-    <module>verification/smoke/boot-smoke</module>
-    <module>framework/web-support</module>
-    <module>bom</module>
+    <module>framework</module>
+    <module>domain-forge-bom</module>
+    <module>verification</module>
   </modules>
   <properties>
     <java.version>21</java.version>

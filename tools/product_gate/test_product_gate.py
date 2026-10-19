@@ -64,7 +64,7 @@ class ProductInputTests(unittest.TestCase):
     def test_empty_extra_or_implicit_aggregate_cannot_pass_preflight(self):
         pom = self.code / "pom.xml"
         original = pom.read_text()
-        for altered in (original.replace("<module>verification/smoke/boot-smoke</module>", ""),
+        for altered in (original.replace("<module>verification</module>", ""),
                         original.replace("</modules>", "<module>components/hidden</module></modules>"),
                         original.replace("</project>", "<profiles/></project>")):
             with self.subTest(altered=altered):
@@ -85,7 +85,7 @@ class ProductInputTests(unittest.TestCase):
     def test_parent_path_and_bom_import_cannot_drift(self):
         pom = self.project / "pom.xml"
         original = pom.read_text()
-        pom.write_text(original.replace("../../../pom.xml", "../../pom.xml"))
+        pom.write_text(original.replace("../pom.xml", "../../pom.xml"))
         self.reject("PG_BASELINE", build.model, ROOT, self.project)
         pom.write_text(original)
         parent = self.code / "pom.xml"
@@ -102,6 +102,45 @@ class ProductInputTests(unittest.TestCase):
             with self.subTest(altered=altered):
                 pom.write_text(altered)
                 self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
+
+    def test_hierarchical_model_has_only_named_direct_children(self):
+        build.model(ROOT, self.project)
+        for relative, children in environment.AGGREGATES.items():
+            document = ET.parse(self.code / relative / "pom.xml")
+            self.assertEqual([x.text for x in document.findall("./{*}modules/{*}module")], list(children))
+            self.assertTrue(all("/" not in child for child in children))
+
+    def test_module_name_mismatch_is_rejected(self):
+        pom = self.code / "framework/domain-forge-web-support/pom.xml"
+        pom.write_text(pom.read_text().replace("<artifactId>domain-forge-web-support</artifactId>",
+                                               "<artifactId>other-library</artifactId>"))
+        self.reject("PG_MODULE_NAME", build.model, ROOT, self.project)
+
+    def test_intermediate_parent_cannot_be_skipped(self):
+        pom = self.code / "framework/domain-forge-web-support/pom.xml"
+        pom.write_text(pom.read_text().replace("<artifactId>framework</artifactId>", "<artifactId>platform</artifactId>")
+                       .replace("../pom.xml", "../../pom.xml"))
+        self.reject("PG_BASELINE", build.model, ROOT, self.project)
+
+    def test_intermediate_aggregate_cannot_expand_or_inject_configuration(self):
+        pom = self.code / "verification/pom.xml"
+        original = pom.read_text()
+        for content in (original.replace("<module>smoke</module>", "<module>smoke/boot-smoke</module>"),
+                        original.replace("</modules>", "<module>consumers</module></modules>"),
+                        original.replace("</project>", "<dependencies/></project>"),
+                        original.replace("</project>", "<build><plugins/></build></project>")):
+            with self.subTest(content=content):
+                pom.write_text(content)
+                self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
+
+    def test_consumer_aggregate_cannot_add_platform_parent_or_omit_consumer(self):
+        pom = self.code / "verification/consumers/pom.xml"
+        original = pom.read_text()
+        for content in (original.replace("</project>", "<parent/></project>"),
+                        original.replace("<module>consumer-a</module>", "")):
+            with self.subTest(content=content):
+                pom.write_text(content)
+                self.reject("PG_CONSUMER_SCOPE", build.model, ROOT, self.project)
 
     def test_parent_managed_compiler_and_plugin_versions_are_checked(self):
         pom = self.code / "pom.xml"

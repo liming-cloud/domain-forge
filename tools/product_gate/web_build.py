@@ -14,8 +14,8 @@ import calibrate_lifecycle
 import calibrate_maven
 import calibrate_maven_source
 
-WEB = Path('framework/web-support')
-BOM = Path('bom')
+WEB = Path('framework/domain-forge-web-support')
+BOM = Path('domain-forge-bom')
 
 
 def lock(root):
@@ -145,14 +145,14 @@ def consumer_model(root, project, name):
                     ('systemPath', 'repositories', 'pluginRepositories', 'profiles', 'extensions')),
                 'PG_CONSUMER_SCOPE', '消费工程含旁路源码、仓库或构建扩展')
         parent = doc.find('{*}parent')
-        require(parent is None or name == 'b' and pom.parent == project / 'app' and
+        require(parent is None or name == 'b' and pom.parent == project / 'consumer-b' and
                     parent.findtext('{*}groupId') == 'example.consumer.b' and parent.findtext('{*}artifactId') == 'consumer-parent' and
                     parent.findtext('{*}relativePath') == '../pom.xml', 'PG_CONSUMER_PARENT', '消费者不能继承平台 parent 或外部源码')
         require(not any(x.text and ('skip' in x.tag.lower()) and x.text.strip().lower() == 'true' for x in doc.iter()),
                 'PG_CONSUMER_TESTS', '消费者不得跳过测试')
         build.compiler_model(doc, pom.parent)
     require((ET.parse(project / 'pom.xml').findtext('./{*}parent') is None) and
-            ([x.text for x in ET.parse(project / 'pom.xml').findall('./{*}modules/{*}module')] == ([] if name == 'a' else ['app'])),
+            ([x.text for x in ET.parse(project / 'pom.xml').findall('./{*}modules/{*}module')] == ([] if name == 'a' else ['consumer-b'])),
             'PG_CONSUMER_SCOPE', '消费者聚合不能借用平台 reactor')
     for source in project.rglob('*.java'):
         text = source.read_text()
@@ -179,7 +179,7 @@ def consume(root, code, name, workspace, published, repository, cache, home, env
     extension = calibrate_maven.observer(home, output); inventory = output / 'inventory.xml'
     execution = command([*argv, '-Dmaven.ext.class.path=' + str(extension), '-Ddomainforge.scope.output=' + str(inventory), 'verify'],
                         project, output / 'verify.log', 600, env)
-    doc = ET.parse(inventory).getroot(); app = project if name == 'a' else project / 'app'
+    doc = ET.parse(inventory).getroot(); app = project if name == 'a' else project / 'consumer-b'
     require({x.get('path') for x in doc.findall('project')} == ({str(project)} if name == 'a' else {str(project), str(app)}),
             'PG_CONSUMER_SCOPE', '实际消费 reactor 与自有模型不符')
     required = ['example.consumer.' + name + '.ClientResultTest#clientMustNotTreatHttp200BusinessRejectionAsSuccess']
@@ -195,7 +195,8 @@ def consume(root, code, name, workspace, published, repository, cache, home, env
         require(metadata.is_file() and (Path(path).name + '>r2-verification=') in metadata.read_text(),
                 'PG_CONSUMER_CACHE', '平台制品缺少本轮显式文件仓库获取来源')
         require((local / path).is_file() and digest(local / path) == checksum, 'PG_CONSUMER_ARTIFACT', '实际取回制品散列不符')
-    require(not (local / 'org/domainforge/domain-forge-build').exists(), 'PG_CONSUMER_PARENT', '消费路径仍依赖内部 parent')
+    require({p.name for p in (local / 'org/domainforge').iterdir() if p.is_dir()} ==
+            {'domain-forge-web-support', 'domain-forge-bom'}, 'PG_CONSUMER_PARENT', '消费路径仍依赖内部 parent 或额外平台制品')
     quality = build.quality(root, app, observed, tools, 'consumer-' + name + '-modules.json')
     (output / 'quality.json').write_text(json.dumps(quality, ensure_ascii=False, indent=2))
     public = set(json.loads((root / 'tools/product_gate/web-modules.json').read_text())['modules'][0]['contract_types'])

@@ -4,12 +4,11 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.domainforge</groupId>
-    <artifactId>domain-forge-build</artifactId>
+    <artifactId>smoke</artifactId>
     <version>0.1.0</version>
-    <relativePath>../../../pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
-  <artifactId>domain-forge</artifactId>
-  <name>Domain Forge</name>
+  <artifactId>boot-smoke</artifactId>
   <description>最小真实工程与质量接入；尚未提供业务或平台能力。</description>
   <dependencies>
     <dependency>

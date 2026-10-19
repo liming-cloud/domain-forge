@@ -31,7 +31,7 @@ def preserve_evidence(workspace, output):
     for directory in directories:
         shutil.copytree(directory, evidence / directory.name, dirs_exist_ok=True)
     for name in ('a', 'b'):
-        app = workspace / ('consumer-' + name) / ('app' if name == 'b' else '.')
+        app = workspace / ('consumer-' + name) / ('consumer-b' if name == 'b' else '.')
         for path in (app / 'target').rglob('*'):
             if path.is_file() and (path.name.startswith('http-') or 'surefire-reports' in path.parts) and path.suffix in ('.log', '.xml', '.txt'):
                 destination = evidence / ('consumer-' + name + '-runtime') / path.relative_to(app / 'target')
@@ -68,7 +68,7 @@ def inspect_product(root, project, observed, argv, env, home, repository, cache,
         result['advisory']['component'] = web_advisory.scan(code, web_build.WEB, result['component'], argv, env, args.advisory_data, scan)
         for name, consumer in result['consumers'].items():
             scan = output / ('consumer-' + name + '-advisory'); scan.mkdir()
-            result['advisory'][name] = web_advisory.scan(Path(consumer['project']), Path('app' if name == 'b' else '.'), consumer['observed'], consumer['argv'], env, args.advisory_data, scan)
+            result['advisory'][name] = web_advisory.scan(Path(consumer['project']), Path('consumer-b' if name == 'b' else '.'), consumer['observed'], consumer['argv'], env, args.advisory_data, scan)
     result['counterexamples'] = web_negative.verify(root, result['consumers'], result['publication'], home, env, workspace)
     result['ok'] = True
     return result

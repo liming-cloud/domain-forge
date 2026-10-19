@@ -42,7 +42,7 @@ class NativeProductTests(unittest.TestCase):
         result = build.quality(ROOT, self.project, self.observed, self.tools)
         self.assertTrue(result["ok"], result["diagnostics"])
         self.assertGreater(self.observed["tests"]["count"], 0)
-        self.assertEqual(self.observed["reactor"], [".", "verification/smoke/boot-smoke", "framework/web-support", "bom"])
+        self.assertEqual(self.observed["reactor"], [".", "framework", "framework/domain-forge-web-support", "domain-forge-bom", "verification", "verification/smoke", "verification/smoke/boot-smoke"])
         self.assertEqual({item["purpose"] for item in result["bindings"]}, {"production", "test"})
 
     def test_observed_reactor_cannot_omit_or_add_modules(self):
@@ -71,7 +71,7 @@ class NativeProductTests(unittest.TestCase):
     def test_module_build_uses_repository_parent_without_install(self):
         project, output, args = self.fixture()
         argv, env, home = args
-        self.assertFalse((self.repository / "org/domainforge/domain-forge-build").exists())
+        self.assertFalse((self.repository / "org/domainforge/platform").exists())
         extension = calibrate_maven.observer(home, output)
         inventory = output / "direct-module.xml"
         environment.command([*argv, "-f", project / "pom.xml", "-Dmaven.ext.class.path=" + str(extension),
@@ -87,7 +87,7 @@ class NativeProductTests(unittest.TestCase):
         with zipfile.ZipFile(artifact) as archive:
             self.assertIn("Main-Class: org.springframework.boot.loader.launch.JarLauncher",
                           archive.read("META-INF/MANIFEST.MF").decode())
-        self.assertFalse((self.repository / "org/domainforge/domain-forge-build").exists())
+        self.assertFalse((self.repository / "org/domainforge/platform").exists())
 
     def test_missing_explicit_boot_repackage_is_rejected(self):
         project, output, args = self.fixture()

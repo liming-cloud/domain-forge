@@ -17,9 +17,17 @@ from calibrate_source import ProbeFailure, digest, require
 
 PRODUCT = Path("platform")
 MODULE = Path("verification/smoke/boot-smoke")
-JAVA_MODULES = (MODULE, Path("framework/web-support"), Path("verification/consumers/bom-only"), Path("verification/consumers/custom-parent/app"))
-REACTOR = (MODULE, Path("framework/web-support"), Path("bom"))
-CONSUMERS = (Path("verification/consumers/bom-only"), Path("verification/consumers/custom-parent"))
+JAVA_MODULES = (MODULE, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
+AGGREGATES = {
+    Path("."): ("framework", "domain-forge-bom", "verification"),
+    Path("framework"): ("domain-forge-web-support",),
+    Path("verification"): ("smoke",),
+    Path("verification/smoke"): ("boot-smoke",),
+}
+REACTOR = (Path("framework"), Path("framework/domain-forge-web-support"), Path("domain-forge-bom"),
+           Path("verification"), Path("verification/smoke"), MODULE)
+CONSUMER_AGGREGATE = Path("verification/consumers")
+CONSUMERS = (Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent"))
 CONTRACTS = Path("verification/contracts/web-support/0.1.0-r2.1")
 CONTRACT_FILES = tuple(CONTRACTS / name for name in ("manifest.json", "consumer-a-openapi.json", "consumer-b-openapi.json"))
 
@@ -118,12 +126,12 @@ def sources(root):
     for directory in (code, code / ".mvn", *(code / module / "src" for module in JAVA_MODULES)):
         require(directory.is_dir() and not directory.is_symlink(), "PG_INPUT", "缺少普通工程输入目录")
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
-    required.update(str(module / "pom.xml") for module in (*REACTOR, *JAVA_MODULES, *CONSUMERS))
+    required.update(str(module / "pom.xml") for module in (*REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE))
     required.update(str(consumer / name) for consumer in CONSUMERS for name in ("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties"))
     paths = []
     for path in code.rglob("*"):
         require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")
-        if any(path.is_relative_to(code / module / "target") for module in (Path("."), *REACTOR, *JAVA_MODULES, *CONSUMERS)):
+        if any(path.is_relative_to(code / module / "target") for module in (Path("."), *REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE)):
             continue
         if path.is_file():
             relative = path.relative_to(code)
