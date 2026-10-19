@@ -23,8 +23,8 @@ class ProductInputTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="domain-forge-product-input-")
         self.addCleanup(temporary.cleanup)
         self.project = environment.copy_project(ROOT, Path(temporary.name) / "project", environment.sources(ROOT))
-        self.root = self.project.parents[2]
-        self.code = self.project.parents[1]
+        self.root = environment.product_root(self.project).parent
+        self.code = environment.product_root(self.project)
         shutil.copytree(ROOT / "tools/product_gate", self.root / "tools/product_gate")
 
     def reject(self, code, function, *args):
@@ -33,15 +33,38 @@ class ProductInputTests(unittest.TestCase):
         self.assertEqual(code, caught.exception.diagnostic["code"])
 
     def test_unregistered_module_is_not_silently_excluded(self):
-        target = self.root / "code/components/unregistered/pom.xml"
+        target = self.root / "platform/framework/unregistered/pom.xml"
         target.parent.mkdir(parents=True)
         target.write_text("<project/>\n")
+        self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
+
+    def test_legacy_root_cannot_shadow_product_inputs(self):
+        legacy = self.root / "code/pom.xml"
+        legacy.parent.mkdir(exist_ok=True)
+        legacy.write_text("<project/>\n")
+        self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
+
+    def test_contract_resources_cannot_hide_unknown_input(self):
+        unknown = self.root / "platform/verification/contracts/web-support/0.1.0-r2.1/extra.json"
+        unknown.parent.mkdir(parents=True, exist_ok=True)
+        unknown.write_text("{}\n")
+        self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
+
+    def test_missing_contract_cannot_pass_source_preflight(self):
+        contract = self.root / "platform/verification/contracts/web-support/0.1.0-r2.1/consumer-a-openapi.json"
+        contract.unlink(missing_ok=True)
+        self.reject("PG_INPUT", environment.sources, self.root)
+
+    def test_legacy_contract_tree_cannot_shadow_current_contract(self):
+        legacy = self.root / "docs/contracts/web-support/0.1.0-r2.1/consumer-a-openapi.json"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text("{}\n")
         self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
 
     def test_empty_extra_or_implicit_aggregate_cannot_pass_preflight(self):
         pom = self.code / "pom.xml"
         original = pom.read_text()
-        for altered in (original.replace("<module>verification/boot-smoke</module>", ""),
+        for altered in (original.replace("<module>verification/smoke/boot-smoke</module>", ""),
                         original.replace("</modules>", "<module>components/hidden</module></modules>"),
                         original.replace("</project>", "<profiles/></project>")):
             with self.subTest(altered=altered):
@@ -62,7 +85,7 @@ class ProductInputTests(unittest.TestCase):
     def test_parent_path_and_bom_import_cannot_drift(self):
         pom = self.project / "pom.xml"
         original = pom.read_text()
-        pom.write_text(original.replace("../../pom.xml", "../../../pom.xml"))
+        pom.write_text(original.replace("../../../pom.xml", "../../pom.xml"))
         self.reject("PG_BASELINE", build.model, ROOT, self.project)
         pom.write_text(original)
         parent = self.code / "pom.xml"
@@ -102,13 +125,13 @@ class ProductInputTests(unittest.TestCase):
         script = self.code / "mvnw"
         script.write_text(script.read_text() + "\n# drift\n")
         self.reject("PG_WRAPPER", environment.wrapper, self.root)
-        shutil.copy2(ROOT / "code/mvnw", script)
+        shutil.copy2(ROOT / "platform/mvnw", script)
         config = self.code / ".mvn/wrapper/maven-wrapper.properties"
         config.write_text(config.read_text().replace("distributionSha256Sum=", "distributionSha256Sum=00"))
         self.reject("PG_WRAPPER", environment.wrapper, self.root)
 
     def test_git_preserves_official_wrapper_bytes_even_with_input_autocrlf(self):
-        for name in ("code/mvnw", "code/mvnw.cmd"):
+        for name in ("platform/mvnw", "platform/mvnw.cmd"):
             raw = subprocess.check_output(["git", "hash-object", "--no-filters", name], cwd=ROOT)
             filtered = subprocess.check_output(["git", "-c", "core.autocrlf=input", "hash-object",
                                                 "--path=" + name, name], cwd=ROOT)
@@ -120,10 +143,10 @@ class ProductInputTests(unittest.TestCase):
         resource = self.project / "src/main/resources/new.txt"
         resource.write_text("must be packaged\n")
         actual = environment.sources(self.root)
-        self.assertIn("code/verification/boot-smoke/src/main/java/Unexpected.java", actual)
-        self.assertIn("code/verification/boot-smoke/src/main/resources/new.txt", actual)
+        self.assertIn("platform/verification/smoke/boot-smoke/src/main/java/Unexpected.java", actual)
+        self.assertIn("platform/verification/smoke/boot-smoke/src/main/resources/new.txt", actual)
         source.unlink()
-        source.symlink_to(ROOT / "code/verification/boot-smoke/src/main/java/org/domainforge/boot/DomainForgeApplication.java")
+        source.symlink_to(ROOT / "platform/verification/smoke/boot-smoke/src/main/java/org/domainforge/boot/DomainForgeApplication.java")
         self.reject("PG_INPUT", environment.sources, self.root)
 
     def test_unknown_jvm_options_and_mismatched_java_home_are_rejected(self):

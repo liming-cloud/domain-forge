@@ -7,7 +7,7 @@ import tempfile
 import shutil
 from types import SimpleNamespace
 
-from environment import require
+from environment import require, product_root
 import calibrate_http
 import web_build
 import web_http
@@ -45,7 +45,7 @@ def preserve_evidence(workspace, output):
 
 
 def inspect_product(root, project, observed, argv, env, home, repository, cache, workspace, output, args, result):
-    code = project.parents[1]
+    code = product_root(project)
     result['component'] = web_build.component(root, code, observed, repository, args.tools, output)
     result['publication'] = web_build.publish(root, code, result['component'], argv, env, output, workspace / 'published')
     result['tools'] = web_build.tool_bytes(root, repository)

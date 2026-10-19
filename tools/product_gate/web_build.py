@@ -14,8 +14,8 @@ import calibrate_lifecycle
 import calibrate_maven
 import calibrate_maven_source
 
-WEB = Path('components/web-support')
-BOM = Path('platform-bom')
+WEB = Path('framework/web-support')
+BOM = Path('bom')
 
 
 def lock(root):
@@ -162,7 +162,7 @@ def consumer_model(root, project, name):
 
 def consume(root, code, name, workspace, published, repository, cache, home, env, tools):
     project = workspace / ('consumer-' + name)
-    shutil.copytree(code / 'verification/consumers' / ('project-' + name), project)
+    shutil.copytree(code / environment.CONSUMERS[0 if name == 'a' else 1], project)
     consumer_model(root, project, name)
     output = workspace / ('consumer-' + name + '-evidence'); output.mkdir()
     local = workspace / ('consumer-' + name + '-repository')

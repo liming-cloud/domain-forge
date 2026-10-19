@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "product_ci": {"inputs":["docs/contracts/**","docs/design/minimal-engineering.md","docs/design/development-structure.md","docs/design/reusable-web-component.md","tools/product_gate/**","tools/engineering_gate/**","tools/control_plane/**",".github/workflows/**","docs/architecture/02-工程基线.md","docs/architecture/01-总体架构.md","docs/architecture/03-接口响应组件.md"],"checks":["build-gate","dependency-risk-gate","behavior-scenarios","runtime-scenarios","product-scenarios"]},
+  "product_ci": {"inputs":["docs/contracts/**","platform/verification/contracts/**","docs/design/minimal-engineering.md","docs/design/development-structure.md","docs/design/reusable-web-component.md","tools/product_gate/**","tools/engineering_gate/**","tools/control_plane/**",".github/workflows/**","docs/architecture/02-工程基线.md","docs/architecture/01-总体架构.md","docs/architecture/03-接口响应组件.md"],"checks":["build-gate","dependency-risk-gate","behavior-scenarios","runtime-scenarios","product-scenarios"]},
   "reading_order": ["PRODUCT", "REQUIREMENTS", "SYSTEM", "BUILD", "SOURCE", "PERSISTENCE", "HTTP", "ACCESS", "CONFIG", "FAULT", "VERIFY", "DOCS", "TASKS", "AGENT", "REBUILD", "REPO"],
   "maintenance": {"inputs":["tools/control_plane/**","tools/engineering_gate/**",".github/workflows/**","docs/standards/**","docs/workflow/**","docs/design/control-plane-mechanism.md","docs/design/engineering-gates.md","AGENTS.md","docs/workflow/03-研发控制机制.md","docs/workflow/04-工程检查设计.md"],"checks":["engineering-probe-tests","engineering-metric-probe-tests","engineering-input-probe-tests","complexity-baseline-tests","architecture-probe-tests","architecture-integrity-tests","maven-advisory-configuration-tests","maven-scope-tests","maven-wrapper-tests","maven-source-tests","maven-source-metric-tests","maven-architecture-tests","maven-architecture-purpose-tests","maven-architecture-binding-tests","maven-architecture-classpath-tests","dependency-declaration-tests","dependency-declaration-source-tests","dependency-declaration-input-tests","role-boundary-tests","role-boundary-usage-tests","role-boundary-ownership-tests","role-boundary-input-tests","persistence-boundary-tests","method-comment-tests","method-source-binding-tests","method-inheritance-tests","build-mechanism","build-test-coverage-tests","build-artifact-tests","build-version-tests","build-resolution-tests","build-input-tests","dependency-risk-mechanism","http-generation-tests","http-request-tests","http-parameter-tests","http-drift-tests","http-envelope-tests","http-input-tests","http-scope-tests","access-transport-tests","access-configuration-tests","access-coverage-tests","access-input-tests","password-behavior-tests","password-rejection-tests","password-input-tests","policy-behavior-tests","policy-coverage-tests","policy-execution-tests","policy-input-tests","migration-behavior-tests","migration-rejection-tests","migration-history-tests","migration-integrity-tests","migration-input-tests","persistence-mapping-tests","persistence-pagination-tests","persistence-concurrency-tests","persistence-batch-tests","persistence-migration-tests","persistence-migration-recovery-tests","persistence-migration-rejection-tests","persistence-adapter-input-tests","persistence-behavior-tests","persistence-routing-tests","persistence-transaction-tests","persistence-execution-tests","persistence-context-tests","persistence-binding-tests","persistence-rollback-tests","persistence-policy-tests","persistence-integrity-tests","persistence-observer-tests","persistence-input-tests","datasource-isolation-tests","persistence-gate","persistence-adapter-integrity-tests","persistence-migration-provenance-tests","persistence-pagination-plugin-tests","persistence-condition-tests","persistence-affected-rows-tests","persistence-migration-failure-source-tests","persistence-policy-source-tests","access-gate","access-state-scope-tests","access-state-owner-tests","access-state-operation-tests","access-state-session-tests","access-state-expiration-tests","access-state-changes-tests","access-state-permission-tests","access-state-role-tests","access-state-password-tests","access-state-failures-tests","access-state-throttle-tests","access-state-audit-tests","access-state-audit-failure-tests","access-state-reconciliation-tests","access-state-secret-tests","access-state-redis-tests","access-state-project-tests","access-state-input-tests","access-state-login-secret-tests","access-state-header-secret-tests","access-state-new-hash-secret-tests","access-state-failed-login-secret-tests","source-gate","architecture-gate","contract-gate","runtime-mechanism","runtime-nacos-tests","observation-tests","runtime-source-quality-tests"]},
   "reference_inputs": {"tools/engineering_gate/complexity.json": ["decision_ref"]},
@@ -36,7 +36,8 @@
     "ENGINEERING-TASK": {"path":"docs/work/92-工程基线验收依据.md","category":"tasks","kind":"task"},
     "REUSABLE-WEB": {"path":"docs/architecture/03-接口响应组件.md","category":"design","kind":"design"},
     "REUSABLE-WEB-TASK": {"path":"docs/work/93-接口组件验收依据.md","category":"tasks","kind":"task"},
-    "STRUCTURE-MIGRATION": {"path":"docs/work/01-结构迁移.md","category":"tasks","kind":"task"}
+    "STRUCTURE-MIGRATION": {"path":"docs/work/01-结构迁移.md","category":"tasks","kind":"task"},
+    "PRODUCT-PATH-MIGRATION": {"path": "docs/work/02-产品迁移.md", "category": "tasks", "kind": "task"}
   },
   "scopes": {
     "acceptance": "执行者、评审者、决定及单元验收；验收来源、一次记录提交及收尾",
@@ -354,6 +355,35 @@
     {"glob":"code/verification/consumers/project-b/mvnw","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"code/verification/consumers/project-b/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"code/verification/consumers/project-b/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/verification/smoke/boot-smoke/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/smoke/boot-smoke/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"platform/verification/smoke/boot-smoke/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"platform/verification/smoke/boot-smoke/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"platform/verification/contracts/web-support/0.1.0-r2.1/*.json","purpose":"documentation","scopes":["http","contract","build-gate"]},
+    {"glob":"platform/framework/web-support/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/framework/web-support/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"platform/framework/web-support/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"platform/framework/web-support/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/app/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/app/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/app/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/app/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"platform/bom/pom.xml","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/pom.xml","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/bom-only/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/mvnw","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/verification/consumers/custom-parent/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"tools/product_gate/**","purpose":"governance","scopes":["governance","build","dependency-risk","tests","runtime"]}
   ],
   "checks": {
@@ -482,7 +512,7 @@
     "runtime-source-quality-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","tools/engineering_gate/test_runtime.py","RuntimeQualityChecks"],"requires_test_count":true,"environment_argv":["@python","-B","tools/engineering_gate/calibrate_runtime.py","--environment"],"reason":"本轮实际 Java 观察器及夹具说明、格式和复杂度检查"},
     "delivery-evidence": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","delivery","--task","@task"]}
   },
-  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION"},
-  "current_task": "structure-migration",
+  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION","product-path-migration":"PRODUCT-PATH-MIGRATION"},
+  "current_task": "product-path-migration",
   "index": "docs/00-文档导航.md"
 }

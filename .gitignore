@@ -12,5 +12,5 @@
 
 # Maven 可复验产物；交付验证使用隔离工作副本。
 /target/
-/code/**/target/
+/platform/**/target/
 __pycache__/

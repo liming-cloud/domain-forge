@@ -27,7 +27,7 @@ class WebInputTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name).resolve()
         self.project = self.directory / 'consumer'
-        shutil.copytree(ROOT / 'code/verification/consumers/project-a', self.project)
+        shutil.copytree(ROOT / 'platform/verification/consumers/bom-only', self.project)
 
     def reject(self, code, action, *args):
         with self.assertRaises(environment.ProbeFailure) as failure:
@@ -55,7 +55,7 @@ class WebInputTests(unittest.TestCase):
             raise environment.ProbeFailure('PG_NATIVE_FAILURE', 'injected native failure')
         args = SimpleNamespace(tools='fixed', http_tools='fixed', check='all')
         with patch.object(web_build, 'component', return_value={}), patch.object(web_build, 'publish', return_value={}), patch.object(web_build, 'tool_bytes', return_value={}), patch.object(web_build, 'consume', side_effect=fail):
-            self.reject('PG_NATIVE_FAILURE', web_verify.inspect, ROOT, ROOT / 'code/verification/boot-smoke', {}, [], {}, None, None, None, workspace, output, args)
+            self.reject('PG_NATIVE_FAILURE', web_verify.inspect, ROOT, ROOT / 'platform/verification/smoke/boot-smoke', {}, [], {}, None, None, None, workspace, output, args)
         self.assertEqual((output / 'independent-builds/consumer-a-evidence/verify.log').read_text(), 'native failure evidence')
         self.assertTrue((output / 'independent-builds/consumer-a-runtime/http-runtime.log').is_file())
         self.assertTrue((output / 'independent-builds/http-preparation/tools/prepare.log').is_file())
@@ -63,9 +63,8 @@ class WebInputTests(unittest.TestCase):
 
     def test_frozen_contract_rejects_manual_edit_and_input_drift(self):
         root = self.directory / 'root'; root.mkdir()
-        shutil.copytree(ROOT / 'code', root / 'code', ignore=shutil.ignore_patterns('target'))
-        destination = root / 'docs/contracts/web-support/0.1.0-r2.1'
-        shutil.copytree(ROOT / 'docs/contracts/web-support/0.1.0-r2.1', destination)
+        shutil.copytree(ROOT / 'platform', root / 'platform', ignore=shutil.ignore_patterns('target'))
+        destination = root / 'platform/verification/contracts/web-support/0.1.0-r2.1'
         (root / 'tools/product_gate').mkdir(parents=True)
         for name in ('a', 'b'):
             shutil.copyfile(ROOT / f'tools/product_gate/consumer-{name}-scenarios.json', root / f'tools/product_gate/consumer-{name}-scenarios.json')
@@ -79,12 +78,12 @@ class WebInputTests(unittest.TestCase):
         scenario = root / 'tools/product_gate/consumer-a-scenarios.json'; scenario.write_text(scenario.read_text() + ' ')
         self.reject('PG_HTTP_BASELINE', web_http.contract_baseline, root, 'a', generated)
         shutil.copyfile(ROOT / 'tools/product_gate/consumer-a-scenarios.json', scenario)
-        source = root / 'code/components/web-support/src/main/java/org/domainforge/web/api/ApiResponse.java'
+        source = root / 'platform/framework/web-support/src/main/java/org/domainforge/web/api/ApiResponse.java'
         source.write_text(source.read_text() + '// drift\n')
         self.reject('PG_HTTP_BASELINE', web_http.contract_baseline, root, 'a', generated)
 
     def test_component_fork_rejected_by_observation_entry(self):
-        project = self.directory / 'web'; shutil.copytree(ROOT / 'code/components/web-support', project)
+        project = self.directory / 'web'; shutil.copytree(ROOT / 'platform/framework/web-support', project)
         pom = project / 'pom.xml'; pom.write_text(pom.read_text().replace('</project>', '<properties><maven.compiler.fork>true</maven.compiler.fork></properties></project>'))
         self.reject('SG_BUILD_CLASSPATH', web_build.observe, ROOT, project, None, None, False, [])
 
@@ -135,7 +134,7 @@ class WebInputTests(unittest.TestCase):
     def test_valid_no_parent_consumer_and_own_parent_consumer(self):
         web_build.consumer_model(ROOT, self.project, 'a')
         project = self.directory / 'consumer-b'
-        shutil.copytree(ROOT / 'code/verification/consumers/project-b', project)
+        shutil.copytree(ROOT / 'platform/verification/consumers/custom-parent', project)
         web_build.consumer_model(ROOT, project, 'b')
 
     def test_missing_consumer_cannot_be_a_complete_result(self):
@@ -143,7 +142,7 @@ class WebInputTests(unittest.TestCase):
 
     def test_reactor_parent_system_path_and_skip_bypasses(self):
         pom = self.project / 'pom.xml'; original = pom.read_text()
-        changes = [('<modules><module>../../../components/web-support</module></modules>', 'PG_CONSUMER_SCOPE'),
+        changes = [('<modules><module>../../../framework/web-support</module></modules>', 'PG_CONSUMER_SCOPE'),
                    ('<parent><groupId>org.domainforge</groupId><artifactId>domain-forge-build</artifactId><version>0.1.0</version></parent>', 'PG_CONSUMER_PARENT'),
                    ('<systemPath>/tmp/implicit.jar</systemPath>', 'PG_CONSUMER_SCOPE'),
                    ('<properties><skipTests>true</skipTests></properties>', 'PG_CONSUMER_TESTS')]

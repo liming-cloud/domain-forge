@@ -8,9 +8,9 @@
   <packaging>pom</packaging>
   <!-- 仓库内部 parent 与聚合；外部消费项目无需继承。 -->
   <modules>
-    <module>verification/boot-smoke</module>
-    <module>components/web-support</module>
-    <module>platform-bom</module>
+    <module>verification/smoke/boot-smoke</module>
+    <module>framework/web-support</module>
+    <module>bom</module>
   </modules>
   <properties>
     <java.version>21</java.version>

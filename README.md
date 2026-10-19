@@ -5,7 +5,7 @@
 - [产品定义与首版范围](docs/product/01-产品定义.md#产品目的)
 - [当前恢复点与确认记录](docs/product/02-研发路线.md#当前恢复点)
 - [整体研发结构](docs/architecture/01-总体架构.md)
-- [当前结构迁移任务](docs/work/01-结构迁移.md#目标与输入)
+- [当前产品迁移任务](docs/work/02-产品迁移.md#目标与输入)
 - [文档总索引](docs/00-文档导航.md) · [Agent 入口](AGENTS.md)
 
 ## 开发与验证入口
@@ -14,9 +14,9 @@
 
 ```bash
 # 仓库根执行；先按工程说明选择固定 JDK 和工具环境。
-code/mvnw -f code/pom.xml -B -ntp verify
+platform/mvnw -f platform/pom.xml -B -ntp verify
 python3 -B tools/control_plane/control_plane.py check
 python3 -B tools/product_gate/verify.py --project .
 ```
 
-`code/` 管理实际产品工程，`docs/` 管理当前结论文档，`tools/` 管理质量工具；目标目录及后续顺序见总体架构。普通 Maven 构建不替代完整质量验证。当前授权、验证结果与剩余风险见[结构迁移记录](docs/work/01-结构迁移.md#唯一任务记录)。
+`platform/` 管理实际产品工程，`docs/` 管理当前结论文档，`tools/` 管理质量工具；目标目录及后续顺序见总体架构。普通 Maven 构建不替代完整质量验证。当前授权、验证结果与剩余风险见[产品迁移记录](docs/work/02-产品迁移.md#唯一任务记录)。

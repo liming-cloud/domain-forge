@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 import zipfile
 
-from environment import MODULE, REACTOR, baseline, command, digest, require, sources
+from environment import MODULE, REACTOR, baseline, command, digest, require, sources, product_root
 import calibrate_architecture
 import calibrate_lifecycle
 import calibrate_maven
@@ -20,7 +20,7 @@ import role_boundaries
 
 
 def model(root, project):
-    aggregate = ET.parse(project.parents[1] / "pom.xml").getroot()
+    aggregate = ET.parse(product_root(project) / "pom.xml").getroot()
     expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "domain-forge-build",
                 "version": "0.1.0", "packaging": "pom"}
     require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) ==
@@ -35,7 +35,7 @@ def model(root, project):
     parent = document.find("./{*}parent")
     require(parent is not None and len(parent) == 4 and
             all(parent.findtext("{*}" + key) == expected[key] for key in ("groupId", "artifactId", "version")) and
-            parent.findtext("{*}relativePath") == "../../pom.xml",
+            parent.findtext("{*}relativePath") == "../../../pom.xml",
             "PG_BASELINE", "探针必须通过仓库路径继承已验证的内部 parent")
     require(not any(document.find(path) is not None for path in ("./{*}modules", "./{*}profiles",
                 "./{*}build/{*}directory", "./{*}build/{*}outputDirectory", "./{*}build/{*}testOutputDirectory")),
@@ -100,12 +100,12 @@ def compiler_model(document, project):
 
 def lifecycle(root, project, argv, env, home, repository, output):
     require(not (project / "target").exists(), "PG_DIRTY_BUILD", "产品交付从无旧输出副本执行")
-    source_inputs = sources(project.parents[2])
+    source_inputs = sources(product_root(project).parent)
     model(root, project)
     inputs = calibrate_maven.project_inputs(project)
     extension = calibrate_maven.observer(home, output)
     inventory = output / "maven-inventory.xml"
-    execution = command([*argv, "-f", str(project.parents[1] / "pom.xml"), "-Dmaven.ext.class.path=" + str(extension),
+    execution = command([*argv, "-f", str(product_root(project) / "pom.xml"), "-Dmaven.ext.class.path=" + str(extension),
                          "-Ddomainforge.scope.output=" + str(inventory), "verify"],
                         project, output / "verify.log", 600, env)
     require(inventory.is_file(), "PG_BUILD_OBSERVER", "缺少本次真实 Maven 观察结果")
@@ -140,7 +140,7 @@ def lifecycle(root, project, argv, env, home, repository, output):
              "direct_dependencies": calibrate_maven.direct_dependencies(document)}
     artifact = packaged(document, project, build, dependencies)
     calibrate_maven_source.unchanged_build(build, project)
-    require(sources(project.parents[2]) == source_inputs, "PG_INPUT_CHANGED", "聚合或模块输入在构建期间变化")
+    require(sources(product_root(project).parent) == source_inputs, "PG_INPUT_CHANGED", "聚合或模块输入在构建期间变化")
     return {"build": build, "execution": execution, "goals": goals, "tests": tests, "artifact": artifact,
             "dependencies": dependencies, "plugin_dependencies": plugin_dependencies,
             "constraints": constraints, "plugin_constraints": plugin_constraints, "resolved": resolved,
@@ -151,7 +151,7 @@ def lifecycle(root, project, argv, env, home, repository, output):
 
 def module_inventory(document, project):
     """核对全部真实 reactor，再选择当前 JAR 的原生观察，不丢弃未知执行。"""
-    code = project.parents[1]
+    code = product_root(project)
     projects = document.findall("project")
     expected = {str(code), *(str(code / item) for item in REACTOR)}
     require(len(projects) == len(expected) and {x.get("path") for x in projects} == expected,
@@ -163,11 +163,11 @@ def module_inventory(document, project):
     allowed = {str(code / item) for item in REACTOR}
     require(all(x.get("project") in allowed for tag in ("compilation", "execution") for x in document.findall(tag)),
             "PG_BUILD_SCOPE", "聚合或未知模块执行了未支持的编译／插件")
-    bom = next(x for x in projects if x.get("path") == str(code / "platform-bom"))
+    bom = next(x for x in projects if x.get("path") == str(code / "bom"))
     require(bom.get("packaging") == "pom" and not any(bom.findall(tag) for tag in ("declaredDependency", "resolvedDependency"))
-            and not any(x.get("project") == str(code / "platform-bom") for x in document.findall("compilation"))
+            and not any(x.get("project") == str(code / "bom") for x in document.findall("compilation"))
             and all(x.get("group") == "org.codehaus.mojo" and x.get("artifact") == "flatten-maven-plugin" and
-                    x.get("goal") == "flatten" for x in document.findall("execution") if x.get("project") == str(code / "platform-bom")),
+                    x.get("goal") == "flatten" for x in document.findall("execution") if x.get("project") == str(code / "bom")),
             "PG_BUILD_SCOPE", "平台 BOM 只能生成消费 POM，不能包含直接依赖、编译或额外执行")
     return select_inventory(document, project)
 

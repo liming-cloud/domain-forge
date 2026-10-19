@@ -6,7 +6,7 @@
     <groupId>org.domainforge</groupId>
     <artifactId>domain-forge-build</artifactId>
     <version>0.1.0</version>
-    <relativePath>../../pom.xml</relativePath>
+    <relativePath>../../../pom.xml</relativePath>
   </parent>
   <artifactId>domain-forge</artifactId>
   <name>Domain Forge</name>

@@ -15,10 +15,29 @@ ENGINEERING = Path(__file__).resolve().parents[1] / "engineering_gate"
 sys.path.insert(0, str(ENGINEERING))
 from calibrate_source import ProbeFailure, digest, require
 
-MODULE = Path("verification/boot-smoke")
-JAVA_MODULES = (MODULE, Path("components/web-support"), Path("verification/consumers/project-a"), Path("verification/consumers/project-b/app"))
-REACTOR = (MODULE, Path("components/web-support"), Path("platform-bom"))
-CONSUMERS = (Path("verification/consumers/project-a"), Path("verification/consumers/project-b"))
+PRODUCT = Path("platform")
+MODULE = Path("verification/smoke/boot-smoke")
+JAVA_MODULES = (MODULE, Path("framework/web-support"), Path("verification/consumers/bom-only"), Path("verification/consumers/custom-parent/app"))
+REACTOR = (MODULE, Path("framework/web-support"), Path("bom"))
+CONSUMERS = (Path("verification/consumers/bom-only"), Path("verification/consumers/custom-parent"))
+CONTRACTS = Path("verification/contracts/web-support/0.1.0-r2.1")
+CONTRACT_FILES = tuple(CONTRACTS / name for name in ("manifest.json", "consumer-a-openapi.json", "consumer-b-openapi.json"))
+
+
+def product_root(project):
+    """探针相对位置固定，拒绝把错误目录当成聚合或 Wrapper 根。"""
+    code = project.parents[len(MODULE.parts) - 1]
+    require(code.name == PRODUCT.name and project == code / MODULE,
+            "PG_INPUT", "探针不属于固定产品布局")
+    return code
+
+
+def contract_sources(root):
+    """只登记三个派生合同资源，不把 manifest 纳入自身源输入。"""
+    paths = [root / PRODUCT / name for name in CONTRACT_FILES]
+    require(all(path.is_file() and not path.is_symlink() for path in paths),
+            "PG_INPUT", "缺少普通合同资源")
+    return {path.relative_to(root).as_posix(): digest(path) for path in paths}
 
 
 def baseline(root):
@@ -75,7 +94,7 @@ def runtime(root):
 
 def wrapper(root, code=None):
     lock = baseline(root)
-    code = code or root / "code"
+    code = code or root / PRODUCT
     for name, expected in lock["wrapper"]["scripts"].items():
         require((code / name).is_file() and not (code / name).is_symlink() and digest(code / name) == expected,
                 "PG_WRAPPER", "官方 Wrapper 脚本缺失或被改写：" + name)
@@ -92,9 +111,10 @@ def wrapper(root, code=None):
 def sources(root):
     """覆盖代码区全部维护文件；未支持模块不能被复制清单静默遗漏。"""
     require(not any((root / name).exists() or (root / name).is_symlink()
-                    for name in ("pom.xml", "src", ".mvn", "mvnw", "mvnw.cmd")),
+                    for name in ("pom.xml", "src", ".mvn", "mvnw", "mvnw.cmd", "code", "docs/contracts")),
             "PG_BUILD_SCOPE", "旧根目录工程输入必须迁入代码区")
-    code = root / "code"
+    code = root / PRODUCT
+    contract_sources(root)
     for directory in (code, code / ".mvn", *(code / module / "src" for module in JAVA_MODULES)):
         require(directory.is_dir() and not directory.is_symlink(), "PG_INPUT", "缺少普通工程输入目录")
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
@@ -107,6 +127,8 @@ def sources(root):
             continue
         if path.is_file():
             relative = path.relative_to(code)
+            if relative in CONTRACT_FILES:
+                continue
             require(relative.as_posix() in required or any(relative.is_relative_to(module / "src") for module in JAVA_MODULES),
                     "PG_BUILD_SCOPE", "未登记或未支持的代码输入：" + relative.as_posix())
             paths.append(path)
@@ -116,12 +138,12 @@ def sources(root):
 
 def copy_project(root, target, inputs):
     target.mkdir()
-    for name, checksum in inputs.items():
+    for name, checksum in {**inputs, **contract_sources(root)}.items():
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / name, destination)
         require(digest(destination) == checksum, "PG_INPUT_CHANGED", "复制期间输入变化")
-    return target / "code" / MODULE
+    return target / PRODUCT / MODULE
 
 
 def bootstrap(root, project, cache, repository, output):
@@ -133,7 +155,7 @@ def bootstrap(root, project, cache, repository, output):
                         '<id>product-central</id><mirrorOf>*</mirrorOf>'
                         '<url>https://repo.maven.apache.org/maven2</url></mirror></mirrors></settings>')
     env = dict(os.environ, MAVEN_USER_HOME=str(cache), MAVEN_SKIP_RC="true")
-    argv = [str(project.parents[1] / "mvnw"), "-B", "-ntp", "-s", str(settings), "-gs", str(settings),
+    argv = [str(product_root(project) / "mvnw"), "-B", "-ntp", "-s", str(settings), "-gs", str(settings),
             "-Dmaven.repo.local=" + str(repository)]
     execution = command([*argv, "--version"], project, output / "wrapper.log", 300, env, preparation=True)
     text = (output / "wrapper.log").read_text()

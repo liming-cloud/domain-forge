@@ -64,7 +64,7 @@ def baseline_inputs(root):
 
 
 def contract_baseline(root, name, generated):
-    directory = root / 'docs/contracts/web-support/0.1.0-r2.1'
+    directory = root / environment.PRODUCT / environment.CONTRACTS
     manifest = json.loads((directory / 'manifest.json').read_text())
     require(manifest.get('schema') == 1 and manifest.get('version') == '0.1.0-r2.1' and
             manifest.get('inputs') == baseline_inputs(root) and set(manifest.get('contracts', {})) == {'a', 'b'},
