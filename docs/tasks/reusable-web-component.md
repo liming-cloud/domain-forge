@@ -138,11 +138,11 @@
       "criterion": "现行原生观测校准的真实接收、分类、故障隔离、敏感内容和恢复反例；不据此宣称 Web 组件已接入遥测平台"
     }
   ],
-  "frontier": "阶段 1a 的 F01 已完成先红后绿、真实 A/B 消费本地验证及语义复核。2026-10-19 已获当前候选提交推送和 Git／CI／delivery 核验授权；精确对象及实际结果只维护于 .run-artifacts/r2-delivery/acceptance-checklist.md，不能从本段预推已通过。原生漏洞告警保留，R2-01 人工验收未获得，不进入阶段 1b 或修改 CI。",
+  "frontier": "2026-10-19 用户已确认精确功能候选 d2c936eb7b6f021a943d5cabea5dacb6a7f2ad4b 的 R2-01／阶段 1a 人工验收通过，原生漏洞告警继续保留。当前办理一次限定验收记录提交和真实 Git／CI／delivery 收尾；收尾后仅细化阶段 1b 迁移清单、影响范围及验证要求，确认后才实施。本记录前面的待验收措辞保留对应历史时点，以本唯一记录及引用的当前核验结果为准。",
   "pending": [
-    "对清单所列精确候选及 R2-01 范围取得用户独立人工验收；总体设计批准、本地和 CI 通过均不代替验收",
-    "原生漏洞告警继续保留，生产风险处置未完成；本次不作风险豁免",
-    "阶段 1b 及后续能力须满足前序验收及对应执行授权；当前不迁移或修改 CI"
+    "验收记录提交自身的远端、CI 及 delivery 必须在提交推送后核对；实际结果原位维护于 .run-artifacts/f01-close/delivery-final.json，不预记通过或追加 CI 进度提交",
+    "原生漏洞告警继续保留，具体可利用性和生产风险处置未完成；人工验收不构成风险豁免或生产安全放行",
+    "完成必要收尾后，仅提交阶段 1b 的迁移清单、影响范围和验证要求供确认；当前不实施迁移、不修改 CI 或扩展业务功能"
   ],
   "deferred": [
     "阶段 1b：结论文档、产品/工具路径与薄 dev 入口分批迁移；当前不迁移、不修改 CI",
@@ -151,8 +151,37 @@
     "Q0—Q4 检查优化独立推进，未经执行授权不切换现行政策；性能、真实升级、部署恢复和 AI 任务验收仍保留",
     "Tomcat 原生漏洞告警保留；未作风险豁免、版本变更或生产安全放行"
   ],
-  "acceptance": null,
-  "closing": null
+  "acceptance": {
+    "actor": "本会话用户／项目验收责任人",
+    "date": "2026-10-19",
+    "source": "REUSABLE-WEB-TASK#唯一任务记录",
+    "functional_sha": "d2c936eb7b6f021a943d5cabea5dacb6a7f2ad4b",
+    "scope": "R2-01 Web 组件、平台 BOM 与两个独立消费项目，以及阶段 1a 的 F01 内部诊断修复；对应 R2-A01—A12 和整体方案 A05。原生漏洞告警保留，不包含阶段 1b 迁移、CI 优化、业务扩展或生产安全放行。",
+    "source_message": "确认候选 d2c936e 的 R2-01／阶段 1a 人工验收通过，原生漏洞告警继续保留；完成验收记录和必要收尾，允许提交推送。随后进入阶段 1b，先明确迁移清单、影响范围和验证要求，确认后再实施，暂不修改 CI 或扩展业务功能。",
+    "source_conversation": "01a137db-5b64-70c1-9b20-587ab9d0619e",
+    "evidence": {
+      "ci": "https://github.com/liming-cloud/domain-forge/actions/runs/39189686502/attempts/2",
+      "ci_attempt": 2,
+      "checklist": ".run-artifacts/r2-delivery/acceptance-checklist.md",
+      "review": ".run-artifacts/f01-local/semantic-review.json",
+      "native_product": ".run-artifacts/f01-delivery/ci-product-verification.json",
+      "delivery": ".run-artifacts/f01-delivery/delivery-final.json",
+      "input": "24b535fb5be1a8d832482b70d831fe7555b33a1fd5096baee9d48f5542143bd4"
+    },
+    "limitations": [
+      "Tomcat 11.0.24 的 11 项原生漏洞告警（4 critical、5 high、2 medium）继续保留，未作风险豁免",
+      "A/B 原始 JUnit XML 已核对；R1／组件原始 XML 未上传，保留 reactor 日志及报告绑定清单的证据范围",
+      "本单元合成消费场景不证明真实 IAM、DDD 业务、生产部署恢复、升级兼容或性能目标"
+    ]
+  },
+  "closing": {
+    "status": "pending",
+    "reason": "记录提交自身 SHA、远端和 CI 尚须在推送后取得并核验，不能自引用或预写通过；实际收尾对象和结果原位维护于 .run-artifacts/f01-close/delivery-final.json。",
+    "functional_run_id": 39189686502,
+    "functional_run_attempt": 2,
+    "evidence": ".run-artifacts/f01-close/delivery-final.json",
+    "next_authorization": "必要收尾完成后允许阶段 1b 清单、影响范围和验证要求设计；确认后再实施，暂不修改 CI 或扩展业务功能。"
+  }
 }
 ```
 

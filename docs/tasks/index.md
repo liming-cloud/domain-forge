@@ -5,10 +5,10 @@
 
 ## 活动与待处理
 
-- [reusable-web-component](reusable-web-component.md#目标与输入)：阶段 1a 的 F01 已完成先红后绿、真实 A/B 消费本地验证及语义复核。2026-10-19 已获当前候选提交推送和 Git／CI／delivery 核验授权；精确对象及实际结果只维护于 .run-artifacts/r2-delivery/acceptance-checklist.md，不能从本段预推已通过。原生漏洞告警保留，R2-01 人工验收未获得，不进入阶段 1b 或修改 CI。
-- reusable-web-component 待处理：对清单所列精确候选及 R2-01 范围取得用户独立人工验收；总体设计批准、本地和 CI 通过均不代替验收
-- reusable-web-component 待处理：原生漏洞告警继续保留，生产风险处置未完成；本次不作风险豁免
-- reusable-web-component 待处理：阶段 1b 及后续能力须满足前序验收及对应执行授权；当前不迁移或修改 CI
+- [reusable-web-component](reusable-web-component.md#目标与输入)：收尾待处理；记录提交自身 SHA、远端和 CI 尚须在推送后取得并核验，不能自引用或预写通过；实际收尾对象和结果原位维护于 .run-artifacts/f01-close/delivery-final.json。
+- reusable-web-component 待处理：验收记录提交自身的远端、CI 及 delivery 必须在提交推送后核对；实际结果原位维护于 .run-artifacts/f01-close/delivery-final.json，不预记通过或追加 CI 进度提交
+- reusable-web-component 待处理：原生漏洞告警继续保留，具体可利用性和生产风险处置未完成；人工验收不构成风险豁免或生产安全放行
+- reusable-web-component 待处理：完成必要收尾后，仅提交阶段 1b 的迁移清单、影响范围和验证要求供确认；当前不实施迁移、不修改 CI 或扩展业务功能
 
 ## 归档查询
 
