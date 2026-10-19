@@ -70,8 +70,12 @@ def component(root, code, observed, repository, tools, output):
     project = code / WEB
     required = ['reservedCodesCannotBecomeBusinessRejections', 'duplicateAndBroadDeclarationsAreRejected',
                 'exactMatchingDoesNotInspectSubclassOrCause', 'nonServletContextDoesNotActivateWebSupport']
+    diagnostics = ['unknownFailureRetainsLocationAndCauseWithoutMessages', 'throwingMappingRetainsItsFailureLocation',
+                   'invalidMappingRetainsValidationFailure', 'expectedRejectionAndMalformedInputAreNotSystemFailures',
+                   'committedResponseRethrowsWithoutDuplicateDiagnostics', 'cyclicCausesAndLargeStacksRemainBounded']
     result = observe(root, project, document, repository, False,
-                     ['org.domainforge.web.internal.ResponseContractTest#' + name for name in required])
+                     ['org.domainforge.web.internal.ResponseContractTest#' + name for name in required] +
+                     ['org.domainforge.web.internal.FailureDiagnosticsTest#' + name for name in diagnostics])
     require(not any(x.get('artifact') == 'spring-boot-maven-plugin' for x in document.findall('execution') if x.get('project') == str(project)),
             'PG_LIBRARY_ARTIFACT', '普通组件不得执行 Boot 打包')
     with zipfile.ZipFile(result['artifact']['path']) as jar:

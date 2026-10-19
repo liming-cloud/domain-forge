@@ -8,7 +8,7 @@ Agent 只读取任务命中的小节；索引存在不代表门禁或人工验�
 
 首次通读按编号阅读；编号是阅读顺序，文档 ID 才是稳定身份。后续设计和当前进度从分类及任务入口补读。此顺序不扩大 Agent 的最低阅读清单。
 
-1. [01 · PRODUCT · 多项目研发平台：产品定义](product/product-definition.md)
+1. [01 · PRODUCT · 企业级 DDD 微服务脚手架：产品定义](product/product-definition.md)
 2. [02 · REQUIREMENTS · 需求分析与领域设计规范](standards/requirements-and-domain.md)
 3. [03 · SYSTEM · 系统设计规范](standards/system-design.md)
 4. [04 · BUILD · 技术与构建规范](standards/technology-and-build.md)

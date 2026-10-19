@@ -105,6 +105,28 @@ class WebInputTests(unittest.TestCase):
         interaction = {'status': 500, 'body': {'code': 'INTERNAL_ERROR', 'message': 'java.lang.IllegalStateException at example.Controller:91', 'data': None}}
         self.assertTrue(web_http.safe_messages([interaction], [case]))
 
+    def test_internal_diagnostic_rejects_missing_generic_duplicate_and_secret_logs(self):
+        case = {'code': 'INTERNAL_ERROR', 'request': {'path': '/unknown'}}
+        line = ' ERROR example platform_http_failure kind=unhandled cause=java.lang.IllegalStateException at=example.ContractController.unknown:147'
+        self.assertEqual(web_http.failure_diagnostic(case, line)['count'], 1)
+        for text in ('', ' ERROR internal error', line + '\n' + line, line.replace('unknown:147', 'unknown')):
+            self.reject('PG_HTTP_DIAGNOSTIC', web_http.failure_diagnostic, case, text)
+        self.reject('PG_HTTP_DIAGNOSTIC_SECRET', web_http.failure_diagnostic, case, line + ' synthetic-secret')
+
+    def test_mapping_diagnostic_requires_the_actual_extension_or_validation_location(self):
+        for mode, failure, location in [('throw', 'IllegalStateException', 'RejectionAdapter.map'),
+                                        ('invalid', 'IllegalArgumentException', 'RejectionMappings.apply'),
+                                        ('null', 'IllegalArgumentException', 'RejectionMappings.apply')]:
+            case = {'code': 'INTERNAL_ERROR', 'request': {'path': '/mapping?mode=' + mode}}
+            line = ' ERROR platform_http_failure kind=rejection-mapping cause=java.lang.' + failure + ' at=example.' + location + ':42'
+            self.assertTrue(web_http.failure_diagnostic(case, line)['required'])
+            self.reject('PG_HTTP_DIAGNOSTIC', web_http.failure_diagnostic, case, line.replace('rejection-mapping', 'unhandled'))
+
+    def test_business_rejections_must_not_be_system_failures(self):
+        case = {'code': 'DECLINED', 'request': {'path': '/rejected'}}
+        self.assertFalse(web_http.failure_diagnostic(case, '')['required'])
+        self.reject('PG_HTTP_DIAGNOSTIC', web_http.failure_diagnostic, case, ' ERROR platform_http_failure kind=unhandled')
+
     def test_bom_cannot_publish_direct_dependencies(self):
         pom = self.directory / 'bom.xml'
         pom.write_text('<project><groupId>org.domainforge</groupId><artifactId>domain-forge-bom</artifactId><version>0.1.0-r2.1</version><dependencyManagement><dependencies><dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-web-support</artifactId><version>0.1.0-r2.1</version></dependency><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-dependencies</artifactId><version>4.0.8</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement><dependencies><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot</artifactId><version>4.0.8</version></dependency></dependencies></project>')

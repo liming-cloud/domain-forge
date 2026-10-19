@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -126,6 +127,26 @@ def start(artifact, port, log):
         runtime.stop(process); stream.close(); raise
 
 
+def failure_diagnostic(case, text):
+    """只核对本次请求新增日志；未知与扩展故障须可定位，正常拒绝不能误记系统故障。"""
+    require('synthetic-secret' not in text, 'PG_HTTP_DIAGNOSTIC_SECRET', '内部诊断泄漏测试敏感内容')
+    lines = [line for line in text.splitlines() if 'platform_http_failure ' in line]
+    if case.get('code') != 'INTERNAL_ERROR':
+        require(not lines, 'PG_HTTP_DIAGNOSTIC', '非系统故障被记为系统故障')
+        return {'required': False, 'count': 0}
+    require(len(lines) == 1, 'PG_HTTP_DIAGNOSTIC', '本次故障缺少或重复内部诊断')
+    line = lines[0]
+    path = case['request']['path']
+    mapping = path.startswith('/mapping')
+    kind = 'rejection-mapping' if mapping else 'unhandled'
+    location = ('RejectionAdapter.map' if path.endswith('=throw') else 'RejectionMappings.apply') if mapping else 'ContractController.unknown'
+    failure = 'IllegalArgumentException' if mapping and not path.endswith('=throw') else 'IllegalStateException'
+    require(' ERROR ' in line and 'kind=' + kind in line and failure in line and
+            re.search(re.escape(location) + r':\d+', line),
+            'PG_HTTP_DIAGNOSTIC', '诊断缺少准确的故障类别、原因类型或代码位置')
+    return {'required': True, 'count': 1, 'line': line}
+
+
 def packaged(root, consumers, output):
     """A/B 同时从真实打包结果运行；逐例请求，停止 A 后仍请求 B。"""
     artifacts = artifact_binding(consumers)
@@ -138,9 +159,16 @@ def packaged(root, consumers, output):
             process, stream = start(consumers[name]['observed']['artifact']['path'], port, output / ('consumer-' + name + '-packaged.log'))
             active[name] = (process, stream, port)
             _, cases = calibrate_http.scenarios(root / ('tools/product_gate/consumer-' + name + '-scenarios.json'))
-            interactions = []
+            interactions, internal_diagnostics = [], []
+            log = output / ('consumer-' + name + '-packaged.log')
             for case in cases:
-                req = case['request']; status, headers, raw = request(port, req['method'], req['path'], req['headers'], req['body'])
+                offset = log.stat().st_size
+                req = case['request']
+                request_headers = dict(req['headers'], **{'X-F01-Probe': 'synthetic-secret-header'})
+                status, headers, raw = request(port, req['method'], req['path'], request_headers, req['body'])
+                with log.open('rb') as stream_log:
+                    stream_log.seek(offset)
+                    internal_diagnostics.append({'case': case['id'], **failure_diagnostic(case, stream_log.read().decode(errors='replace'))})
                 interactions.append({'status': status, 'headers': {k.lower(): [v] for k, v in headers.items()},
                                      'body': json.loads(raw) if case['protocol'] == 'json' else raw.decode(errors='replace'),
                                      'body_base64': base64.b64encode(raw).decode()})
@@ -150,7 +178,8 @@ def packaged(root, consumers, output):
             require(request(port, 'GET', '/missing')[0] == 404 and request(port, 'POST', '/success')[0] == 405,
                     'PG_HOST_HTTP', '未选中路由的宿主 HTTP 语义改变')
             require(request(port, 'GET', '/actuator/env')[0] == 404, 'PG_HOST_HTTP', '暴露未声明运维端点')
-            results[name] = {'port': port, 'interactions': interactions, 'host_404_405': True, 'health_only': True}
+            results[name] = {'port': port, 'interactions': interactions, 'internal_diagnostics': internal_diagnostics,
+                             'host_404_405': True, 'health_only': True}
         runtime.stop(active['a'][0])
         status, _, body = request(active['b'][2], 'GET', '/rejected')
         require(status == 200 and json.loads(body)['code'] == 'DECLINED', 'PG_CONSUMER_ISOLATION', '停止 A 后 B 不再可独立运行')

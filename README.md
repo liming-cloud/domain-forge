@@ -1,6 +1,6 @@
 # Domain Forge
 
-为多个业务项目提供版本化组件、服务和轻量起步模板。产品责任与当前完成状态以文档正文为准。
+公司级 DDD 微服务脚手架，交付可复用基础组件、登录注册与身份权限等基础后端、业务服务起步模板及部署参考方案，并指导 AI 编码与人工审核。产品责任与当前完成状态以文档正文为准。
 
 - [产品定义与首版范围](docs/product/product-definition.md#产品目的)
 - [当前恢复点与确认记录](docs/product/rebuild.md#当前恢复点)
@@ -19,4 +19,4 @@ python3 -B tools/control_plane/control_plane.py check
 python3 -B tools/product_gate/verify.py --project .
 ```
 
-`code/` 管理工程源码及可执行资源，`docs/` 管理文档正文，`tools/` 管理质量工具。普通 Maven 构建不替代完整质量验证；R2-01 当前候选的验证及待人工验收状态见[任务记录](docs/tasks/reusable-web-component.md#唯一任务记录)，不表示整个 R2 或业务模板已经交付。
+`code/` 管理工程源码及可执行资源，`docs/` 管理文档正文，`tools/` 管理质量工具。普通 Maven 构建不替代完整质量验证；当前阶段 1a 的 F01 本地修复、后续候选核验及待人工验收状态见[任务记录](docs/tasks/reusable-web-component.md#唯一任务记录)，不表示整个 R2 或业务模板已经交付。
