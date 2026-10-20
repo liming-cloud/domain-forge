@@ -43,5 +43,11 @@
     "surefire": "3.5.6",
     "jar": "3.4.2"
   },
-  "python": "3.14.5"
+  "python": "3.14.5",
+  "module_contracts": {
+    "modules.json": "feedd42af68e5cbeffda6991271422a2a8d2aa9a7b0c844a4868120604513b66",
+    "web-modules.json": "2dcb64ffe4225e9461077c43c7c3d27fa50d463895625f6354b5b7fac05d332a",
+    "consumer-a-modules.json": "de6d15647e2119887f8569d9dabb1def0288895d8663f7d3bb2e04f3a7f51d82",
+    "consumer-b-modules.json": "b8e1b2584580592957ae1c2be4c46f5b12f88c418befb2e762e1a135b06044c5"
+  }
 }

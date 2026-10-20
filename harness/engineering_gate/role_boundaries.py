@@ -7,9 +7,10 @@ import urllib.request
 from calibrate_architecture import inside, payload_references
 from calibrate_lifecycle import fixed_version
 from calibrate_source import HERE, ProbeFailure, require
+import structural_contracts
 
 
-ROLES = {"interfaces", "application", "domain", "infrastructure"}
+ROLES = {"interfaces", "application", "domain", "infrastructure", "bootstrap"}
 USAGES = {"import", "annotation", "annotation-value", "type"}
 
 
@@ -80,6 +81,10 @@ def inspect(report, modules, rules):
                 errors.append({"code": "SG_ROLE_OWNERSHIP", "type": name, "source": binding["source"]})
         roles[name] = role
     artifacts = {node["file"]: node for item in report["build"]["compilations"] for node in item["dependencies"]}
+    strict = all("api_categories" in module for module in modules.values())
+    component_types = {item["name"] for item in report.get("component_inventory", [])} | {
+        name for name, binding in bindings.items() if binding["module"] is not None and
+        modules[binding["module"]]["kind"] == "component"}
     uses, annotations = {}, {}
     for reference in references:
         uses.setdefault((reference["owner"], reference["target"]), set()).add(reference["usage"])
@@ -108,12 +113,29 @@ def inspect(report, modules, rules):
         if role not in ROLES:
             return
         detail = {"type": owner, "target": target, "role": role, "source": bindings[owner]["source"]}
+        if strict and target in component_types:
+            return  # 精确组件合同在结构检查中按调用位置统一核对。
         destination = roles.get(target)
         if destination in ROLES:
             allowed = {"domain": {"domain"}, "application": {"application", "domain"},
-                       "interfaces": {"interfaces", "application", "domain"}, "infrastructure": ROLES}
+                       "interfaces": {"interfaces", "application", "domain"},
+                       "infrastructure": ROLES - {"bootstrap"}, "bootstrap": ROLES}
             if destination not in allowed[role]:
                 errors.append(dict(detail, code="SG_ROLE_DEPENDENCY", target_role=destination))
+            return
+        if role == "interfaces":
+            # HTTP 技术属于入口；已校准的 SQL／客户端库仍须留在基础设施。
+            metadata_types = set(rules["application_annotations"]) | {
+                value for values in rules["annotation_values"].values() for value in values}
+            kind = classification(target, origin)
+            artifact = artifacts.get(urllib.request.url2pathname(urllib.parse.urlsplit(origin).path), {})
+            known_client = target in rules["technical_types"] or any(
+                all(artifact.get(key) == library[key] for key in ("group", "artifact"))
+                for library in rules["technical_libraries"])
+            if kind == "uncalibrated" and known_client:
+                errors.append(dict(detail, code="SG_ROLE_CALIBRATION"))
+            elif kind == "technical" and target not in metadata_types:
+                errors.append(dict(detail, code="SG_TECHNICAL_DEPENDENCY", usage=usage or "bytecode", operation=operation))
             return
         if role not in {"application", "domain"}:
             return
@@ -164,9 +186,11 @@ def inspect(report, modules, rules):
         if roles.get(name) not in {"interfaces", "application", "domain"}:
             continue
         target = reference["target"]
-        kind = classification(target, reference.get("origin_uri", ""))
+        kind = "owned" if strict and target in component_types else classification(target, reference.get("origin_uri", ""))
         if kind == "technical" or roles.get(target) == "infrastructure":
             errors.append(dict(code="SG_TECHNICAL_CONTRACT", type=name, origin=origin, target=target, path=path + [target]))
         elif kind == "uncalibrated":
             errors.append(dict(code="SG_ROLE_CALIBRATION", type=name, origin=origin, target=target, path=path + [target]))
+    if strict:
+        errors.extend(structural_contracts.inspect(report, modules, roles, classification))
     return roles, errors

@@ -87,6 +87,29 @@ public class Payload {
         self.assertEqual({item["artifact"]: item["version"] for item in baseline["technical_libraries"]},
                          {"mybatis-plus-core": MP_VERSION, "mybatis-plus-annotation": MP_VERSION, "dynamic-datasource-spring": "4.5.0"})
 
+    def test_http_entry_cannot_call_real_mapper_then_moves_to_infrastructure(self):
+        self.source("interfaces.http", extra="private com.baomidou.mybatisplus.core.mapper.BaseMapper<String> mapper;")
+        path = self.role.case.project / "src/test-named-production/java/probe/Service.java"
+        path.write_text(path.read_text().replace('return "ok";', 'return String.valueOf(mapper.selectCount(null));'))
+        self.role.strict_definition()
+        report = self.role.command("SG_TECHNICAL_DEPENDENCY")
+        self.assertTrue(report["build"]["ok"])
+        self.assertTrue(any(item.get("target") == "com.baomidou.mybatisplus.core.mapper.BaseMapper"
+                            for item in report["diagnostics"]))
+        import calibrate_architecture
+        import role_boundaries
+        rules = role_boundaries.baseline()
+        next(item for item in rules["technical_libraries"] if item["artifact"] == "mybatis-plus-core")["version"] = "3.5.16"
+        modules = calibrate_architecture.declaration(self.role.case.project / "modules.json", schema=4)
+        _, diagnostics = role_boundaries.inspect(report, modules, rules)
+        self.assertIn("SG_ROLE_CALIBRATION", {item["code"] for item in diagnostics}, "已知 ORM 的未校准版本不能静默放行")
+        self.role.case.repaired_project()
+        self.source("infrastructure.persistence", extra="private com.baomidou.mybatisplus.core.mapper.BaseMapper<String> mapper;")
+        path = self.role.case.project / "src/test-named-production/java/probe/Service.java"
+        path.write_text(path.read_text().replace('return "ok";', 'return String.valueOf(mapper.selectCount(null));'))
+        self.role.strict_definition()
+        self.assertTrue(self.role.command()["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

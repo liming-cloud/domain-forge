@@ -15,6 +15,7 @@ import calibrate_maven_source
 import calibrate_source
 import dependency_declarations
 import method_contracts
+import structural_contracts
 from calibrate_source import HERE, ProbeFailure, digest, require
 
 
@@ -22,7 +23,8 @@ def configuration():
     names = ("calibrate_maven_architecture.py", "calibrate_architecture.py", "ArchitectureInventory.java",
              "calibrate_maven.py", "MavenScopeSpy.java", "maven-scope.lock.json", "calibrate_maven_source.py",
              "calibrate_source.py", "MetricInventory.java", "tools.lock.json", "method_contracts.py", "MethodInventory.java", "comments.xml",
-             "dependency_declarations.py", "calibrate_lifecycle.py", "calibrate_wrapper.py", "maven-lifecycle.lock.json")
+             "dependency_declarations.py", "calibrate_lifecycle.py", "calibrate_wrapper.py", "maven-lifecycle.lock.json",
+             "structural_contracts.py")
     return {name: digest(HERE / name) for name in names}
 
 
@@ -77,7 +79,7 @@ def select_contracts(modules, types, bindings):
             and by_name[name]["public"] == "true" and by_binding[name]["purpose"] == "production"]
     selected = {member["id"] for contract in contracts for member in contract["members"]}
     for module in modules.values():
-        for identifier in module.get("critical_methods", []):
+        for identifier in module.get("critical_methods", []) + [query["implementation"] for query in module.get("query_bindings", [])]:
             matches = [(name, member) for name, item in by_name.items() for member in item["members"]
                        if member["id"] == identifier and "(" in identifier and by_binding[name]["module"] == module["id"]
                        and by_binding[name]["purpose"] == "production"]
@@ -133,6 +135,8 @@ def probe(args, schema=2):
     require(definition.is_file() and not definition.is_symlink(), "SG_DECLARATION", "模块声明缺失或为符号链接")
     declaration_hash = digest(definition)
     modules = calibrate_architecture.declaration(definition, schema=schema)
+    if schema == 4:
+        structural_contracts.bind_declaration(definition, getattr(args, "contract_sha256", None))
     require(declaration_hash == digest(definition), "SG_INPUT_CHANGED", "读取期间模块声明变化")
     capability_rules = dependency_declarations.capabilities()
     paths, before_environment = environment(args)
@@ -143,7 +147,7 @@ def probe(args, schema=2):
     require(inputs == build["artifacts"], "SG_SOURCE_BINDING", "实际构建类产物与导入输入不一致")
     types = calibrate_architecture.inventory(paths, roots, expected, list(build["classpath_artifacts"]))
     bindings = bind_types(build, types, paths, modules)
-    diagnostics = calibrate_architecture.violations(modules, types)
+    diagnostics = calibrate_architecture.violations(structural_contracts.owned(modules), types)
     diagnostics.extend(origin_violations(build, types))
     by_name = {item["name"]: item for item in bindings}
     for item in diagnostics:

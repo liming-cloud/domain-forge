@@ -1,5 +1,5 @@
 {
-  "schema": 3,
+  "schema": 4,
   "modules": [
     {
       "id": "web-support",
@@ -27,7 +27,15 @@
       ],
       "data_contracts": [
         "org.domainforge.web.api.ApiResponse"
-      ]
+      ],
+      "api_categories": {
+        "org.domainforge.web.api.ApiResponse": "http",
+        "org.domainforge.web.api.PlatformJsonApi": "http",
+        "org.domainforge.web.api.BusinessRejectionMapping": "http",
+        "org.domainforge.web.api.HttpFailureResponses": "http"
+      },
+      "api_uses": {},
+      "query_bindings": []
     }
   ]
 }

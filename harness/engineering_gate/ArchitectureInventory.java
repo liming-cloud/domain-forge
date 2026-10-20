@@ -1,9 +1,11 @@
 import com.tngtech.archunit.ArchConfiguration;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaAccess;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaEnumConstant;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMember;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -96,6 +98,16 @@ final class ArchitectureInventory {
 
   /** 导出数据形状的实例字段和泛型继承，不把服务的内部操作当作传输合同。 */
   private static void writeShape(XMLStreamWriter output, JavaClass type) throws XMLStreamException {
+    for (var annotation : type.getAnnotations()) {
+      writeAnnotationShape(output, annotation, type.getName() + ":annotation");
+    }
+    for (JavaMember member : type.getMembers()) {
+      if (member.getModifiers().contains(JavaModifier.PUBLIC)) {
+        for (var annotation : member.getAnnotations()) {
+          writeAnnotationShape(output, annotation, memberId(member) + ":annotation");
+        }
+      }
+    }
     var parents = new ArrayList<>(type.getInterfaces());
     type.getSuperclass().ifPresent(parents::add);
     for (var parent : parents) {
@@ -108,6 +120,25 @@ final class ArchitectureInventory {
         for (JavaClass reference : field.getAllInvolvedRawTypes()) {
           writeShapeType(output, reference, memberId(field));
         }
+      }
+    }
+  }
+
+  /** 制品合同也保留注解和参数的类型，避免仅源码路径能识别技术泄漏。 */
+  private static void writeAnnotationShape(XMLStreamWriter output, Object value, String origin)
+      throws XMLStreamException {
+    if (value instanceof JavaAnnotation<?> annotation) {
+      writeShapeType(output, annotation.getRawType(), origin);
+      for (Object property : annotation.getProperties().values()) {
+        writeAnnotationShape(output, property, origin);
+      }
+    } else if (value instanceof JavaClass type) {
+      writeShapeType(output, type, origin);
+    } else if (value instanceof JavaEnumConstant constant) {
+      writeShapeType(output, constant.getDeclaringClass(), origin);
+    } else if (value instanceof Object[] values) {
+      for (Object element : values) {
+        writeAnnotationShape(output, element, origin);
       }
     }
   }

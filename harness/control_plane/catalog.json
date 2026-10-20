@@ -38,7 +38,8 @@
     "REUSABLE-WEB-TASK": {"path":"docs/work/93-接口组件验收依据.md","category":"tasks","kind":"task"},
     "STRUCTURE-MIGRATION": {"path":"docs/work/01-结构迁移.md","category":"tasks","kind":"task"},
     "PRODUCT-PATH-MIGRATION": {"path": "docs/work/02-产品迁移.md", "category": "tasks", "kind": "task"},
-    "TOOL-PATH-MIGRATION": {"path":"docs/work/03-工具迁移.md","category":"tasks","kind":"task"}
+    "TOOL-PATH-MIGRATION": {"path":"docs/work/03-工具迁移.md","category":"tasks","kind":"task"},
+    "STRUCTURAL-RULES": {"path":"docs/work/04-结构规则.md","category":"tasks","kind":"task"}
   },
   "scopes": {
     "acceptance": "执行者、评审者、决定及单元验收；验收来源、一次记录提交及收尾",
@@ -275,6 +276,8 @@
     {"glob":"harness/engineering_gate/test_dependency_declarations.py","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate","tests"]},
     {"glob":"harness/engineering_gate/calibrate_roles.py","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate"]},
     {"glob":"harness/engineering_gate/role_boundaries.py","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate"]},
+    {"glob":"harness/engineering_gate/structural_contracts.py","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate"]},
+    {"glob":"harness/engineering_gate/structural_runtime_fixture.py","purpose":"governance","scopes":["governance","build-gate","architecture","migration","migration-calibration","persistence-gate","test-gate","tests"]},
     {"glob":"harness/engineering_gate/role-boundaries.lock.json","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate"]},
     {"glob":"harness/engineering_gate/test_role_boundaries.py","purpose":"governance","scopes":["governance","build-gate","architecture","test-gate","tests"]},
     {"glob":"harness/engineering_gate/test_persistence_boundaries.py","purpose":"governance","scopes":["governance","architecture","persistence-gate","test-gate","tests"]},
@@ -539,7 +542,7 @@
     "runtime-source-quality-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","harness/engineering_gate/test_runtime.py","RuntimeQualityChecks"],"requires_test_count":true,"environment_argv":["@python","-B","harness/engineering_gate/calibrate_runtime.py","--environment"],"reason":"本轮实际 Java 观察器及夹具说明、格式和复杂度检查"},
     "delivery-evidence": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","delivery","--task","@task"]}
   },
-  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION","product-path-migration":"PRODUCT-PATH-MIGRATION","tool-path-migration":"TOOL-PATH-MIGRATION"},
-  "current_task": "tool-path-migration",
+  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION","product-path-migration":"PRODUCT-PATH-MIGRATION","tool-path-migration":"TOOL-PATH-MIGRATION","structural-rules":"STRUCTURAL-RULES"},
+  "current_task": "structural-rules",
   "index": "docs/00-文档导航.md"
 }

@@ -18,6 +18,7 @@ import calibrate_source
 import dependency_declarations
 import method_contracts
 import role_boundaries
+import structural_contracts
 
 
 def model(root, project):
@@ -273,27 +274,33 @@ def packaged(document, project, build, dependencies):
             "resources": sorted(resources), "dependencies": sorted(jars), "metadata_starters": metadata_starters}
 
 
-def quality(root, project, observed, tools, declaration="modules.json"):
+def quality(root, project, observed, tools, declaration="modules.json", contract_sha256=None):
     """直接使用观察器的真实对象执行必要源码、依赖、合同与职责检查。"""
     build = observed["build"]
     paths, tool_environment = calibrate_source.toolchain(tools)
     groups, implementations, diagnostics = calibrate_maven_source.source_checks(SimpleNamespace(tools=tools), build, paths)
-    modules = calibrate_architecture.declaration(root / "harness/product_gate" / declaration, schema=3)
+    definition = root / "harness/product_gate" / declaration
+    expected_contract = contract_sha256 or baseline(root).get("module_contracts", {}).get(declaration)
+    structural_contracts.bind_declaration(definition, expected_contract)
+    modules = calibrate_architecture.declaration(definition, schema=4)
     roots, inputs, expected = calibrate_architecture.bytecode_inputs([item["output"] for item in build["compilations"]])
     require(inputs == build["artifacts"], "PG_SOURCE_BINDING", "导入类产物不属于同次构建")
     types = calibrate_architecture.inventory(paths, roots, expected, list(build["classpath_artifacts"]))
     bindings = calibrate_maven_architecture.bind_types(build, types, paths, modules)
-    diagnostics.extend(calibrate_architecture.violations(modules, types))
+    diagnostics.extend(calibrate_architecture.violations(structural_contracts.owned(modules), types))
     diagnostics.extend(calibrate_maven_architecture.origin_violations(build, types))
     contracts = calibrate_maven_architecture.select_contracts(modules, types, bindings)
     methods, errors, references = method_contracts.bind(build, bindings, contracts, paths)
     diagnostics.extend(errors)
     declarations, errors = dependency_declarations.inspect(build, references, [])
     diagnostics.extend(errors)
-    report = {"build": build, "bindings": bindings, "inventory": types, "dependency_declarations": declarations}
+    report = {"build": build, "bindings": bindings, "inventory": types, "dependency_declarations": declarations,
+              "method_contracts": methods}
+    report["component_inventory"] = structural_contracts.external_inventory(report, modules, paths)
     roles, errors = role_boundaries.inspect(report, modules, role_boundaries.baseline())
     diagnostics.extend(errors)
     calibrate_maven_source.unchanged_build(build, project)
+    structural_contracts.bind_declaration(definition, expected_contract)
     return {"ok": not diagnostics, "compilation_checks": groups, "implementations": implementations,
             "bindings": bindings, "contracts": contracts, "methods": methods, "roles": roles,
             "dependency_declarations": declarations, "tool_environment": tool_environment, "diagnostics": diagnostics}

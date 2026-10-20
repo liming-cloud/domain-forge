@@ -34,14 +34,17 @@ def declaration(path, schema=1):
         fields = {"id", "package", "depends_on", "contract_types", "contract_members"}
         if schema == 1:
             fields.add("purpose")
-        if schema == 3:
+        if schema in (3, 4):
             fields.add("kind")
-        require(isinstance(item, dict) and fields <= set(item) <= fields | {"data_contracts"} | ({"critical_methods"} if schema != 1 else set()),
+        if schema == 4:
+            fields.update(("api_categories", "api_uses", "query_bindings"))
+        optional = {"data_contracts"} | ({"critical_methods"} if schema != 1 else set()) | ({"artifact"} if schema == 4 else set())
+        require(isinstance(item, dict) and fields <= set(item) <= fields | optional,
                 "SG_DECLARATION", "模块字段缺失或未知")
         require(isinstance(item["id"], str) and re.fullmatch(r"[a-z][a-z0-9-]*", item["id"]) and item["id"] not in modules and
                 isinstance(item["package"], str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+", item["package"]) and
                 (schema != 1 or item["purpose"] in ("production", "test")), "SG_DECLARATION", "模块身份、包根或用途无效")
-        require(schema != 3 or item["kind"] in ("context", "component", "assembly"),
+        require(schema not in (3, 4) or item["kind"] in ("context", "component", "assembly"),
                 "SG_DECLARATION", "模块性质未知，不能用任意名称豁免职责")
         for key in ("depends_on", "contract_types", "contract_members", "data_contracts", "critical_methods"):
             value = item.get(key, [])
@@ -49,6 +52,9 @@ def declaration(path, schema=1):
                     len(value) == len(set(value)), "SG_DECLARATION", "模块列表须为唯一非空字符串")
         require(set(item.get("data_contracts", [])) <= set(item["contract_types"]),
                 "SG_DECLARATION", "数据合同须为同一模块已声明的公开类型")
+        if schema == 4:
+            import structural_contracts
+            structural_contracts.validate(item)
         modules[item["id"]] = item
     for identifier, item in modules.items():
         require(all(target in modules and target != identifier for target in item["depends_on"]), "SG_DECLARATION", "模块依赖目标未知或指向自身")

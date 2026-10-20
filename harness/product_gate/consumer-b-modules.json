@@ -1,5 +1,5 @@
 {
-  "schema": 3,
+  "schema": 4,
   "modules": [
     {
       "id": "consumer-b",
@@ -11,7 +11,10 @@
       ],
       "contract_members": [
         "example.consumer.b.ConsumerApplication.main([Ljava.lang.String;):void"
-      ]
+      ],
+      "api_categories": {},
+      "api_uses": {},
+      "query_bindings": []
     }
   ]
 }

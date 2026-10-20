@@ -130,6 +130,10 @@ spring.sql.init.mode=never
 
 
 class MigrationBehaviorCommands(FlywayFixtures):
+    def test_context_bootstrap_and_guarded_query_have_real_sql_and_failure_evidence(self):
+        import structural_runtime_fixture
+        structural_runtime_fixture.verify(self)
+
     def test_native_application_initializes_restarts_and_upgrades_without_tool_migrate(self):
         first = self.command()
         self.assertTrue(first["native_observation"]["started"])
