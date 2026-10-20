@@ -24,7 +24,7 @@ def resolution(root, name, consumer, publication, home, env, workspace):
         expected = 'domain-forge-web-support:jar:' + version
     else:
         pom = project / 'pom.xml'
-        pom.write_text(pom.read_text().replace(version, '0.1.0-r2.missing'))
+        pom.write_text(pom.read_text().replace(json.loads((root / 'harness/product_gate/foundation-baseline.json').read_text())['version'], '0.1.0-r2.missing'))
         expected = 'domain-forge-bom:pom:0.1.0-r2.missing'
     settings = output / 'settings.xml'
     settings.write_text(Path(consumer['argv'][4]).read_text().replace(publication['repository'], str(remote))

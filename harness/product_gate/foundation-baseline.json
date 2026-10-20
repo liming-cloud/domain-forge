@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "version": "0.2.0-2b.1",
+  "managed_dependencies": [
+    [
+      "org.domainforge",
+      "domain-forge-web-support",
+      "0.1.0-r2.1",
+      "jar",
+      "compile"
+    ],
+    [
+      "org.springframework.boot",
+      "spring-boot-dependencies",
+      "4.0.8",
+      "pom",
+      "import"
+    ],
+    [
+      "org.domainforge",
+      "domain-forge-persistence",
+      "0.2.0-2b.1",
+      "jar",
+      "compile"
+    ],
+    [
+      "com.baomidou",
+      "mybatis-plus-spring-boot4-starter",
+      "3.5.17",
+      "jar",
+      "compile"
+    ],
+    [
+      "com.baomidou",
+      "mybatis-plus-core",
+      "3.5.17",
+      "jar",
+      "compile"
+    ],
+    [
+      "com.baomidou",
+      "mybatis-plus-annotation",
+      "3.5.17",
+      "jar",
+      "compile"
+    ],
+    [
+      "com.baomidou",
+      "mybatis-plus-extension",
+      "3.5.17",
+      "jar",
+      "compile"
+    ],
+    [
+      "com.baomidou",
+      "mybatis-plus-jsqlparser",
+      "3.5.17",
+      "jar",
+      "compile"
+    ]
+  ],
+  "postgres_image": "postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",
+  "postgres_version": "18.4",
+  "required_tests": [
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#paginationUsesPostgresAndFiniteLimit",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#invalidPaginationLimitsFail",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#missingResourcesCannotBecomeReady",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#multipleDataSourcesAreRejected",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#singleResourceSetsNativeTransactionTimeout",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#differentTransactionResourceIsRejected",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#invalidTransactionTimeoutIsRejected",
+    "org.domainforge.persistence.autoconfigure.PersistenceConfigurationTest#invalidMigrationResourcesAreRejectedBeforeMigration"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "version": "0.2.0-2b.1",
+  "assets": [
+    {
+      "source": "assets/.mvn/wrapper/maven-wrapper.properties",
+      "target": ".mvn/wrapper/maven-wrapper.properties",
+      "sha256": "9e702bcd7e68ba1cace0a3382a7082e6e1e1b321688a7a3fbf4d5ae7eb0af533",
+      "render": false,
+      "executable": false
+    },
+    {
+      "source": "assets/AGENTS.md.tpl",
+      "target": "AGENTS.md",
+      "sha256": "640357608c63d9ff9628c14c2f1d7f071177b96ec008dbf24716d3d0fb85bab8",
+      "render": false,
+      "executable": false
+    },
+    {
+      "source": "assets/README.md.tpl",
+      "target": "README.md",
+      "sha256": "8bac5c7fbd408c75c17e7234147ab2598aa6224c024f90066506f9d814c6a94d",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "assets/mvnw",
+      "target": "mvnw",
+      "sha256": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
+      "render": false,
+      "executable": true
+    },
+    {
+      "source": "assets/mvnw.cmd",
+      "target": "mvnw.cmd",
+      "sha256": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c",
+      "render": false,
+      "executable": false
+    },
+    {
+      "source": "assets/pom.xml.tpl",
+      "target": "pom.xml",
+      "sha256": "b86f2563c998154904e5418ed2b8b5ad42904e102e28f5ad36d6268a0ea039f5",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/Application.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/Application.java",
+      "sha256": "5dcf8edddafcca17077d57f5c98f5e818bc7c4ab8a6f4037125635888a8d3acd",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/LoggingState.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/LoggingState.java",
+      "sha256": "b4e3ceabaae0f591f87e73428e472293fcde5d2cb87023bc61ef9cc6897bdc4d",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "assets/src/main/resources/application.properties",
+      "target": "src/main/resources/application.properties",
+      "sha256": "e12e3478c46c2b75fdea615d5997e496416e2387be2211cfeae0696bff6cffa9",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "assets/src/main/resources/logback-spring.xml",
+      "target": "src/main/resources/logback-spring.xml",
+      "sha256": "7c22a15d4379b13f84b92a61f466dc8edb944b76b170be2e0ce2f1cc803c4901",
+      "render": false,
+      "executable": false
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java",
+      "sha256": "544789d9259dd93f9445c64f1e49b20560e8f77717ea0596896674756d55340c",
+      "render": true,
+      "executable": false
+    },
+    {
+      "source": "01-使用说明.md",
+      "target": "docs/01-使用说明.md",
+      "sha256": "27192f1745b1cc61233504674ce9ad245743b7e361f30cf0a5c1becc20b49fd6",
+      "render": false,
+      "executable": false
+    }
+  ]
+}

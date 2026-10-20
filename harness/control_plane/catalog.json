@@ -39,7 +39,9 @@
     "STRUCTURE-MIGRATION": {"path":"docs/work/01-结构迁移.md","category":"tasks","kind":"task"},
     "PRODUCT-PATH-MIGRATION": {"path": "docs/work/02-产品迁移.md", "category": "tasks", "kind": "task"},
     "TOOL-PATH-MIGRATION": {"path":"docs/work/03-工具迁移.md","category":"tasks","kind":"task"},
-    "STRUCTURAL-RULES": {"path":"docs/work/04-结构规则.md","category":"tasks","kind":"task"}
+    "STRUCTURAL-RULES": {"path":"docs/work/04-结构规则.md","category":"tasks","kind":"task"},
+    "TEMPLATE-GUIDE": {"path":"platform/templates/ddd-service/01-使用说明.md","category":"design","kind":"design"},
+    "FOUNDATION-TEMPLATE": {"path":"docs/work/05-基础与模板.md","category":"tasks","kind":"task"}
   },
   "scopes": {
     "acceptance": "执行者、评审者、决定及单元验收；验收来源、一次记录提交及收尾",
@@ -361,6 +363,16 @@
     {"glob":"code/verification/consumers/project-b/mvnw","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"code/verification/consumers/project-b/mvnw.cmd","purpose":"production","scopes":["build","build-gate"]},
     {"glob":"code/verification/consumers/project-b/.mvn/**","purpose":"production","scopes":["build","build-gate"]},
+    {"glob":"platform/framework/domain-forge-persistence/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
+    {"glob":"platform/framework/domain-forge-persistence/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
+    {"glob":"platform/framework/domain-forge-persistence/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
+    {"glob":"platform/framework/domain-forge-persistence/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
+    {"glob":"platform/templates/ddd-service/01-使用说明.md","purpose":"documentation","scopes":["documentation","consumption","generation"]},
+    {"glob":"platform/templates/ddd-service/generate.py","purpose":"production","scopes":["generation","build-gate","tests"]},
+    {"glob":"platform/templates/ddd-service/template.json","purpose":"production","scopes":["generation","contract","build-gate"]},
+    {"glob":"platform/templates/ddd-service/assets/**","purpose":"production","scopes":["generation","configuration","architecture","source-coverage","build-gate"]},
+    {"glob":"platform/verification/service-template/**","purpose":"test","scopes":["tests","persistence","transaction","migration","observability","data-query","build-gate"]},
+    {"glob":"platform/verification/contracts/service-template/**","purpose":"documentation","scopes":["contract","architecture","build-gate"]},
     {"glob":"platform/framework/domain-forge-web-support/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
     {"glob":"platform/framework/domain-forge-web-support/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
     {"glob":"platform/framework/domain-forge-web-support/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
@@ -542,7 +554,7 @@
     "runtime-source-quality-tests": {"kind":"automatic","implemented":true,"argv":["@python","-B","harness/engineering_gate/test_runtime.py","RuntimeQualityChecks"],"requires_test_count":true,"environment_argv":["@python","-B","harness/engineering_gate/calibrate_runtime.py","--environment"],"reason":"本轮实际 Java 观察器及夹具说明、格式和复杂度检查"},
     "delivery-evidence": {"kind":"automatic","implemented":true,"argv":["@python","-B","@entry","delivery","--task","@task"]}
   },
-  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION","product-path-migration":"PRODUCT-PATH-MIGRATION","tool-path-migration":"TOOL-PATH-MIGRATION","structural-rules":"STRUCTURAL-RULES"},
-  "current_task": "structural-rules",
+  "tasks": {"control-plane-verification":"CONTROL-TASK","minimal-engineering":"ENGINEERING-TASK","reusable-web-component":"REUSABLE-WEB-TASK","structure-migration":"STRUCTURE-MIGRATION","product-path-migration":"PRODUCT-PATH-MIGRATION","tool-path-migration":"TOOL-PATH-MIGRATION","structural-rules":"STRUCTURAL-RULES","foundation-template":"FOUNDATION-TEMPLATE"},
+  "current_task": "foundation-template",
   "index": "docs/00-文档导航.md"
 }

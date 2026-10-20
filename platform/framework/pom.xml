@@ -11,5 +11,6 @@
   <packaging>pom</packaging>
   <modules>
     <module>domain-forge-web-support</module>
+    <module>domain-forge-persistence</module>
   </modules>
 </project>

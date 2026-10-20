@@ -3,3 +3,5 @@ platform/mvnw -text
 platform/mvnw.cmd -text
 platform/verification/consumers/**/mvnw -text
 platform/verification/consumers/**/mvnw.cmd -text
+platform/templates/ddd-service/assets/mvnw -text
+platform/templates/ddd-service/assets/mvnw.cmd -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

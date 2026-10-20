@@ -22,7 +22,7 @@ def lock(root):
     return json.loads((root / 'harness/product_gate/web-baseline.json').read_text())
 
 
-def consumer_pom(path, artifact, version, boot):
+def consumer_pom(path, artifact, version, boot, managed=None):
     """检查生成模型而非修订生成文件；BOM 保留 import，组件不携带宿主构建。"""
     model = ET.parse(path).getroot()
     require(all(model.find('{*}' + tag) is None for tag in
@@ -34,15 +34,17 @@ def consumer_pom(path, artifact, version, boot):
     if artifact == 'domain-forge-bom':
         actual = {(x.findtext('{*}groupId'), x.findtext('{*}artifactId'), x.findtext('{*}version'),
                    x.findtext('{*}type', 'jar'), x.findtext('{*}scope', 'compile')) for x in nodes}
-        require(model.find('{*}dependencies') is None and len(nodes) == 2 and actual == {('org.domainforge', 'domain-forge-web-support', version, 'jar', 'compile'),
-                    ('org.springframework.boot', 'spring-boot-dependencies', boot, 'pom', 'import')},
-                'PG_CONSUMER_POM', 'BOM 必须只管理真实组件并 import 固定 Boot')
+        expected = set(map(tuple, managed)) if managed is not None else {
+            ('org.domainforge', 'domain-forge-web-support', version, 'jar', 'compile'),
+            ('org.springframework.boot', 'spring-boot-dependencies', boot, 'pom', 'import')}
+        require(model.find('{*}dependencies') is None and len(nodes) == len(expected) and actual == expected,
+                'PG_CONSUMER_POM', 'BOM 必须精确管理固定组件与原生依赖，不接受遗漏、重复或额外覆盖')
     else:
         dependencies = model.findall('./{*}dependencies/{*}dependency')
         require(dependencies and all(x.findtext('{*}optional') == 'true' and
                 calibrate_lifecycle.fixed_version(x.findtext('{*}version')) for x in dependencies),
                 'PG_CONSUMER_POM', '组件依赖必须固定且由宿主选择框架，不强制容器')
-    return {'path': str(path), 'sha256': digest(path)}
+    return {'path': str(path), 'sha256': digest(path), 'version': version}
 
 
 def observe(root, project, document, repository, executable, required_tests):
@@ -86,8 +88,13 @@ def component(root, code, observed, repository, tools, output):
     (output / 'web-quality.json').write_text(json.dumps(result['quality'], ensure_ascii=False, indent=2))
     require(result['quality']['ok'], 'PG_SOURCE_QUALITY', '组件源码／架构检查失败，详见 web-quality.json')
     version = lock(root)['candidate_version']
-    result['poms'] = {artifact: consumer_pom(code / module / 'target/.flattened-pom.xml', artifact, version, environment.baseline(root)['boot_version'])
-                      for module, artifact in ((WEB, 'domain-forge-web-support'), (BOM, 'domain-forge-bom'))}
+    foundation = json.loads((root / 'harness/product_gate/foundation-baseline.json').read_text())
+    result['poms'] = {
+        'domain-forge-web-support': consumer_pom(code / WEB / 'target/.flattened-pom.xml',
+            'domain-forge-web-support', version, environment.baseline(root)['boot_version']),
+        'domain-forge-bom': consumer_pom(code / BOM / 'target/.flattened-pom.xml',
+            'domain-forge-bom', foundation['version'], environment.baseline(root)['boot_version'],
+            foundation['managed_dependencies'])}
     return result
 
 
@@ -109,14 +116,16 @@ def publish(root, code, result, argv, env, output, target):
     goal = ':'.join([tool['group'], tool['artifact'], tool['version'], 'deploy-file'])
     executions = []
     for artifact, pom in result['poms'].items():
+        version = pom.get('version', lock(root)['candidate_version'])
         gav = target / 'org/domainforge' / artifact / version
         require(not gav.exists(), 'PG_IMMUTABLE_GAV', '禁止覆盖已有候选 GAV；变更必须选择新版本或新隔离验证仓库')
         file = result['artifact']['path'] if artifact == 'domain-forge-web-support' else pom['path']
         executions.append(command([*argv, '-N', '-f', str(code / 'pom.xml'), goal, '-Durl=' + target.as_uri(),
              '-DrepositoryId=r2-verification', '-Dfile=' + str(file), '-DpomFile=' + pom['path'], '-DgeneratePom=false'],
              code, output / (artifact + '-publish.log'), 600, env))
-    expected = {'org/domainforge/' + artifact + '/' + version + '/' + artifact + '-' + version + '.pom': meta['sha256']
+    expected = {'org/domainforge/' + artifact + '/' + meta['version'] + '/' + artifact + '-' + meta['version'] + '.pom': meta['sha256']
                 for artifact, meta in result['poms'].items()}
+    version = lock(root)['candidate_version']
     expected['org/domainforge/domain-forge-web-support/' + version + '/domain-forge-web-support-' + version + '.jar'] = result['artifact']['sha256']
     require(all((target / name).is_file() and digest(target / name) == checksum for name, checksum in expected.items()),
             'PG_PUBLICATION', '发布字节偏离本次生成产物')

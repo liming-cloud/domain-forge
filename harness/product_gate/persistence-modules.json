@@ -1,0 +1,20 @@
+{
+  "schema": 4,
+  "modules": [
+    {
+      "id": "persistence",
+      "package": "org.domainforge.persistence",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration"
+      ],
+      "contract_members": [],
+      "api_categories": {
+        "org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration": "configuration"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    }
+  ]
+}

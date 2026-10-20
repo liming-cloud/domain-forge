@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "version": "0.2.0-2b.1",
+  "inputs": {
+    "templates/ddd-service/template.json": "2eb37806669e7409309aed086b2a2614cb76017b8359259022d56903075d7462",
+    "templates/ddd-service/generate.py": "3dbf960a88630882ff81dd97f9efc38ed06a577390d70c499473e0ed7f30ab5a",
+    "templates/ddd-service/01-使用说明.md": "27192f1745b1cc61233504674ce9ad245743b7e361f30cf0a5c1becc20b49fd6",
+    "templates/ddd-service/assets/mvnw.cmd": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c",
+    "templates/ddd-service/assets/pom.xml.tpl": "b86f2563c998154904e5418ed2b8b5ad42904e102e28f5ad36d6268a0ea039f5",
+    "templates/ddd-service/assets/AGENTS.md.tpl": "640357608c63d9ff9628c14c2f1d7f071177b96ec008dbf24716d3d0fb85bab8",
+    "templates/ddd-service/assets/README.md.tpl": "8bac5c7fbd408c75c17e7234147ab2598aa6224c024f90066506f9d814c6a94d",
+    "templates/ddd-service/assets/mvnw": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
+    "templates/ddd-service/assets/src/main/resources/logback-spring.xml": "7c22a15d4379b13f84b92a61f466dc8edb944b76b170be2e0ce2f1cc803c4901",
+    "templates/ddd-service/assets/src/main/resources/application.properties": "e12e3478c46c2b75fdea615d5997e496416e2387be2211cfeae0696bff6cffa9",
+    "templates/ddd-service/assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/LoggingState.java.tpl": "b4e3ceabaae0f591f87e73428e472293fcde5d2cb87023bc61ef9cc6897bdc4d",
+    "templates/ddd-service/assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/Application.java.tpl": "5dcf8edddafcca17077d57f5c98f5e818bc7c4ab8a6f4037125635888a8d3acd",
+    "templates/ddd-service/assets/src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java.tpl": "544789d9259dd93f9445c64f1e49b20560e8f77717ea0596896674756d55340c",
+    "templates/ddd-service/assets/.mvn/wrapper/maven-wrapper.properties": "9e702bcd7e68ba1cace0a3382a7082e6e1e1b321688a7a3fbf4d5ae7eb0af533",
+    "verification/service-template/migrations/V2__verification.sql": "ab2014b4407b6272184b47c63066703e38736cf5237069e22e9b7382a327493f",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/bootstrap/FixturePersistence.java.tpl": "5de95c90ce254192698ab07d9051ab5e12c4f2345b28ebc44557864588f146af",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/interfaces/http/RecordController.java.tpl": "0227eef4afd4fdb1e4d912f04d52a2d8a56b5c0970273485099f34599a7006d2",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/domain/repository/RecordWriter.java.tpl": "fa0f88f735deee7fb4c1b630db66b9337d61206598fbc72d725422aa48937e8e",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/SqlRecordWriter.java.tpl": "a9f087ece9e4bc283c38de4c2f366e8bf6c53eddb91d3687be1293645d9e3fa5",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/RecordPo.java.tpl": "4d97f701b901a433a324ad3ac3ec6cfa745a129eedf363ac3b4e5db483d07637",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/RecordMapper.java.tpl": "d0cd4e444fcafb8b2a7546599c13ef9b80c6155c3966daa9924eb43b9b09b537",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/SqlRecords.java.tpl": "576f3dab6365d1fd03938742589ae6623f99401c4981f10fe03489121808f74e",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/application/command/WritePair.java.tpl": "cb13c8130d17f23d54c7db834fa52022672351c37a50da0201f24e931389d2d5",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/application/query/RecordFilter.java.tpl": "d9d656e6c19e3bb4e6df15fbf4cfb4f9e4b3f3eb2e90e8dcbe7b347a24e676c9",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/application/query/Records.java.tpl": "de2ca826b273d0e05e47adda0aae30fb43df287be2b63b649ed7240c0a6fe0f6",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/application/query/RecordView.java.tpl": "79f6a9e5619cab4e891b7c45410691409443a03741151fdf0d76494d7323dc9a",
+    "verification/service-template/src/main/resources/db/migration/V1__verification.sql": "9ba892e0cd6d1af5bf9c1f3499b1d270c382f9d93853a81fff9582d56db68a72",
+    "verification/service-template/src/test/java/@@PACKAGE_PATH@@/bootstrap/RuntimeLimitsTest.java.tpl": "e14a6c8cac0120768ff6326dab55f12bbc894ae65c89903246d9be6b4dac45ae",
+    "verification/service-template/src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingFailureTest.java.tpl": "228a55143b414ccc6bdac3be604d8c4a0c27bba927f51512ca56317c0a4ec218",
+    "verification/service-template/src/test/java/@@PACKAGE_PATH@@/bootstrap/PersistenceRuntimeTest.java.tpl": "3738b08c92b543b7034c04202690c7192171ca77577b90befce6b57446057496"
+  },
+  "contracts": {
+    "bare-modules.json": "b6960b063fb85c1a8e8158355d51328b0699ac4d75fc9612e57b59fd61ad40f2",
+    "fixture-modules.json": "15b1f8f7220be39bd540c5756c4d57a4d439c200b690fe872519453caed1dc20"
+  }
+}

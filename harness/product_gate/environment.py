@@ -17,14 +17,18 @@ from calibrate_source import ProbeFailure, digest, require
 
 PRODUCT = Path("platform")
 MODULE = Path("verification/smoke/boot-smoke")
-JAVA_MODULES = (MODULE, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
+PERSISTENCE = Path("framework/domain-forge-persistence")
+TEMPLATE = Path("templates/ddd-service")
+FOUNDATION_FIXTURE = Path("verification/service-template")
+FOUNDATION_CONTRACT = Path("verification/contracts/service-template/0.2.0-2b.1")
+JAVA_MODULES = (MODULE, PERSISTENCE, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
 AGGREGATES = {
     Path("."): ("framework", "domain-forge-bom", "verification"),
-    Path("framework"): ("domain-forge-web-support",),
+    Path("framework"): ("domain-forge-web-support", "domain-forge-persistence"),
     Path("verification"): ("smoke",),
     Path("verification/smoke"): ("boot-smoke",),
 }
-REACTOR = (Path("framework"), Path("framework/domain-forge-web-support"), Path("domain-forge-bom"),
+REACTOR = (Path("framework"), Path("framework/domain-forge-web-support"), PERSISTENCE, Path("domain-forge-bom"),
            Path("verification"), Path("verification/smoke"), MODULE)
 CONSUMER_AGGREGATE = Path("verification/consumers")
 CONSUMERS = (Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent"))
@@ -116,6 +120,25 @@ def wrapper(root, code=None):
             {"wrapper/maven-wrapper.properties"}, "PG_INPUT", "存在尚未支持的隐式 Maven 配置")
 
 
+def foundation_sources(root):
+    """固定模板／夹具全量输入，拒绝目录放行造成文件静默漏检。"""
+    code = root / PRODUCT
+    directory = code / FOUNDATION_CONTRACT
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    files = [path for relative in (TEMPLATE, FOUNDATION_FIXTURE) for path in (code / relative).rglob('*') if path.is_file()]
+    require(all(not path.is_symlink() for relative in (TEMPLATE, FOUNDATION_FIXTURE, FOUNDATION_CONTRACT)
+                for path in (code / relative).rglob('*')), 'PG_INPUT', '基础模板输入不可为链接')
+    require(manifest.get('schema') == 1 and manifest.get('version') == '0.2.0-2b.1' and
+            manifest.get('inputs') == {path.relative_to(code).as_posix(): digest(path) for path in files},
+            'PG_TEMPLATE_INPUT', '模板或夹具输入偏离版本化合同')
+    expected = {'bare-modules.json', 'fixture-modules.json'}
+    require(set(manifest.get('contracts', {})) == expected and
+            {path.name for path in directory.iterdir()} == expected | {'manifest.json'} and
+            all(digest(directory / name) == checksum for name, checksum in manifest['contracts'].items()),
+            'PG_TEMPLATE_INPUT', '基础模板模块合同缺失或被改写')
+    return manifest
+
+
 def sources(root):
     """覆盖代码区全部维护文件；未支持模块不能被复制清单静默遗漏。"""
     require(not any((root / name).exists() or (root / name).is_symlink()
@@ -123,6 +146,7 @@ def sources(root):
             "PG_BUILD_SCOPE", "旧根目录工程输入必须迁入代码区")
     code = root / PRODUCT
     contract_sources(root)
+    foundation_sources(root)
     for directory in (code, code / ".mvn", *(code / module / "src" for module in JAVA_MODULES)):
         require(directory.is_dir() and not directory.is_symlink(), "PG_INPUT", "缺少普通工程输入目录")
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
@@ -137,7 +161,8 @@ def sources(root):
             relative = path.relative_to(code)
             if relative in CONTRACT_FILES:
                 continue
-            require(relative.as_posix() in required or any(relative.is_relative_to(module / "src") for module in JAVA_MODULES),
+            require(relative.as_posix() in required or any(relative.is_relative_to(module / "src") for module in JAVA_MODULES) or
+                    any(relative.is_relative_to(directory) for directory in (TEMPLATE, FOUNDATION_FIXTURE, FOUNDATION_CONTRACT)),
                     "PG_BUILD_SCOPE", "未登记或未支持的代码输入：" + relative.as_posix())
             paths.append(path)
     require(required <= {p.relative_to(code).as_posix() for p in paths}, "PG_INPUT", "缺少必要工程输入")
