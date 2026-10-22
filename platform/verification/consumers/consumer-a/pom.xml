@@ -12,6 +12,7 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+<dependency><groupId>org.domainforge</groupId><artifactId>shared</artifactId><version>0.3.0-iam.2</version></dependency>
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-bom</artifactId>

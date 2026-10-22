@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import java.time.Duration;
-import java.util.List;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.flywaydb.core.Flyway;
@@ -12,7 +11,6 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
-import org.springframework.boot.transaction.autoconfigure.TransactionManagerCustomizer;
 import org.springframework.boot.transaction.autoconfigure.TransactionProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +20,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.RollbackOn;
-import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 
 /** 由服务显式导入的单库装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。 */
 @Configuration(proxyBeanMethods = false)
@@ -42,21 +39,22 @@ public class DomainForgePersistenceConfiguration {
     return interceptor;
   }
 
-  /** 迁移前拒绝多数据源或独立 Flyway 连接，防止失败启动已改动错误数据库。 */
+  /** 迁移前核对明确绑定的数据源，防止失败启动已改动错误数据库。 */
   @Bean
-  FlywayMigrationStrategy domainForgeMigrationStrategy(List<DataSource> sources) {
+  FlywayMigrationStrategy domainForgeMigrationStrategy(@Qualifier("dataSource") DataSource source) {
     return flyway -> {
-      if (sources.size() != 1 || flyway.getConfiguration().getDataSource() != sources.getFirst()) {
-        throw new IllegalStateException("迁移前要求唯一数据源且 Flyway 使用同一资源");
+      if (flyway.getConfiguration().getDataSource() != source) {
+        throw new IllegalStateException("Flyway 必须使用明确绑定的 dataSource");
       }
       flyway.migrate();
     };
   }
 
-  /** 沿用Boot唯一事务属性；仅管理器未设超时时由原生定制点补有限默认。 */
-  @Bean
-  TransactionManagerCustomizer<AbstractPlatformTransactionManager> domainForgeTransactionDefaults(
-      TransactionProperties properties, Environment environment) {
+  /** 只补齐绑定管理器的有限超时，不改变其他事务资源。 */
+  private static void configureTimeout(
+      DataSourceTransactionManager transaction,
+      TransactionProperties properties,
+      Environment environment) {
     if (environment.containsProperty("domainforge.persistence.transaction-timeout-seconds")) {
       throw new IllegalArgumentException(
           "旧属性domainforge.persistence.transaction-timeout-seconds已移除，请迁移到spring.transaction.default-timeout");
@@ -67,38 +65,29 @@ public class DomainForgePersistenceConfiguration {
             || timeout.compareTo(Duration.ofSeconds(300)) > 0)) {
       throw new IllegalArgumentException("spring.transaction.default-timeout须在1至300秒之间");
     }
-    return transaction -> {
-      if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {
-        transaction.setDefaultTimeout(timeout == null ? 10 : Math.toIntExact(timeout.getSeconds()));
-      }
-    };
+    if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {
+      transaction.setDefaultTimeout(timeout == null ? 10 : Math.toIntExact(timeout.getSeconds()));
+    }
   }
 
-  /** 在服务就绪前核对单库资源，不覆盖宿主的原生事务配置。 */
+  /** 原生默认 Bean 名即绑定合同；自定义名称可声明别名，不按类型或顺序回落。 */
   @Bean
   SmartInitializingSingleton domainForgePersistenceResources(
-      List<DataSource> sources,
-      List<PlatformTransactionManager> transactions,
-      List<SqlSessionFactory> sessions,
-      List<Flyway> migrations,
-      @Qualifier("domainForgeTransactionDefaults")
-          TransactionManagerCustomizer<AbstractPlatformTransactionManager> defaults) {
-    if (sources.size() != 1
-        || transactions.size() != 1
-        || sessions.size() != 1
-        || migrations.size() != 1) {
-      throw new IllegalStateException("单库接入要求唯一数据源、事务管理器、会话工厂与迁移器");
+      @Qualifier("dataSource") DataSource source,
+      @Qualifier("transactionManager") PlatformTransactionManager manager,
+      @Qualifier("sqlSessionFactory") SqlSessionFactory sessions,
+      @Qualifier("flyway") Flyway migration,
+      TransactionProperties properties,
+      Environment environment) {
+    if (!(manager instanceof DataSourceTransactionManager transaction)) {
+      throw new IllegalStateException("transactionManager 必须管理绑定的本地 JDBC 资源");
     }
+    configureTimeout(transaction, properties, environment);
     return () -> {
-      if (!(transactions.getFirst() instanceof DataSourceTransactionManager transaction)
-          || transaction.getDataSource() != sources.getFirst()
-          || sessions.getFirst().getConfiguration().getEnvironment().getDataSource()
-              != sources.getFirst()
-          || migrations.getFirst().getConfiguration().getDataSource() != sources.getFirst()) {
-        throw new IllegalStateException("单库事务、会话与迁移必须使用同一数据源");
-      }
-      if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {
-        defaults.customize(transaction);
+      if (transaction.getDataSource() != source
+          || sessions.getConfiguration().getEnvironment().getDataSource() != source
+          || migration.getConfiguration().getDataSource() != source) {
+        throw new IllegalStateException("绑定的本地事务、会话与迁移必须使用同一数据源");
       }
     };
   }

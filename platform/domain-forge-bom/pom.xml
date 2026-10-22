@@ -12,15 +12,21 @@
   <packaging>pom</packaging>
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-cache</artifactId><version>0.3.0-iam.2</version></dependency>
+      <dependency><groupId>org.redisson</groupId><artifactId>redisson</artifactId><version>${redisson.version}</version></dependency>
+      <dependency><groupId>org.redisson</groupId><artifactId>redisson-spring-boot-starter</artifactId><version>${redisson.version}</version></dependency>
+      <dependency><groupId>org.redisson</groupId><artifactId>redisson-spring-data-40</artifactId><version>${redisson.version}</version></dependency>
+      <dependency><groupId>cn.dev33</groupId><artifactId>sa-token-redisson</artifactId><version>1.46.0</version></dependency>
+
       <dependency>
         <groupId>org.domainforge</groupId>
-        <artifactId>domain-forge-domain</artifactId>
-        <version>0.3.0-iam.1</version>
+        <artifactId>shared</artifactId>
+        <version>0.3.0-iam.2</version>
       </dependency>
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-web-support</artifactId>
-        <version>0.1.0-r2.1</version>
+        <version>0.3.0-iam.2</version>
       </dependency>
       <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -32,7 +38,7 @@
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-persistence</artifactId>
-        <version>0.2.1-min.1</version>
+        <version>0.3.0-iam.2</version>
       </dependency>
       <dependency>
         <groupId>com.baomidou</groupId>
@@ -61,14 +67,10 @@
       </dependency>
       <dependency>
         <groupId>org.domainforge</groupId>
-        <artifactId>domain-forge-access-control-contract</artifactId>
-        <version>0.3.0-iam.1</version>
-      </dependency>
-      <dependency>
-        <groupId>org.domainforge</groupId>
-        <artifactId>domain-forge-access-control-backend</artifactId>
+        <artifactId>domain-forge-access-control</artifactId>
         <version>0.3.0-iam.2</version>
       </dependency>
+
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-iam-client</artifactId>

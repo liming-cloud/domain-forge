@@ -10,7 +10,7 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.BusinessRejectionMapping;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

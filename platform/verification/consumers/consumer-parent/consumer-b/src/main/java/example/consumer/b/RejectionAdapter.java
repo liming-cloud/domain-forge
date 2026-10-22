@@ -1,6 +1,6 @@
 package example.consumer.b;
 
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.BusinessRejectionMapping;
 import org.springframework.stereotype.Component;
 

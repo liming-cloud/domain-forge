@@ -1,0 +1,17 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 2s
+      connect-timeout: 2s
+domainforge:
+  cache:
+    threads: 4
+    netty-threads: 4
+    connection-pool-size: 16
+    connection-minimum-idle-size: 2
+    subscription-pool-size: 4
+    subscription-minimum-idle-size: 1
+    retry-attempts: 0

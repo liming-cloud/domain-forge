@@ -1,7 +1,7 @@
 package example.consumer.a;
 
 import java.util.List;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.HttpFailureResponses;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,7 +52,7 @@ public class ContractController {
   @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "明确合同状态")
   @GetMapping("/accepted")
   public org.springframework.http.ResponseEntity<ApiResponse<Void>> accepted() {
-    return ApiResponse.accepted(null);
+    return org.domainforge.web.api.HttpResponses.accepted(null);
   }
 
   /**

@@ -2,7 +2,7 @@ package example.consumer.b;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.junit.jupiter.api.Test;
 
 class ClientResultTest {
@@ -12,7 +12,7 @@ class ClientResultTest {
     assertFalse(isSuccess(200, response));
     assertTrue(isSuccess(200, ApiResponse.success(null)));
     assertFalse(isSuccess(500, ApiResponse.success(null)));
-    assertFalse(isSuccess(202, ApiResponse.accepted(null).getBody()));
+    assertFalse(isSuccess(202, org.domainforge.web.api.HttpResponses.accepted(null).getBody()));
   }
 
   private static boolean isSuccess(int status, ApiResponse<?> response) {

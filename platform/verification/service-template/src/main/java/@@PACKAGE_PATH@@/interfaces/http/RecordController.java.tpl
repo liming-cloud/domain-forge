@@ -2,7 +2,7 @@ package @@PACKAGE@@.interfaces.http;
 
 import @@PACKAGE@@.application.query.RecordFilter;
 import @@PACKAGE@@.application.query.Records;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.HttpFailureResponses;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.http.ResponseEntity;

@@ -3,7 +3,7 @@ package org.domainforge.web.internal;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.BusinessRejectionMapping;
 import org.domainforge.web.api.HttpFailureResponses;
 import org.domainforge.web.autoconfigure.WebSupportAutoConfiguration;
@@ -25,7 +25,7 @@ class ResponseContractTest {
       assertThrows(IllegalArgumentException.class, () -> ApiResponse.rejected(code, "拒绝"));
     }
     assertNull(ApiResponse.success(null).data());
-    assertEquals(202, ApiResponse.accepted(null).getStatusCode().value());
+    assertEquals(202, org.domainforge.web.api.HttpResponses.accepted(null).getStatusCode().value());
     assertEquals(401, HttpFailureResponses.unauthenticated().getStatusCode().value());
     assertEquals(403, HttpFailureResponses.forbidden().getStatusCode().value());
     assertEquals(503, HttpFailureResponses.unavailable().getStatusCode().value());

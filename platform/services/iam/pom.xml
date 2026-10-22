@@ -10,9 +10,9 @@
   </dependencyManagement>
   <dependencies>
     <dependency><groupId>com.alibaba.cloud</groupId><artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId></dependency>
-    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-domain</artifactId></dependency>
-    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-access-control-backend</artifactId></dependency>
-    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-access-control-contract</artifactId></dependency>
+    <dependency><groupId>org.domainforge</groupId><artifactId>shared</artifactId></dependency>
+    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-access-control</artifactId></dependency>
+
     <dependency><groupId>org.springdoc</groupId><artifactId>springdoc-openapi-starter-webmvc-api</artifactId><version>3.0.3</version></dependency>
     <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-web-support</artifactId></dependency>
     <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-persistence</artifactId></dependency>

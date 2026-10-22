@@ -2,7 +2,7 @@ package org.domainforge.web.internal;
 
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.logging.Logger;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.HttpFailureResponses;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.beans.TypeMismatchException;

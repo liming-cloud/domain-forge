@@ -10,7 +10,7 @@ from calibrate_lifecycle import fixed_version
 
 
 CATEGORIES = {"neutral", "http", "client", "configuration", "domain-marker"}
-DOMAIN_MARKERS = {"org.domainforge.domain.api." + name for name in ("Entity", "AggregateRoot", "ValueObject")}
+DOMAIN_MARKERS = {"org.domainforge.shared." + name for name in ("Entity", "AggregateRoot", "ValueObject")}
 
 
 def validate(module):
@@ -31,13 +31,14 @@ def validate(module):
                 or name in DOMAIN_MARKERS for name, positions in uses.items()),
             "SG_COMPONENT_POSITION", "领域只准入精确的三个领域标识")
     if "domain-marker" in categories.values():
-        require(module["package"] == "org.domainforge.domain.api"
-                and set(categories) == DOMAIN_MARKERS and set(categories.values()) == {"domain-marker"}
-                and not module["contract_members"],
-                "SG_DOMAIN_MARKER", "领域标识仅含三个固定公开接口且无操作成员")
+        require(module["package"] == "org.domainforge.shared"
+                and {name for name, category in categories.items() if category == "domain-marker"} == DOMAIN_MARKERS
+                and not any(member.startswith(name + ".") for name in DOMAIN_MARKERS
+                            for member in module["contract_members"]),
+                "SG_DOMAIN_MARKER", "shared 中领域标识只含三个固定接口且无操作成员；其他数据类型须另行分类")
         if "artifact" in module:
             require(module["artifact"].get("group") == "org.domainforge"
-                    and module["artifact"].get("artifact") == "domain-forge-domain",
+                    and module["artifact"].get("artifact") == "shared",
                     "SG_DOMAIN_MARKER", "领域标识制品身份不符")
     queries = module["query_bindings"]
     require(isinstance(queries, list) and all(isinstance(query, dict) and
@@ -125,13 +126,13 @@ def inspect(report, modules, roles, classify):
             continue
         actual = {name for name in classes if inside(name, module["package"])
                   and bindings.get(name, {}).get("purpose") != "test"}
-        valid = actual == DOMAIN_MARKERS
-        for name in actual:
+        valid = DOMAIN_MARKERS <= actual
+        for name in DOMAIN_MARKERS & actual:
             item = classes[name]
             valid &= item.get("interface") == "true" and item["public"] == "true" and not item["members"]
             targets = {ref["target"] for ref in item["dependencies"]}
             parents = {ref["target"] for ref in item["shape_types"] if ref["origin"].endswith(":supertype")}
-            expected = {"org.domainforge.domain.api.Entity"} if name.endswith(".AggregateRoot") else set()
+            expected = {"org.domainforge.shared.Entity"} if name.endswith(".AggregateRoot") else set()
             valid &= targets <= expected | {"java.lang.Object"} and parents - {"java.lang.Object"} == expected
         if not valid:
             errors.append(dict(code="SG_DOMAIN_MARKER", module=module["id"]))

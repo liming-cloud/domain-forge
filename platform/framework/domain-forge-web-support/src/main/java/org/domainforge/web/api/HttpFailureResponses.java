@@ -1,5 +1,6 @@
 package org.domainforge.web.api;
 
+import org.domainforge.shared.ApiResponse;
 import org.springframework.http.ResponseEntity;
 
 /** 固定技术失败的 HTTP 状态与安全提示；不执行认证、授权或服务可用性判断。 */

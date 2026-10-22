@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import example.consumer.b.ConsumerApplication;
 import example.consumer.b.ConsumerRejection;
 import example.consumer.b.RejectionAdapter;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.BusinessRejectionMapping;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.junit.jupiter.api.Test;

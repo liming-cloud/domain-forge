@@ -4,7 +4,7 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.BusinessRejectionMapping;
 
 /** 启动时固定确切异常映射，执行时验证扩展返回的拒绝语义。 */

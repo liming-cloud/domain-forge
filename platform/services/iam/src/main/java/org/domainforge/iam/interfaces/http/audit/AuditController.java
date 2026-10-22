@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 import org.domainforge.iam.application.query.audit.AuditQueries;
 import org.domainforge.iam.application.query.audit.AuditView;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;

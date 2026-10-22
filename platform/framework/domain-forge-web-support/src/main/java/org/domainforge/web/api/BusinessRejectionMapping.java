@@ -1,5 +1,7 @@
 package org.domainforge.web.api;
 
+import org.domainforge.shared.ApiResponse;
+
 /**
  * 消费方入口适配层的具体拒绝映射；不要求领域异常继承平台类型。
  *

@@ -3,7 +3,7 @@ package org.domainforge.iam.domain.model;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import org.domainforge.domain.api.AggregateRoot;
+import org.domainforge.shared.AggregateRoot;
 
 /** 账号维护自身凭据、启用状态及直接权限；不向公开查询导出凭据。 */
 public record Account(

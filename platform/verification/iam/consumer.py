@@ -11,7 +11,7 @@ app=workspace/'identity-consumer';generated=module.generate(code/'templates/ddd-
 parent=workspace/'company-parent';parent.mkdir();(parent/'pom.xml').write_text('<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><groupId>example.company</groupId><artifactId>company-parent</artifactId><version>1.0.0</version><packaging>pom</packaging></project>')
 pom=app/'pom.xml';s=pom.read_text().replace('<modelVersion>4.0.0</modelVersion>','<modelVersion>4.0.0</modelVersion><parent><groupId>example.company</groupId><artifactId>company-parent</artifactId><version>1.0.0</version><relativePath>../company-parent/pom.xml</relativePath></parent>')
 new=''
-for group,artifact in [('org.domainforge','domain-forge-iam-client'),('org.domainforge','domain-forge-access-control-backend'),('org.domainforge','domain-forge-access-control-contract'),('cn.dev33','sa-token-core'),('org.springframework','spring-web'),('org.springframework.cloud','spring-cloud-commons'),('org.springframework.cloud','spring-cloud-loadbalancer'),('io.projectreactor','reactor-core')]:
+for group,artifact in [('org.domainforge','domain-forge-iam-client'),('org.domainforge','domain-forge-access-control'),('org.domainforge','domain-forge-access-control'),('cn.dev33','sa-token-core'),('org.springframework','spring-web'),('org.springframework.cloud','spring-cloud-commons'),('org.springframework.cloud','spring-cloud-loadbalancer'),('io.projectreactor','reactor-core')]:
  new+=f'<dependency><groupId>{group}</groupId><artifactId>{artifact}</artifactId></dependency>\n'
 position=s.index('\n  <dependencies>')+len('\n  <dependencies>');s=s[:position]+new+s[position:];pom.write_text(s)
 bootstrap=app/'src/main/java/example/company/consumer/bootstrap/Application.java';s=bootstrap.read_text().replace('import org.springframework.boot.SpringApplication;','import org.springframework.boot.SpringApplication;\nimport org.domainforge.access.backend.configuration.BackendAccessConfiguration;\nimport org.domainforge.iam.client.configuration.IamClientConfiguration;').replace('@Import(DomainForgePersistenceConfiguration.class)','@Import({DomainForgePersistenceConfiguration.class, IamClientConfiguration.class, BackendAccessConfiguration.class})');bootstrap.write_text(s)
@@ -20,8 +20,8 @@ p=app/'src/main/java/example/company/consumer/interfaces/http/IdentityEndpoint.j
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import org.domainforge.access.api.CurrentAccess;
-import org.domainforge.access.api.CurrentSubject;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.CurrentSubject;
+import org.domainforge.shared.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,7 +48,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -115,5 +115,5 @@ if result.returncode==0:
   libraries=[name for name in z.namelist() if name.startswith('BOOT-INF/lib/')]
   assert not any(any(term in name for term in ['sa-token-redis','spring-data-redis','lettuce','/iam-']) for name in libraries)
   report['platform_libraries']=[name for name in libraries if 'domain-forge-' in name]
- assert {p.name for p in (cache/'org/domainforge').iterdir()}=={'domain-forge-bom','domain-forge-domain','domain-forge-web-support','domain-forge-persistence','domain-forge-access-control-contract','domain-forge-access-control-backend','domain-forge-iam-client'}
+ assert {p.name for p in (cache/'org/domainforge').iterdir()}=={'domain-forge-bom','domain-forge-domain','domain-forge-web-support','domain-forge-persistence','domain-forge-access-control','domain-forge-access-control','domain-forge-iam-client'}
 (art/'consumer-build.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n');print(json.dumps({'ok':report['ok'],'workspace':str(workspace)}));raise SystemExit(result.returncode)

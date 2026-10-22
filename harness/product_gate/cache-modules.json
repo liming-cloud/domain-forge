@@ -1,0 +1,22 @@
+{
+  "schema": 4,
+  "modules": [
+    {
+      "id": "cache",
+      "package": "org.domainforge.cache",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.cache.autoconfigure.CacheConfiguration",
+        "org.domainforge.cache.autoconfigure.CacheDefaults"
+      ],
+      "contract_members": [],
+      "api_categories": {
+        "org.domainforge.cache.autoconfigure.CacheConfiguration": "configuration",
+        "org.domainforge.cache.autoconfigure.CacheDefaults": "configuration"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    }
+  ]
+}

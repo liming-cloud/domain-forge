@@ -12,7 +12,7 @@ import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess
 import org.domainforge.iam.application.port.operation.CommandResult;
 import org.domainforge.iam.application.query.operation.ObserveOperation;
 import org.domainforge.iam.application.query.operation.OperationObservation;
-import org.domainforge.web.api.ApiResponse;
+import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

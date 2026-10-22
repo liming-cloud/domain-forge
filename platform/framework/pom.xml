@@ -10,10 +10,10 @@
   <artifactId>framework</artifactId>
   <packaging>pom</packaging>
   <modules>
-    <module>domain-forge-domain</module>
+    <module>domain-forge-cache</module>
     <module>domain-forge-web-support</module>
     <module>domain-forge-persistence</module>
-    <module>access-control</module>
+    <module>domain-forge-access-control</module>
     <module>domain-forge-iam-client</module>
   </modules>
 </project>

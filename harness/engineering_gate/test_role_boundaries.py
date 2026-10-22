@@ -202,7 +202,7 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
     def test_domain_markers_require_exact_artifact_and_empty_jdk_only_interfaces(self):
         self.source("domain")
         self.strict_definition()
-        package = "org.domainforge.domain.api"
+        package = "org.domainforge.shared"
         names = [package + "." + name for name in ("Entity", "AggregateRoot", "ValueObject")]
         sources = []
         for name in ("Entity", "AggregateRoot", "ValueObject"):
@@ -210,11 +210,14 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
             path.write_text("package " + package + "; public interface " + name +
                             (" extends Entity" if name == "AggregateRoot" else "") + " {}")
             sources.append(path)
+        dto = self.case.root / "Response.java"
+        dto.write_text("package " + package + "; public record Response(String value) {}")
+        sources.append(dto)
         version = "1.0.0-probe." + self.case.root.name.rsplit("-", 1)[-1]
-        directory = pathlib.Path(self.case.repository) / "org/domainforge/domain-forge-domain" / version
+        directory = pathlib.Path(self.case.repository) / "org/domainforge/shared" / version
         directory.mkdir(parents=True)
         self.addCleanup(shutil.rmtree, directory)
-        jar = directory / ("domain-forge-domain-" + version + ".jar")
+        jar = directory / ("shared-" + version + ".jar")
         classes = self.case.root / "markers"
 
         def build_jar():
@@ -227,12 +230,12 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
             return hashlib.sha256(jar.read_bytes()).hexdigest()
 
         checksum = build_jar()
-        (directory / ("domain-forge-domain-" + version + ".pom")).write_text(
+        (directory / ("shared-" + version + ".pom")).write_text(
             "<project><modelVersion>4.0.0</modelVersion><groupId>org.domainforge</groupId>"
-            "<artifactId>domain-forge-domain</artifactId><version>" + version + "</version></project>")
+            "<artifactId>shared</artifactId><version>" + version + "</version></project>")
         pom = self.case.project / "pom.xml"
         pom.write_text(pom.read_text().replace("<dependencies>", "<dependencies><dependency>"
-            "<groupId>org.domainforge</groupId><artifactId>domain-forge-domain</artifactId><version>" +
+            "<groupId>org.domainforge</groupId><artifactId>shared</artifactId><version>" +
             version + "</version></dependency>", 1))
         source = self.case.project / "src/test-named-production/java/probe/Service.java"
         source.write_text(source.read_text().replace("public class Service {",
@@ -243,13 +246,22 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
                          contract_types=names, contract_members=[],
                          api_categories={name: "domain-marker" for name in names},
                          api_uses={}, query_bindings=[], artifact=dict(group="org.domainforge",
-                         artifact="domain-forge-domain", version=version, sha256=checksum))
+                         artifact="shared", version=version, sha256=checksum))
+        component["contract_types"].append(package + ".Response")
+        component["api_categories"][package + ".Response"] = "http"
+        component["contract_members"].append(package + ".Response.<init>(java.lang.String):void")
         self.case.definition["modules"].append(component)
         self.assertTrue(self.command()["ok"])
         self.fresh_copy()
         component["artifact"]["artifact"] = "unrelated-library"
         self.command("SG_DOMAIN_MARKER")
-        component["artifact"]["artifact"] = "domain-forge-domain"
+        component["artifact"]["artifact"] = "shared"
+        self.fresh_copy()
+        source = self.case.project / "src/test-named-production/java/probe/Service.java"
+        original = source.read_text()
+        source.write_text(original.replace('return "ok";', 'return new ' + package + '.Response("ok").value();'))
+        self.assertTrue(self.command("SG_COMPONENT_POSITION")["build"]["ok"])
+        source.write_text(original)
         self.fresh_copy()
         sources[0].write_text("package " + package + "; public interface Entity { javax.sql.DataSource SOURCE = null; }")
         component["artifact"]["sha256"] = build_jar()

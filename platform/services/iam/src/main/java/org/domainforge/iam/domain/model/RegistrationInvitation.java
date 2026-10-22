@@ -2,7 +2,7 @@ package org.domainforge.iam.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.domainforge.domain.api.AggregateRoot;
+import org.domainforge.shared.AggregateRoot;
 
 /** 注册邀请只允许绑定的登录名在有效期内消费一次；秘密仅以摘要保存。 */
 public record RegistrationInvitation(

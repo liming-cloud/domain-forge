@@ -45,39 +45,31 @@ class PersistenceConfigurationTest {
   /** 缺少必要资源必须失败，不能把未接入数据库当作成功启用。 */
   @Test
   void missingResourcesCannotBecomeReady() {
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            new DomainForgePersistenceConfiguration()
-                .domainForgePersistenceResources(
-                    List.of(), List.of(), List.of(), List.of(), transaction -> {}));
+    try (var context = new AnnotationConfigApplicationContext()) {
+      context.register(DomainForgePersistenceConfiguration.class);
+      assertThrows(BeanCreationException.class, context::refresh);
+    }
   }
 
-  /** 多数据源不得根据 Bean 顺序静默选择。 */
+  /** 不声明默认绑定的多数据源不得根据 Bean 顺序静默选择。 */
   @Test
   void multipleDataSourcesAreRejected() {
-    var source = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            new DomainForgePersistenceConfiguration()
-                .domainForgePersistenceResources(
-                    List.of(source, source), List.of(), List.of(), List.of(), transaction -> {}));
+    try (var context = LocalResourceBindingTest.context()) {
+      context.removeBeanDefinition("dataSource");
+      context.registerBean("firstSource", DataSource.class, () -> new DriverManagerDataSource());
+      context.registerBean("secondSource", DataSource.class, () -> new DriverManagerDataSource());
+      assertThrows(BeanCreationException.class, context::refresh);
+    }
   }
 
-  /** 在调用迁移之前拒绝多源及独立连接，不依赖迁移后的就绪检查。 */
+  /** 在调用迁移之前拒绝独立连接，不依赖迁移后的就绪检查。 */
   @Test
   void invalidMigrationResourcesAreRejectedBeforeMigration() {
-    var source = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-    var other = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-    var flyway = org.flywaydb.core.Flyway.configure().dataSource(other).load();
-    var configuration = new DomainForgePersistenceConfiguration();
-    for (var sources :
-        List.of(
-            List.<javax.sql.DataSource>of(source), List.<javax.sql.DataSource>of(source, other))) {
-      var strategy = configuration.domainForgeMigrationStrategy(sources);
-      assertThrows(IllegalStateException.class, () -> strategy.migrate(flyway));
-    }
+    var source = new DriverManagerDataSource();
+    var other = new DriverManagerDataSource();
+    var flyway = Flyway.configure().dataSource(other).load();
+    var strategy = new DomainForgePersistenceConfiguration().domainForgeMigrationStrategy(source);
+    assertThrows(IllegalStateException.class, () -> strategy.migrate(flyway));
   }
 
   /** 同源检查不再覆盖已由原生配置设置的事务等待。 */
@@ -105,11 +97,12 @@ class PersistenceConfigurationTest {
     var guard =
         new DomainForgePersistenceConfiguration()
             .domainForgePersistenceResources(
-                List.of(source),
-                List.of(transaction),
-                List.of(session),
-                List.of(flyway),
-                manager -> {});
+                source,
+                transaction,
+                session,
+                flyway,
+                new org.springframework.boot.transaction.autoconfigure.TransactionProperties(),
+                new org.springframework.core.env.StandardEnvironment());
     assertThrows(IllegalStateException.class, guard::afterSingletonsInstantiated);
   }
 
@@ -226,8 +219,9 @@ class PersistenceConfigurationTest {
         .getPropertySources()
         .addFirst(new MapPropertySource("verification", properties));
     var source = new DriverManagerDataSource();
-    context.registerBean(DataSource.class, () -> source);
+    context.registerBean("dataSource", DataSource.class, () -> source);
     context.registerBean(
+        "sqlSessionFactory",
         SqlSessionFactory.class,
         () ->
             new org.apache.ibatis.session.SqlSessionFactoryBuilder()
@@ -237,7 +231,8 @@ class PersistenceConfigurationTest {
                             "verification",
                             new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(),
                             source))));
-    context.registerBean(Flyway.class, () -> Flyway.configure().dataSource(source).load());
+    context.registerBean(
+        "flyway", Flyway.class, () -> Flyway.configure().dataSource(source).load());
     if (hostConfigurations.length > 0) {
       context.register(hostConfigurations);
     }

@@ -24,7 +24,7 @@
   <dependencies>
     <dependency>
       <groupId>org.domainforge</groupId>
-      <artifactId>domain-forge-domain</artifactId>
+      <artifactId>shared</artifactId>
     </dependency>
     <dependency>
       <groupId>org.domainforge</groupId>
