@@ -43,7 +43,26 @@ def component(root, code, observed, repository, tools, output):
     return result
 
 
-def publish(root, code, component, publication, argv, env, output):
+def domain_component(root, code, observed, repository, tools, output):
+    """领域标识是纯 Java 普通制品，独立消费不携带框架或内部 parent。"""
+    project = code / environment.DOMAIN
+    result = web_build.observe(root, project, ET.parse(observed['inventory']['path']).getroot(),
+        repository, False, ['org.domainforge.domain.api.JavaOnlyConsumptionTest#compilesWithoutFrameworkOrSharedBaseClass'])
+    result['quality'] = build.quality(root, project, result, tools, 'domain-modules.json')
+    (output / 'domain-quality.json').write_text(json.dumps(result['quality'], ensure_ascii=False, indent=2))
+    require(result['quality']['ok'], 'PG_SOURCE_QUALITY', '领域标识源码或精确结构不符')
+    pom = project / 'target/.flattened-pom.xml'
+    model = ET.parse(pom).getroot()
+    require(model.find('{*}parent') is None and not model.findall('./{*}dependencies/{*}dependency')
+            and model.findtext('{*}groupId') == 'org.domainforge'
+            and model.findtext('{*}artifactId') == 'domain-forge-domain'
+            and model.findtext('{*}version') == '0.3.0-iam.1',
+            'PG_CONSUMER_POM', '领域标识消费 POM 必须无运行依赖')
+    result['pom'] = {'path': str(pom), 'sha256': digest(pom)}
+    return result
+
+
+def publish(root, code, component, domain, publication, argv, env, output):
     """在既有 Web 独立消费结束后追加新坐标；绝不覆盖本轮已有 GAV。"""
     target = Path(publication['repository']); version = lock(root)['version']
     relative = 'org/domainforge/domain-forge-persistence/' + version + '/domain-forge-persistence-' + version
@@ -56,10 +75,18 @@ def publish(root, code, component, publication, argv, env, output):
     artifacts = dict(publication['artifacts'])
     artifacts[relative + '.jar'] = component['artifact']['sha256']
     artifacts[relative + '.pom'] = component['pom']['sha256']
+    relative_domain = 'org/domainforge/domain-forge-domain/0.3.0-iam.1/domain-forge-domain-0.3.0-iam.1'
+    require(not (target / relative_domain).parent.exists(), 'PG_IMMUTABLE_GAV', '领域标识候选坐标已经存在')
+    command([*argv, '-N', '-f', code / 'pom.xml', ':'.join([tool['group'], tool['artifact'], tool['version'], 'deploy-file']),
+             '-Durl=' + target.as_uri(), '-DrepositoryId=foundation-verification',
+             '-Dfile=' + domain['artifact']['path'], '-DpomFile=' + domain['pom']['path'], '-DgeneratePom=false'],
+            code, output / 'domain-publish.log', 600, env)
+    artifacts[relative_domain + '.jar'] = domain['artifact']['sha256']
+    artifacts[relative_domain + '.pom'] = domain['pom']['sha256']
     require(all((target / path).is_file() and digest(target / path) == checksum for path, checksum in artifacts.items()),
             'PG_PUBLICATION', '本轮制品发布字节不符')
     require({p.name for p in (target / 'org/domainforge').iterdir()} ==
-            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence'},
+            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'domain-forge-domain'},
             'PG_PUBLICATION', '制品仓库出现未批准的平台坐标')
     return {'repository': str(target), 'artifacts': artifacts, 'execution': execution}
 
@@ -150,7 +177,7 @@ def consume(root, code, app, workspace, publication, repository, home, env, tool
                 metadata.is_file() and Path(path).name + '>foundation-verification=' in metadata.read_text(),
                 'PG_CONSUMER_ARTIFACT', '生成工程未从本轮仓库取回精确平台制品')
     require({p.name for p in (local / 'org/domainforge').iterdir() if p.is_dir()} ==
-            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence'},
+            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'domain-forge-domain'},
             'PG_CONSUMER_PARENT', '生成工程消费了内部 parent 或未知平台制品')
     definition = module_contract(code, publication, output, fixture)
     quality = build.quality(root, app, observed, tools, definition, digest(definition))
@@ -168,7 +195,8 @@ def module_contract(code, publication, output, fixture):
     for module in declaration['modules']:
         if module['kind'] != 'component':
             continue
-        name = 'domain-forge-' + ('web-support' if module['id'] == 'web-support' else 'persistence')
+        require(module['id'] in {'web-support', 'persistence', 'domain'}, 'PG_COMPONENT_BINDING', '未知模板组件')
+        name = 'domain-forge-' + module['id']
         matches = [(path, checksum) for path, checksum in publication['artifacts'].items()
                    if Path(path).name.startswith(name + '-') and path.endswith('.jar')]
         require(len(matches) == 1, 'PG_COMPONENT_BINDING', '组件合同缺少唯一发布制品')

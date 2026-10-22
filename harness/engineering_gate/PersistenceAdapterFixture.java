@@ -82,30 +82,21 @@ public class PersistenceAdapterFixture {
   /** 真实通用映射和有限自定义查询，不提供产品接口。 */
   public interface RowMapper extends BaseMapper<StoredRow> {
     /** 按参数限定范围，对关联结果按记录分组计数。 */
-    @Select(
-        "SELECT r.id, count(d.id) AS details FROM gate_adapter r LEFT JOIN gate_detail d ON"
-            + " d.owner_id=r.id WHERE r.tenant=#{tenant} GROUP BY r.id ORDER BY r.id")
     Page<Summary> summary(Page<Summary> page, @Param("tenant") String tenant);
 
     /** 自定义更新自行维护版本条件，不能依赖方法名推断覆盖。 */
-    @Update(
-        "UPDATE gate_adapter SET quantity=quantity+1, revision=revision+1 WHERE id=#{id} AND"
-            + " revision=#{version}")
     int conditional(@Param("id") long id, @Param("version") int version);
 
     /** 同值更新与未匹配分别保留原生行数。 */
-    @Update("UPDATE gate_adapter SET quantity=#{value} WHERE id=#{id}")
     int same(@Param("id") long id, @Param("value") BigDecimal value);
 
     /** 由数据库维护合成唯一性约束。 */
-    @Insert("INSERT INTO gate_unique(code) VALUES (#{code})")
     int unique(@Param("code") String code);
   }
 
   /** 只在原生 BATCH 会话中执行的合成 Mapper。 */
   public interface BatchMapper {
     /** 延迟唯一约束用来区分刷新与提交失败。 */
-    @Insert("INSERT INTO gate_batch(id, code) VALUES (#{id}, #{code})")
     int insert(@Param("id") long id, @Param("code") String code);
   }
 

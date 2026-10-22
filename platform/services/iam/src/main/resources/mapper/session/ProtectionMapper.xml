@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.session.ProtectionMapper">
+  <select id="lock" resultType="org.domainforge.iam.infrastructure.persistence.session.ProtectionRow">
+    SELECT generation,blocked_until&lt;=clock_timestamp() AS allowed,policy_digest,account_attempts,
+      account_window_seconds,address_attempts,address_window_seconds,blocked_until
+    FROM iam_login_protection WHERE id=1 FOR UPDATE
+  </select>
+  <update id="initialize">
+    UPDATE iam_login_protection SET generation=#{generation},blocked_until=clock_timestamp(),
+      policy_digest=#{digest},account_attempts=#{policy.accountAttempts},account_window_seconds=#{policy.accountWindowSeconds},
+      address_attempts=#{policy.addressAttempts},address_window_seconds=#{policy.addressWindowSeconds}
+    WHERE id=1 AND generation IS NULL
+  </update>
+  <update id="recover">
+    UPDATE iam_login_protection SET generation=#{generation},
+      blocked_until=GREATEST(blocked_until,clock_timestamp()+#{seconds}*interval '1 second') WHERE id=1
+  </update>
+  <update id="changePolicy">
+    UPDATE iam_login_protection SET policy_digest=#{digest},
+      blocked_until=GREATEST(blocked_until,clock_timestamp()+GREATEST(account_window_seconds,address_window_seconds,
+        #{policy.accountWindowSeconds},#{policy.addressWindowSeconds})*interval '1 second'),
+      account_attempts=#{policy.accountAttempts},account_window_seconds=#{policy.accountWindowSeconds},
+      address_attempts=#{policy.addressAttempts},address_window_seconds=#{policy.addressWindowSeconds}
+    WHERE id=1 AND generation IS NOT NULL AND policy_digest=#{expected} AND policy_digest&lt;&gt;#{digest}
+  </update>
+</mapper>

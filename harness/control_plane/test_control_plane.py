@@ -1093,6 +1093,7 @@ class CurrentCatalogJourneys(unittest.TestCase):
         catalog = json.loads((origin / "harness/control_plane/catalog.json").read_text(encoding="utf-8"))
         paths = {item["path"] for item in catalog["documents"].values()}
         paths.update(catalog.get("reference_inputs", {}))
+        paths.add("platform/services/iam/src/main/resources/application.properties")  # 当前设计链接的真实部署配置。
         paths |= {"harness/control_plane/catalog.json", "harness/control_plane/control_plane.py", "harness/control_plane/test_control_plane.py"}
         paths |= {"harness/control_plane/delivery_evidence.py", "harness/control_plane/test_delivery_evidence.py"}
         for relative in paths:
@@ -1628,6 +1629,22 @@ class CurrentCatalogJourneys(unittest.TestCase):
                     self.assertIn("ENGINEERING-DESIGN#真实编译范围与源码检查绑定", {item["ref"] for item in output["rules"]})
                 finally:
                     target.unlink()
+
+    def test_domain_module_source_loads_model_and_java_principles_without_self_tags(self):
+        self.task["scopes"] = []
+        self.task["extra_refs"] = []
+        self.task["verification"] = [item for item in self.task["verification"] if item["check"] == "doc-integrity"]
+        self.task["design_refs"] = ["CONTROL-DESIGN#方案比较与选择"]
+        target = self.root / "platform/framework/domain-forge-domain/src/main/java/org/domainforge/domain/api/Entity.java"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("package org.domainforge.domain.api; public interface Entity {}\n")
+        code, output = self.route()
+        self.assertEqual(code, 0, output)
+        refs = {item["ref"] for item in output["rules"]}
+        self.assertIn("SOURCE#源码表达与状态保护", refs)
+        self.assertIn("REQUIREMENTS#上下文模型与战术设计", refs)
+        self.assertIn("SYSTEM#职责与依赖", refs)
+        self.assertIn("build-gate", output["required_checks"])
 
     def test_maven_architecture_binding_inputs_require_module_and_actual_build_rules(self):
         self.task["scopes"] = []

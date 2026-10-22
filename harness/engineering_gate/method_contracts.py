@@ -31,7 +31,9 @@ def inventory(build):
                 for item in references) and
             len(references) == len({(item["file"], item["owner"], item["target"], item["usage"]) for item in references}),
             "SG_DEPENDENCY_DECLARATION", "源码类型引用重复或无法唯一定位")
-    return methods, references
+    sql_issues = [dict(item.attrib, file=file.attrib["name"])
+                  for file in files for item in file.findall("sql_violation")]
+    return methods, references, sql_issues
 
 
 def own_comment_issue(method):
@@ -62,15 +64,17 @@ def comment_sources(method, methods, visiting=frozenset()):
     return sorted(inherited)
 
 
-def bind(build, bindings, contracts, paths):
+def bind(build, bindings, contracts, paths, *, sql_policy=False):
     """只选择精确合同方法与构造器，不强加内部访问器或同包测试的说明责任。"""
-    observed, references = inventory(build)
+    observed, references, sql_issues = inventory(build)
     methods = {item["id"]: item for item in observed}
     owners = {item["name"]: item for item in bindings}
     purposes = {path: compilation["purpose"] for compilation in build["compilations"] for path in compilation["sources"]}
     positions = checkstyle(paths, [pathlib.Path(path) for path in purposes], "comments", "test")
     diagnostics = [dict(item, code="SG_METHOD_POSITION", purpose=purposes[item["file"]])
                    for item in positions if item["rule"] == "InvalidJavadocPosition"]
+    if sql_policy:
+        diagnostics.extend(dict(item, purpose=purposes[item["file"]]) for item in sql_issues)
     selected = []
     for contract in contracts:
         for member in contract["members"]:
@@ -79,11 +83,23 @@ def bind(build, bindings, contracts, paths):
             identifier = member["id"]
             method = methods.get(identifier)
             details = {"member": identifier, "file": contract["source"], "purpose": contract["purpose"]}
-            if (method is None or method["explicit"] != "true" or method["file"] != contract["source"]
+            generated = method is not None and method.get("generated_kind") in {
+                "record-accessor", "enum-values", "enum-value-of"} and method["explicit"] == "false"
+            if (method is None or (method["explicit"] != "true" and not generated) or method["file"] != contract["source"]
                     or method["owner"] != contract["name"]):
                 diagnostics.append(dict(code="SG_METHOD_BINDING", **details))
                 continue
             details["line"] = int(method["line"])
+            if generated:
+                # JDK语义树给出的精确编译器成员绑定类型说明，不伪造方法正文或位置。
+                declaration = dict(method, start=method["declaration_start"])
+                issue = own_comment_issue(declaration)
+                if issue:
+                    diagnostics.append(dict(code=issue, **details))
+                selected.append(dict(method, module=owners[method["owner"]]["module"], purpose=contract["purpose"],
+                                     comment_sources=[dict(type=method["owner"], file=method["file"], line=int(method["line"]))],
+                                     semantic_review_proven=False))
+                continue
             sources = comment_sources(method, methods)
             issue = own_comment_issue(method)
             if issue and method["doc_present"] == "true":

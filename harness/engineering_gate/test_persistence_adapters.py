@@ -50,6 +50,8 @@ class AdapterFixtures(test_flyway.FlywayFixtures):
         text = pom.read_text(encoding="utf-8")
         pom.write_text(text[:text.index("<dependencyManagement>")] + self.persistence.framework_pom() + text[text.index("<build>"):], encoding="utf-8")
         self.write("src/test-named-production/java/probe/adapter/PersistenceAdapterFixture.java", (HERE / "PersistenceAdapterFixture.java").read_text(encoding="utf-8"))
+        for name in ("PersistenceRowMapper.xml", "PersistenceBatchMapper.xml"):
+            self.write("src/main/resources/mapper/" + name, (HERE / name).read_text(encoding="utf-8"))
         properties = "spring.flyway.enabled=false\nmybatis-plus.global-config.banner=false\nspring.datasource.dynamic.primary=master\nspring.datasource.dynamic.strict=true\nspring.sql.init.mode=never\n"
         for alias in self.peers:
             for key, suffix in (("url", "URL"), ("username", "USER"), ("password", "PASSWORD")):
@@ -75,6 +77,13 @@ class AdapterFixtures(test_flyway.FlywayFixtures):
         text = path.read_text(encoding="utf-8")
         self.assertIn(old, text)
         path.write_text(text.replace(old, new), encoding="utf-8")
+
+    def replace_sql(self, old, new):
+        path = self.project / "src/main/resources/mapper/PersistenceRowMapper.xml"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(old, text)
+        import html
+        path.write_text(text.replace(old, html.escape(new, quote=False)), encoding="utf-8")
 
     def command(self, diagnostic=None):
         self.contract.write_text(json.dumps(self.definition), encoding="utf-8")
@@ -134,7 +143,7 @@ class AdapterPaginationCommands(AdapterFixtures):
 
     def test_removed_scope_cannot_pass_then_repairs(self):
         self.seed("pagination")
-        self.replace("WHERE r.tenant=#{tenant}", "WHERE 1=1")
+        self.replace_sql("WHERE r.tenant=#{tenant}", "WHERE 1=1")
         self.command("SG_ADAPTER_RESULT")
         self.repair("pagination")
         self.command()
@@ -167,7 +176,7 @@ class AdapterConcurrencyCommands(AdapterFixtures):
 class AdapterConcurrencyConditionCommands(AdapterFixtures):
     def test_custom_update_cannot_omit_version_condition_then_repairs(self):
         self.seed("concurrency")
-        self.replace('WHERE id=#{id} AND"\n            + " revision=#{version}', 'WHERE id=#{id}')
+        self.replace_sql('WHERE id=#{id} AND revision=#{version}', 'WHERE id=#{id}')
         self.command("SG_ADAPTER_RESULT")
         self.repair("concurrency")
         self.command()
@@ -176,7 +185,7 @@ class AdapterConcurrencyConditionCommands(AdapterFixtures):
 class AdapterAffectedRowsCommands(AdapterFixtures):
     def test_fixed_return_cannot_hide_wrong_native_zero_rows_then_repairs(self):
         self.seed("concurrency")
-        self.replace("UPDATE gate_adapter SET quantity=#{value} WHERE id=#{id}",
+        self.replace_sql("UPDATE gate_adapter SET quantity=#{value} WHERE id=#{id}",
                      "UPDATE gate_adapter SET quantity=#{value} WHERE id=#{id} AND quantity<>#{value}")
         self.replace('return stale + ":" + same + ":" + missing;', 'return "0:1:0";')
         self.command("SG_ADAPTER_AFFECTED_ROWS")
@@ -397,7 +406,7 @@ class AdapterToolQualityChecks(unittest.TestCase):
     def test_observer_and_owned_fixture_pass_source_quality(self):
         tools = os.environ.get("DOMAIN_FORGE_GATE_TOOLS", "")
         self.assertTrue(tools, "必须提供真实源码工具")
-        files = [str(HERE / name) for name in ("PersistenceAdapterInventory.java", "PersistenceAdapterFixture.java", "PersistenceMigrationFixture.java")]
+        files = [str(HERE / name) for name in ("PersistenceAdapterInventory.java", "PersistenceAdapterFixture.java", "PersistenceMigrationFixture.java", "PersistenceQueries.java")]
         for action in ("comments", "method-presence", "format", "complexity"):
             argv = [sys.executable, "-B", str(HERE / "calibrate_source.py"), "--tools", tools, action]
             if action in ("comments", "complexity"):

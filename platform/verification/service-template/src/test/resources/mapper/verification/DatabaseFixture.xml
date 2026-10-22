@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="verification.database">
+  <delete id="clear">DELETE FROM probe_entry</delete>
+  <select id="count" resultType="int">SELECT count(*) FROM probe_entry</select>
+  <select id="migrations" resultType="int">SELECT count(*) FROM flyway_schema_history WHERE success AND version='1'</select>
+  <insert id="beforeDeadline">INSERT INTO probe_entry VALUES (7000,'before-timeout')</insert>
+  <insert id="afterDeadline">INSERT INTO probe_entry VALUES (7001,'after-timeout')</insert>
+</mapper>

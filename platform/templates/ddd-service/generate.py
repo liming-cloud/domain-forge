@@ -38,7 +38,7 @@ def load_assets(source, values):
     ordinary_path(source / 'template.json')
     require(not any(p.is_symlink() for p in (source / 'assets').rglob('*')), '资产不接受符号链接')
     manifest = json.loads((source / 'template.json').read_text())
-    require(manifest['schema'] == 1 and manifest['version'] == '0.2.0-2b.1', '模板版本不匹配')
+    require(manifest['schema'] == 1 and manifest['version'] == '0.3.0-iam.2', '模板版本不匹配')
     assets = []
     targets = set()
     for entry in manifest['assets']:

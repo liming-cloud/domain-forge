@@ -1,0 +1,24 @@
+{
+  "schema": 4,
+  "modules": [
+    {
+      "id": "domain",
+      "package": "org.domainforge.domain.api",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.domain.api.Entity",
+        "org.domainforge.domain.api.AggregateRoot",
+        "org.domainforge.domain.api.ValueObject"
+      ],
+      "contract_members": [],
+      "api_categories": {
+        "org.domainforge.domain.api.Entity": "domain-marker",
+        "org.domainforge.domain.api.AggregateRoot": "domain-marker",
+        "org.domainforge.domain.api.ValueObject": "domain-marker"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    }
+  ]
+}

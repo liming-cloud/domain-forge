@@ -199,6 +199,62 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
         self.assertEqual(json.loads(p.stdout)["diagnostics"][0]["code"], "SG_MODULE_CONTRACT")
         self.assertFalse((self.case.project / "target").exists(), "旧 schema 也不能忽略调用方固定的合同")
 
+    def test_domain_markers_require_exact_artifact_and_empty_jdk_only_interfaces(self):
+        self.source("domain")
+        self.strict_definition()
+        package = "org.domainforge.domain.api"
+        names = [package + "." + name for name in ("Entity", "AggregateRoot", "ValueObject")]
+        sources = []
+        for name in ("Entity", "AggregateRoot", "ValueObject"):
+            path = self.case.root / (name + ".java")
+            path.write_text("package " + package + "; public interface " + name +
+                            (" extends Entity" if name == "AggregateRoot" else "") + " {}")
+            sources.append(path)
+        version = "1.0.0-probe." + self.case.root.name.rsplit("-", 1)[-1]
+        directory = pathlib.Path(self.case.repository) / "org/domainforge/domain-forge-domain" / version
+        directory.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, directory)
+        jar = directory / ("domain-forge-domain-" + version + ".jar")
+        classes = self.case.root / "markers"
+
+        def build_jar():
+            process = subprocess.run(["javac", "--release", "21", "-d", str(classes), *map(str, sources)],
+                                     capture_output=True, text=True, timeout=10)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            with zipfile.ZipFile(jar, "w") as archive:
+                for path in classes.rglob("*.class"):
+                    archive.write(path, path.relative_to(classes))
+            return hashlib.sha256(jar.read_bytes()).hexdigest()
+
+        checksum = build_jar()
+        (directory / ("domain-forge-domain-" + version + ".pom")).write_text(
+            "<project><modelVersion>4.0.0</modelVersion><groupId>org.domainforge</groupId>"
+            "<artifactId>domain-forge-domain</artifactId><version>" + version + "</version></project>")
+        pom = self.case.project / "pom.xml"
+        pom.write_text(pom.read_text().replace("<dependencies>", "<dependencies><dependency>"
+            "<groupId>org.domainforge</groupId><artifactId>domain-forge-domain</artifactId><version>" +
+            version + "</version></dependency>", 1))
+        source = self.case.project / "src/test-named-production/java/probe/Service.java"
+        source.write_text(source.read_text().replace("public class Service {",
+            "public class Service implements " + package + ".AggregateRoot {"))
+        self.case.definition["modules"][0].update(depends_on=["domain"],
+            api_uses={name: ["domain"] for name in names})
+        component = dict(id="domain", package=package, kind="component", depends_on=[],
+                         contract_types=names, contract_members=[],
+                         api_categories={name: "domain-marker" for name in names},
+                         api_uses={}, query_bindings=[], artifact=dict(group="org.domainforge",
+                         artifact="domain-forge-domain", version=version, sha256=checksum))
+        self.case.definition["modules"].append(component)
+        self.assertTrue(self.command()["ok"])
+        self.fresh_copy()
+        component["artifact"]["artifact"] = "unrelated-library"
+        self.command("SG_DOMAIN_MARKER")
+        component["artifact"]["artifact"] = "domain-forge-domain"
+        self.fresh_copy()
+        sources[0].write_text("package " + package + "; public interface Entity { javax.sql.DataSource SOURCE = null; }")
+        component["artifact"]["sha256"] = build_jar()
+        self.assertTrue(self.command("SG_DOMAIN_MARKER")["build"]["ok"])
+
     def test_strict_contract_rejects_malformed_or_unfixed_input_before_build(self):
         for mutation in ("unknown-category", "unknown-position", "unhashable-position", "floating-artifact", "overlap"):
             with self.subTest(mutation=mutation):
@@ -634,6 +690,7 @@ class RoleBoundaryPartitionChecks(unittest.TestCase):
 
 def RoleBoundaryPolicySuite():
     names = ("test_component_categories_follow_actual_calling_position",
+             "test_domain_markers_require_exact_artifact_and_empty_jdk_only_interfaces",
              "test_boot4_line_calibrates_actual_spring7_metadata",
              "test_domain_cannot_bind_framework_lifecycle_then_repairs",
              "test_application_cannot_operate_client_even_with_allowed_annotations_then_repairs",

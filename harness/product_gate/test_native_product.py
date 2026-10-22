@@ -42,7 +42,13 @@ class NativeProductTests(unittest.TestCase):
         result = build.quality(ROOT, self.project, self.observed, self.tools)
         self.assertTrue(result["ok"], result["diagnostics"])
         self.assertGreater(self.observed["tests"]["count"], 0)
-        self.assertEqual(self.observed["reactor"], [".", "framework", "framework/domain-forge-web-support", "framework/domain-forge-persistence", "domain-forge-bom", "verification", "verification/smoke", "verification/smoke/boot-smoke"])
+        self.assertEqual(self.observed["reactor"], [
+            ".", "framework", "framework/domain-forge-domain", "framework/domain-forge-web-support",
+            "framework/domain-forge-persistence", "domain-forge-bom", "verification",
+            "verification/smoke", "verification/smoke/boot-smoke", "framework/access-control",
+            "framework/access-control/domain-forge-access-control-contract",
+            "framework/access-control/domain-forge-access-control-backend", "framework/domain-forge-iam-client", "services", "services/iam",
+        ])
         self.assertEqual({item["purpose"] for item in result["bindings"]}, {"production", "test"})
 
     def test_observed_reactor_cannot_omit_or_add_modules(self):

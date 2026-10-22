@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.2.0-2b.1",
+  "version": "0.3.0-iam.2",
   "assets": [
     {
       "source": "assets/.mvn/wrapper/maven-wrapper.properties",
@@ -40,7 +40,7 @@
     {
       "source": "assets/pom.xml.tpl",
       "target": "pom.xml",
-      "sha256": "b86f2563c998154904e5418ed2b8b5ad42904e102e28f5ad36d6268a0ea039f5",
+      "sha256": "315c99d53306525b7170c69f17fa2dcf90728520e071df12e83425dbeff7a4e4",
       "render": true,
       "executable": false
     },
@@ -61,7 +61,7 @@
     {
       "source": "assets/src/main/resources/application.properties",
       "target": "src/main/resources/application.properties",
-      "sha256": "e12e3478c46c2b75fdea615d5997e496416e2387be2211cfeae0696bff6cffa9",
+      "sha256": "07f24433f32b5ad9fc96b00d5c84ef1b88aedc447a7ea05b096e7f4d05e68fcf",
       "render": true,
       "executable": false
     },
@@ -82,7 +82,7 @@
     {
       "source": "01-使用说明.md",
       "target": "docs/01-使用说明.md",
-      "sha256": "27192f1745b1cc61233504674ce9ad245743b7e361f30cf0a5c1becc20b49fd6",
+      "sha256": "8ece6664d1f7027b49e4ef576f6623589a034a749383fce83862de3397fa7a00",
       "render": false,
       "executable": false
     }

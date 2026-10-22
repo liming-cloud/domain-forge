@@ -3,19 +3,26 @@ package org.domainforge.persistence.autoconfigure;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import java.time.Duration;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
+import org.springframework.boot.transaction.autoconfigure.TransactionManagerCustomizer;
+import org.springframework.boot.transaction.autoconfigure.TransactionProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.RollbackOn;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 
 /** 由服务显式导入的单库装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。 */
 @Configuration(proxyBeanMethods = false)
@@ -46,17 +53,36 @@ public class DomainForgePersistenceConfiguration {
     };
   }
 
-  /** 在服务就绪前核对单库资源，并设置应用事务默认等待上限。 */
+  /** 沿用Boot唯一事务属性；仅管理器未设超时时由原生定制点补有限默认。 */
+  @Bean
+  TransactionManagerCustomizer<AbstractPlatformTransactionManager> domainForgeTransactionDefaults(
+      TransactionProperties properties, Environment environment) {
+    if (environment.containsProperty("domainforge.persistence.transaction-timeout-seconds")) {
+      throw new IllegalArgumentException(
+          "旧属性domainforge.persistence.transaction-timeout-seconds已移除，请迁移到spring.transaction.default-timeout");
+    }
+    Duration timeout = properties.getDefaultTimeout();
+    if (timeout != null
+        && (timeout.compareTo(Duration.ofSeconds(1)) < 0
+            || timeout.compareTo(Duration.ofSeconds(300)) > 0)) {
+      throw new IllegalArgumentException("spring.transaction.default-timeout须在1至300秒之间");
+    }
+    return transaction -> {
+      if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {
+        transaction.setDefaultTimeout(timeout == null ? 10 : Math.toIntExact(timeout.getSeconds()));
+      }
+    };
+  }
+
+  /** 在服务就绪前核对单库资源，不覆盖宿主的原生事务配置。 */
   @Bean
   SmartInitializingSingleton domainForgePersistenceResources(
       List<DataSource> sources,
       List<PlatformTransactionManager> transactions,
       List<SqlSessionFactory> sessions,
       List<Flyway> migrations,
-      @Value("${domainforge.persistence.transaction-timeout-seconds:10}") int timeoutSeconds) {
-    if (timeoutSeconds < 1 || timeoutSeconds > 300) {
-      throw new IllegalArgumentException("事务超时须在 1 至 300 秒之间");
-    }
+      @Qualifier("domainForgeTransactionDefaults")
+          TransactionManagerCustomizer<AbstractPlatformTransactionManager> defaults) {
     if (sources.size() != 1
         || transactions.size() != 1
         || sessions.size() != 1
@@ -71,7 +97,9 @@ public class DomainForgePersistenceConfiguration {
           || migrations.getFirst().getConfiguration().getDataSource() != sources.getFirst()) {
         throw new IllegalStateException("单库事务、会话与迁移必须使用同一数据源");
       }
-      transaction.setDefaultTimeout(timeoutSeconds);
+      if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {
+        defaults.customize(transaction);
+      }
     };
   }
 }

@@ -441,15 +441,12 @@ public final class PersistenceInventory {
             System.getenv(prefix + "USER"),
             System.getenv(prefix + "PASSWORD"))) {
       connection.setReadOnly(true);
-      String columns = "\"" + data.getAttribute("columns").replace(",", "\",\"") + "\"";
       String query =
-          "SELECT "
-              + columns
-              + " FROM \""
-              + data.getAttribute("schema")
-              + "\".\""
-              + data.getAttribute("table")
-              + "\" LIMIT 101";
+          PersistenceQueries.snapshot(
+              data.getAttribute("schema"),
+              data.getAttribute("table"),
+              data.getAttribute("columns"),
+              false);
       try (var statement = connection.createStatement();
           var rows = statement.executeQuery(query)) {
         while (rows.next()) {

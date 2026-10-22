@@ -7,7 +7,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
+import build
 import environment
 import foundation_build
 import web_build
@@ -33,7 +35,7 @@ class TemplateInputTests(unittest.TestCase):
 
     def test_generation_is_independent_and_traceable(self):
         metadata = self.generate()
-        self.assertEqual(metadata['template_version'], '0.2.0-2b.1')
+        self.assertEqual(metadata['template_version'], '0.3.0-iam.2')
         self.assertEqual(metadata, json.loads((self.output / 'template-origin.json').read_text()))
         self.assertIn('<artifactId>sample-service</artifactId>', (self.output / 'pom.xml').read_text())
         self.assertNotIn('<parent>', (self.output / 'pom.xml').read_text())
@@ -138,6 +140,30 @@ class TemplateInputTests(unittest.TestCase):
             with self.assertRaises(environment.ProbeFailure) as failure:
                 web_build.consumer_pom(path, 'domain-forge-bom', baseline['version'], '4.0.8', baseline['managed_dependencies'])
             self.assertEqual(failure.exception.diagnostic['code'], 'PG_CONSUMER_POM')
+
+    def test_framework_boms_reject_mixed_versions_missing_and_extra_imports(self):
+        original = ET.parse(ROOT / 'platform/pom.xml').getroot()
+        build.parent_management(ROOT, original)
+        for index in range(3):
+            changed = copy.deepcopy(original)
+            changed.findall('./{*}dependencyManagement/{*}dependencies/{*}dependency')[index].find('{*}version').text = '0.0.1'
+            with self.subTest(mutation='mixed-version', index=index):
+                with self.assertRaises(environment.ProbeFailure):
+                    build.parent_management(ROOT, changed)
+        for mutation in ('missing', 'extra', 'reordered'):
+            changed = copy.deepcopy(original)
+            imports = changed.find('./{*}dependencyManagement/{*}dependencies')
+            if mutation == 'missing':
+                imports.remove(imports[-1])
+            elif mutation == 'extra':
+                imports.append(copy.deepcopy(imports[-1]))
+            else:
+                last = imports[-1]
+                imports.remove(last)
+                imports.insert(0, last)
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(environment.ProbeFailure):
+                    build.parent_management(ROOT, changed)
 
 
 if __name__ == '__main__':

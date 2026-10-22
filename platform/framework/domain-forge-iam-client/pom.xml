@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.domainforge</groupId><artifactId>framework</artifactId><version>0.1.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>domain-forge-iam-client</artifactId><version>0.3.0-iam.2</version>
+  <dependencies>
+    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-access-control-contract</artifactId><version>0.3.0-iam.1</version></dependency>
+    <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-starter-openfeign</artifactId></dependency>
+    <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-starter-loadbalancer</artifactId></dependency>
+    <dependency><groupId>com.alibaba.cloud</groupId><artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId></dependency>
+    <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-openfeign-core</artifactId></dependency>
+    <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-commons</artifactId></dependency>
+    <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-loadbalancer</artifactId></dependency>
+    <dependency><groupId>io.github.openfeign</groupId><artifactId>feign-core</artifactId></dependency>
+    <dependency><groupId>io.github.openfeign</groupId><artifactId>feign-hc5</artifactId></dependency>
+    <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId></dependency>
+    <dependency><groupId>org.apache.httpcomponents.core5</groupId><artifactId>httpcore5</artifactId></dependency>
+    <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+    <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-core</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot</artifactId></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-core</artifactId></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-beans</artifactId></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-web</artifactId></dependency>
+    <dependency><groupId>org.domainforge</groupId><artifactId>domain-forge-access-control-backend</artifactId><version>0.3.0-iam.2</version><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>cn.dev33</groupId><artifactId>sa-token-core</artifactId><version>1.46.0</version><scope>test</scope></dependency>
+    <dependency><groupId>cn.dev33</groupId><artifactId>sa-token-spring-boot-webmvc-v3v4-common</artifactId><version>1.46.0</version><scope>test</scope></dependency>
+    <dependency><groupId>jakarta.servlet</groupId><artifactId>jakarta.servlet-api</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-engine</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins><plugin><groupId>org.codehaus.mojo</groupId><artifactId>flatten-maven-plugin</artifactId><configuration><flattenMode>clean</flattenMode><outputDirectory>${project.build.directory}</outputDirectory><updatePomFile>true</updatePomFile></configuration><executions><execution><id>consumer-pom</id><phase>process-resources</phase><goals><goal>flatten</goal></goals></execution></executions></plugin></plugins></build>
+</project>

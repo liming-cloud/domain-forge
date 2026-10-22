@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "version": "0.3.0-iam.2",
+  "required_tests": {
+    "access-contract": [
+      "org.domainforge.access.api.CurrentSubjectTest#identityIsImmutableAndBounded"
+    ],
+    "access-backend": [
+      "org.domainforge.access.backend.internal.BackendStpLogicTest#anonymousOptionalLookupMatchesNativeContract",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#commonLocalModeUsesNativeAnnotationsAndRebuilds",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeStoreFailuresRemainUnavailable",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unsupportedDeclarationsFailAtStartup",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#modifiedNativeStrategiesFailAtStartup",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#secondContextCannotReplaceRunningNativeOwner",
+      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#changedTokenNeverReusesOldSuccessAfterFailure",
+      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#invalidIdentityUsesSanitizedNativeClassification",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeInvalidationNeverExposesTokenInException",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#nativeAndRequiresEveryPermissionAndRole",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#programmaticProviderReadSanitizesInvalidationAndOutage",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendUsesExternalSourceWithoutTransportConfiguration",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendWithoutSourceFailsStartup",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#localModeKeepsNativeSessionsWithoutTransportConfiguration",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unusedUnsupportedHandlersDoNotRestrictSupportedAccess"
+    ],
+    "iam": [
+      "org.domainforge.iam.interfaces.http.protocol.IamRequestFilterTest#boundsEveryMediaTypeBeforeController",
+      "org.domainforge.iam.interfaces.http.protocol.IamRequestFilterTest#passesExactBoundWithoutChangingBytes",
+      "org.domainforge.iam.domain.model.AccountTest#registrationHasNoImplicitGrantAndNormalizesOnlyLoginName",
+      "org.domainforge.iam.domain.model.AccountTest#passwordAndDisableInvalidatePreviousCredentialVersion",
+      "org.domainforge.iam.domain.model.AccountTest#grantsAreFiniteImmutableAndCurrentWithoutPasswordChange",
+      "org.domainforge.iam.domain.model.AccountTest#invalidNamesAndEmptyCredentialsCannotBecomeAccounts",
+      "org.domainforge.iam.domain.model.AccountTest#diagnosticRepresentationNeverContainsCredentialDigest",
+      "org.domainforge.iam.domain.model.RegistrationInvitationTest#consumesOnlyOnce",
+      "org.domainforge.iam.domain.model.RegistrationInvitationTest#expiryAndReissueRejectConsumption",
+      "org.domainforge.iam.infrastructure.security.ArgonPasswordsTest#hashesOriginalUnicodeWithRandomSalt",
+      "org.domainforge.iam.infrastructure.security.ArgonPasswordsTest#rejectsInvalidOrBlockedPasswords",
+      "org.domainforge.iam.interfaces.http.protocol.IamHttpErrorsTest#hashCapacityUsesShortRetryAdvice",
+      "org.domainforge.iam.infrastructure.configuration.LoginProtectionSettingsTest#rejectsEveryUnsafeBoundaryAndFraction",
+      "org.domainforge.iam.infrastructure.configuration.LoginProtectionSettingsTest#sharedIdentityExcludesLocalResources",
+      "org.domainforge.iam.interfaces.security.RequestCurrentIdentityTest#publicAndPrivateIdentityShareOnlyTheCurrentTokenRequest",
+      "org.domainforge.iam.infrastructure.persistence.operation.SpringTransactionsTest#cannotCreateTransactionIsUnavailableWithoutExecutingWork",
+      "org.domainforge.iam.infrastructure.persistence.operation.SpringTransactionsTest#confirmedGlobalRollbackIsUnavailable",
+      "org.domainforge.iam.infrastructure.persistence.operation.SpringTransactionsTest#confirmedWorkRollbackIsUnavailable",
+      "org.domainforge.iam.infrastructure.persistence.operation.SpringTransactionsTest#rollbackAcknowledgementFailureRemainsUnknown"
+    ],
+    "iam-client": [
+      "org.domainforge.iam.client.internal.CurrentStateClientTest#rejectsUnsafeTokenAndProject",
+      "org.domainforge.iam.client.internal.CurrentStateClientTest#rejectsMalformedSuccessProtocol"
+    ]
+  },
+  "required_integration_tests": {
+    "org.domainforge.iam.client.internal.CurrentStateTransportIT": [
+      "malformedResponsesRejectAndValidResponsesRecover",
+      "statusDoesNotRetryOrFollowRedirect",
+      "optionalLookupDistinguishesInvalidIdentityFromOutage",
+      "nativeReadTimeoutRejectsStalledBodyAndRecovers",
+      "remoteModeUsesSameNativePipeline",
+      "isolatesNativeConfigurationAndHostAuthentication",
+      "nativeHeaderBoundsRejectAndRecover",
+      "rejectsDiscoveredHttpTargetBeforeSendingBearer",
+      "rejectsUnexpectedEndpointBeforeSendingBearer",
+      "nativeUrlOverridesCannotBypassEndpointValidation"
+    ],
+    "org.domainforge.iam.infrastructure.IdentityPersistenceIT": [
+      "jdbcTranslatedCommitFailureRemainsUnknownAndKeepsReceipt",
+      "ordinaryAuditReleasesBusinessConnectionsBeforeBorrowingAgain",
+      "invitationUnknownAndReplayDoNotInventCompletedAudits",
+      "registrationReplayDoesNotEmitCompletedAuditTwice"
+    ]
+  },
+  "contract_version": "0.3.0-iam.1"
+}

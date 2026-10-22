@@ -1,0 +1,105 @@
+{
+  "schema": 4,
+  "modules": [
+    {
+      "id": "access-backend",
+      "package": "org.domainforge.access.backend",
+      "kind": "component",
+      "depends_on": [
+        "access-contract",
+        "web-support"
+      ],
+      "contract_types": [
+        "org.domainforge.access.backend.configuration.BackendAccessConfiguration",
+        "org.domainforge.access.backend.configuration.LocalAccessConfiguration",
+        "org.domainforge.access.backend.configuration.AccessControlConfiguration"
+      ],
+      "contract_members": [],
+      "api_categories": {
+        "org.domainforge.access.backend.configuration.BackendAccessConfiguration": "configuration",
+        "org.domainforge.access.backend.configuration.LocalAccessConfiguration": "configuration",
+        "org.domainforge.access.backend.configuration.AccessControlConfiguration": "configuration"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    },
+    {
+      "id": "access-contract",
+      "package": "org.domainforge.access.api",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.access.api.AccessException",
+        "org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.CurrentAccess",
+        "org.domainforge.access.api.CurrentSubject",
+        "org.domainforge.access.api.CurrentSubjectSource"
+      ],
+      "contract_members": [
+        "org.domainforge.access.api.AccessException.<init>(org.domainforge.access.api.AccessFailure):void",
+        "org.domainforge.access.api.AccessException.failure():org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.CurrentAccess.current():org.domainforge.access.api.CurrentSubject",
+        "org.domainforge.access.api.CurrentSubject.<init>(java.lang.String,java.util.UUID,java.util.Set):void",
+        "org.domainforge.access.api.CurrentSubject.projectId():java.lang.String",
+        "org.domainforge.access.api.CurrentSubject.accountId():java.util.UUID",
+        "org.domainforge.access.api.CurrentSubject.permissions():java.util.Set",
+        "org.domainforge.access.api.AccessFailure.values():[Lorg.domainforge.access.api.AccessFailure;",
+        "org.domainforge.access.api.AccessFailure.valueOf(java.lang.String):org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.AccessFailure.UNAUTHENTICATED:org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.AccessFailure.FORBIDDEN:org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.AccessFailure.UNAVAILABLE:org.domainforge.access.api.AccessFailure",
+        "org.domainforge.access.api.CurrentSubject.<init>(java.lang.String,java.util.UUID,java.util.Set,java.util.Set):void",
+        "org.domainforge.access.api.CurrentSubject.roles():java.util.Set",
+        "org.domainforge.access.api.CurrentSubjectSource.resolve(java.lang.String):org.domainforge.access.api.CurrentSubject"
+      ],
+      "api_categories": {
+        "org.domainforge.access.api.AccessException": "neutral",
+        "org.domainforge.access.api.AccessFailure": "neutral",
+        "org.domainforge.access.api.CurrentAccess": "neutral",
+        "org.domainforge.access.api.CurrentSubject": "neutral",
+        "org.domainforge.access.api.CurrentSubjectSource": "neutral"
+      },
+      "api_uses": {},
+      "query_bindings": [],
+      "data_contracts": [
+        "org.domainforge.access.api.CurrentSubject"
+      ]
+    },
+    {
+      "id": "web-support",
+      "package": "org.domainforge.web",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.web.api.ApiResponse",
+        "org.domainforge.web.api.PlatformJsonApi",
+        "org.domainforge.web.api.BusinessRejectionMapping",
+        "org.domainforge.web.api.HttpFailureResponses"
+      ],
+      "contract_members": [
+        "org.domainforge.web.api.ApiResponse.<init>(java.lang.String,java.lang.String,java.lang.Object):void",
+        "org.domainforge.web.api.ApiResponse.success(java.lang.Object):org.domainforge.web.api.ApiResponse",
+        "org.domainforge.web.api.ApiResponse.accepted(java.lang.Object):org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.ApiResponse.rejected(java.lang.String,java.lang.String):org.domainforge.web.api.ApiResponse",
+        "org.domainforge.web.api.BusinessRejectionMapping.exceptionType():java.lang.Class",
+        "org.domainforge.web.api.BusinessRejectionMapping.map(java.lang.Exception):org.domainforge.web.api.ApiResponse",
+        "org.domainforge.web.api.HttpFailureResponses.invalidRequest():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.unauthenticated():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.forbidden():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.unavailable():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.internalError():org.springframework.http.ResponseEntity"
+      ],
+      "data_contracts": [
+        "org.domainforge.web.api.ApiResponse"
+      ],
+      "api_categories": {
+        "org.domainforge.web.api.ApiResponse": "http",
+        "org.domainforge.web.api.PlatformJsonApi": "http",
+        "org.domainforge.web.api.BusinessRejectionMapping": "http",
+        "org.domainforge.web.api.HttpFailureResponses": "http"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    }
+  ]
+}

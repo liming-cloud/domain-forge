@@ -15,13 +15,17 @@
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-bom</artifactId>
-        <version>0.2.0-2b.1</version>
+        <version>0.3.0-iam.2</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
   <dependencies>
+    <dependency>
+      <groupId>org.domainforge</groupId>
+      <artifactId>domain-forge-domain</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.domainforge</groupId>
       <artifactId>domain-forge-web-support</artifactId>

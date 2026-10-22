@@ -72,6 +72,30 @@ class ProductInputTests(unittest.TestCase):
                 self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
         pom.write_text(original)
 
+    def test_parent_metadata_does_not_change_build_scope(self):
+        for relative in (Path("."), Path("framework")):
+            pom = self.code / relative / "pom.xml"
+            original = pom.read_text()
+            with self.subTest(relative=relative):
+                pom.write_text(original.replace("</project>",
+                    "<name>Domain Forge</name><description>企业研发底座</description></project>"))
+                try:
+                    build.model(ROOT, self.project)
+                finally:
+                    pom.write_text(original)
+
+    def test_metadata_permission_does_not_allow_other_elements_or_duplicates(self):
+        for relative in (Path("."), Path("framework")):
+            pom = self.code / relative / "pom.xml"
+            original = pom.read_text()
+            for extra in ("<profiles/>", "<dependencies/>", "<name>duplicate</name>", "<url>https://example.invalid</url>"):
+                with self.subTest(relative=relative, extra=extra):
+                    pom.write_text(original.replace("</project>", "<name>metadata</name>" + extra + "</project>"))
+                    try:
+                        self.reject("PG_BUILD_SCOPE", build.model, ROOT, self.project)
+                    finally:
+                        pom.write_text(original)
+
     def test_boot_parent_cannot_replace_repository_parent(self):
         pom = self.project / "pom.xml"
         document = ET.parse(pom)

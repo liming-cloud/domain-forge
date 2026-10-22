@@ -1,0 +1,1 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>org.domainforge</groupId><artifactId>platform</artifactId><version>0.1.0</version><relativePath>../pom.xml</relativePath></parent><artifactId>services</artifactId><packaging>pom</packaging><modules><module>iam</module></modules></project>

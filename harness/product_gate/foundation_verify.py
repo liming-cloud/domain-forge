@@ -35,7 +35,8 @@ def inspect(root, project, observed, web, argv, env, home, repository, workspace
         code = product_root(project)
         result['inputs'] = environment.foundation_sources(code.parent)
         result['component'] = build.component(root, code, observed, repository, args.tools, directory)
-        publication = build.publish(root, code, result['component'], web['publication'], argv, env, directory)
+        result['domain'] = build.domain_component(root, code, observed, repository, args.tools, directory)
+        publication = build.publish(root, code, result['component'], result['domain'], web['publication'], argv, env, directory)
         result['publication'] = publication
         result['consumers'] = {}
         with runtime.Database(root, workspace) as database:

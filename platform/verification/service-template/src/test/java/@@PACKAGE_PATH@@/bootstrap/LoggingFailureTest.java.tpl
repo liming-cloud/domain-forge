@@ -14,12 +14,10 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 用受控出口施加阻塞与 I/O 故障，观察真实队列、事务和恢复日志。 */
 class LoggingFailureTest {
@@ -86,8 +84,8 @@ class LoggingFailureTest {
       AsyncAppender asynchronous,
       BlockedOutput blocked)
       throws Exception {
-    var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
-    jdbc.update("DELETE FROM probe_entry");
+    var jdbc = new DatabaseFixture(context);
+    jdbc.clear();
     root.info("block-entry");
     assertTrue(blocked.entered.await(3, TimeUnit.SECONDS));
     assertTimeoutPreemptively(
@@ -100,7 +98,7 @@ class LoggingFailureTest {
         });
     assertEquals(0, asynchronous.getRemainingCapacity());
     assertEquals("DEGRADED", context.getBean(LoggingState.class).health().getStatus().getCode());
-    assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM probe_entry", Integer.class));
+    assertEquals(2, jdbc.count());
     blocked.release.countDown();
     awaitDrained(asynchronous);
   }
@@ -112,7 +110,7 @@ class LoggingFailureTest {
       AsyncAppender asynchronous,
       OutputStreamAppender<ILoggingEvent> sink)
       throws Exception {
-    var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+    var jdbc = new DatabaseFixture(context);
     sink.setOutputStream(new BrokenOutput());
     root.info("fail-entry");
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
@@ -123,7 +121,7 @@ class LoggingFailureTest {
     assertEquals("DEGRADED", context.getBean(LoggingState.class).health().getStatus().getCode());
     assertTimeoutPreemptively(
         Duration.ofSeconds(3), () -> context.getBean(WritePair.class).execute(3000, "none"));
-    assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM probe_entry", Integer.class));
+    assertEquals(4, jdbc.count());
     var recovered = new ByteArrayOutputStream();
     sink.setOutputStream(recovered);
     sink.start();

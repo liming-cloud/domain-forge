@@ -80,6 +80,7 @@ final class ArchitectureInventory {
     output.writeAttribute(
         "public", Boolean.toString(type.getModifiers().contains(JavaModifier.PUBLIC)));
     output.writeAttribute("fully_imported", Boolean.toString(type.isFullyImported()));
+    output.writeAttribute("interface", Boolean.toString(type.isInterface()));
     for (JavaMember member : type.getMembers()) {
       writeMember(output, member);
     }

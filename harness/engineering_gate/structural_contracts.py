@@ -9,7 +9,8 @@ from calibrate_source import digest, require
 from calibrate_lifecycle import fixed_version
 
 
-CATEGORIES = {"neutral", "http", "client", "configuration"}
+CATEGORIES = {"neutral", "http", "client", "configuration", "domain-marker"}
+DOMAIN_MARKERS = {"org.domainforge.domain.api." + name for name in ("Entity", "AggregateRoot", "ValueObject")}
 
 
 def validate(module):
@@ -23,9 +24,21 @@ def validate(module):
     require(isinstance(uses, dict) and all(isinstance(name, str) and name and
             isinstance(positions, list) and positions and
             all(isinstance(position, str) and re.fullmatch(
-                r"(?:application|interfaces|infrastructure|bootstrap)(?:\.[A-Za-z_][A-Za-z0-9_]*)*", position)
+                r"(?:domain|application|interfaces|infrastructure|bootstrap)(?:\.[A-Za-z_][A-Za-z0-9_]*)*", position)
                 for position in positions) and len(positions) == len(set(positions)) for name, positions in uses.items()),
-            "SG_COMPONENT_DECLARATION", "消费位置须精确指定上下文内职责包，不接受领域或通配放行")
+            "SG_COMPONENT_DECLARATION", "消费位置须精确指定上下文内职责包，不接受通配放行")
+    require(all(not any(position.split(".")[0] == "domain" for position in positions)
+                or name in DOMAIN_MARKERS for name, positions in uses.items()),
+            "SG_COMPONENT_POSITION", "领域只准入精确的三个领域标识")
+    if "domain-marker" in categories.values():
+        require(module["package"] == "org.domainforge.domain.api"
+                and set(categories) == DOMAIN_MARKERS and set(categories.values()) == {"domain-marker"}
+                and not module["contract_members"],
+                "SG_DOMAIN_MARKER", "领域标识仅含三个固定公开接口且无操作成员")
+        if "artifact" in module:
+            require(module["artifact"].get("group") == "org.domainforge"
+                    and module["artifact"].get("artifact") == "domain-forge-domain",
+                    "SG_DOMAIN_MARKER", "领域标识制品身份不符")
     queries = module["query_bindings"]
     require(isinstance(queries, list) and all(isinstance(query, dict) and
             set(query) == {"contract", "implementation"} and
@@ -107,6 +120,21 @@ def inspect(report, modules, roles, classify):
     components = {name: module for module in modules.values() if module["kind"] == "component"
                   for name in classes if inside(name, module["package"])}
     categories = {name: category for module in modules.values() for name, category in module["api_categories"].items()}
+    for module in modules.values():
+        if "domain-marker" not in module["api_categories"].values():
+            continue
+        actual = {name for name in classes if inside(name, module["package"])
+                  and bindings.get(name, {}).get("purpose") != "test"}
+        valid = actual == DOMAIN_MARKERS
+        for name in actual:
+            item = classes[name]
+            valid &= item.get("interface") == "true" and item["public"] == "true" and not item["members"]
+            targets = {ref["target"] for ref in item["dependencies"]}
+            parents = {ref["target"] for ref in item["shape_types"] if ref["origin"].endswith(":supertype")}
+            expected = {"org.domainforge.domain.api.Entity"} if name.endswith(".AggregateRoot") else set()
+            valid &= targets <= expected | {"java.lang.Object"} and parents - {"java.lang.Object"} == expected
+        if not valid:
+            errors.append(dict(code="SG_DOMAIN_MARKER", module=module["id"]))
     for module in modules.values():
         for name in module["api_categories"]:
             require(name in classes and classes[name]["public"] == "true", "SG_COMPONENT_TARGET", "组件公开类型缺少真实公开声明：" + name)
@@ -194,6 +222,8 @@ def inspect(report, modules, roles, classify):
 def allowed(category, position):
     """类别限定上界；具体消费者还须声明实际需要的职责子包。"""
     role = position.split(".")[0]
+    if category == "domain-marker":
+        return role in {"domain", "application", "interfaces", "infrastructure"}
     if category == "neutral":
         return role in {"application", "interfaces", "infrastructure"}
     if category == "http":

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.audit.ManualAuditMapper">
+  <insert id="append">
+    INSERT INTO iam_audit(operation_id,actor,target_id,action,outcome,source,occurred_at,provenance,missing_fields) VALUES(CAST(#{operation} AS uuid),#{recordedBy},CAST(#{target} AS uuid),#{action},'original-result-unconfirmed','manual',#{occurredAt},#{provenance},#{missingFields})
+  </insert>
+</mapper>

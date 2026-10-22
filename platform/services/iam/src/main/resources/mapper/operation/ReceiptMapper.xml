@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.operation.ReceiptMapper">
+  <select id="lock" resultType="int">
+    SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key},0))
+  </select>
+  <delete id="expire">
+    DELETE FROM iam_operation WHERE actor_scope=#{scope} AND operation_id=CAST(#{id} AS uuid) AND expires_at&lt;=clock_timestamp()
+  </delete>
+  <select id="find" resultType="org.domainforge.iam.infrastructure.persistence.operation.ReceiptRow">
+    SELECT fingerprint,operation_id::text,target_id::text,result_version,action FROM iam_operation WHERE actor_scope=#{scope} AND operation_id=CAST(#{id} AS uuid)
+  </select>
+  <insert id="insert">
+    INSERT INTO iam_operation(actor_scope,operation_id,fingerprint,target_id,result_version,action) VALUES(#{scope},CAST(#{row.operationId} AS uuid),#{row.fingerprint},CAST(#{row.targetId} AS uuid),#{row.resultVersion},#{row.action})
+  </insert>
+</mapper>

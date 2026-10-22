@@ -15,6 +15,7 @@ import build
 import runtime
 import web_verify
 import foundation_verify
+import iam_verify
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control_plane"))
 from control_plane import input_snapshot
@@ -54,6 +55,7 @@ def verify(args):
         require(quality["ok"], "PG_SOURCE_QUALITY", "源码／架构检查失败，详见 quality.diagnostics")
         result["web"] = web_verify.inspect(root, project, observed, argv, env, home, repository, cache, workspace, output, args)
         result["foundation"] = foundation_verify.inspect(root, project, observed, result["web"], argv, env, home, repository, workspace, output, args)
+        result["iam"] = iam_verify.inspect(root, project, observed, result["foundation"], argv, env, home, repository, workspace, output, args)
         result["checks"]["build-gate"] = {"ok": True, "actual_test_count": observed["tests"]["count"]}
         if args.check in ("all", "dependency-risk-gate"):
             result["advisory"] = advisory.scan(root, workspace, inputs, repository, args.advisory_data,

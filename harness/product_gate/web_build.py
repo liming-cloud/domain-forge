@@ -93,7 +93,7 @@ def component(root, code, observed, repository, tools, output):
         'domain-forge-web-support': consumer_pom(code / WEB / 'target/.flattened-pom.xml',
             'domain-forge-web-support', version, environment.baseline(root)['boot_version']),
         'domain-forge-bom': consumer_pom(code / BOM / 'target/.flattened-pom.xml',
-            'domain-forge-bom', foundation['version'], environment.baseline(root)['boot_version'],
+            'domain-forge-bom', foundation['bom_version'], environment.baseline(root)['boot_version'],
             foundation['managed_dependencies'])}
     return result
 

@@ -24,7 +24,12 @@ def resolution(root, name, consumer, publication, home, env, workspace):
         expected = 'domain-forge-web-support:jar:' + version
     else:
         pom = project / 'pom.xml'
-        pom.write_text(pom.read_text().replace(json.loads((root / 'harness/product_gate/foundation-baseline.json').read_text())['version'], '0.1.0-r2.missing'))
+        bom_version = json.loads((root / 'harness/product_gate/foundation-baseline.json').read_text())['bom_version']
+        source = pom.read_text()
+        require(source.count('<version>' + bom_version + '</version>') == 1,
+                'PG_NEGATIVE_INPUT', '错误版本反例必须准确替换当前导入的 BOM')
+        pom.write_text(source.replace('<version>' + bom_version + '</version>',
+                                      '<version>0.1.0-r2.missing</version>'))
         expected = 'domain-forge-bom:pom:0.1.0-r2.missing'
     settings = output / 'settings.xml'
     settings.write_text(Path(consumer['argv'][4]).read_text().replace(publication['repository'], str(remote))

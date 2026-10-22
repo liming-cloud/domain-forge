@@ -32,7 +32,7 @@ def baseline():
 
 
 def configuration():
-    return {name: digest(HERE / name) for name in ("persistence.lock.json", "calibrate_persistence.py", "PersistenceInventory.java", "calibrate_flyway.py", "flyway.lock.json")}
+    return {name: digest(HERE / name) for name in ("persistence.lock.json", "calibrate_persistence.py", "PersistenceInventory.java", "PersistenceQueries.java", "PersistenceQueries.xml", "calibrate_flyway.py", "flyway.lock.json")}
 
 
 def framework_pom():
@@ -232,9 +232,10 @@ def observe(args, source, credentials, compilation, env):
         request, observed = private / "request.xml", private / "observed.xml"
         observer_input(request, source)
         classpath = os.pathsep.join(compilation["classpath"])
-        compiled = execute(["javac", "--release", "21", "-proc:none", "-encoding", "UTF-8", "-cp", classpath, "-d", str(classes), str(HERE / "PersistenceInventory.java")])
+        compiled = execute(["javac", "--release", "21", "-proc:none", "-encoding", "UTF-8", "-cp", classpath, "-d", str(classes), str(HERE / "PersistenceInventory.java"), str(HERE / "PersistenceQueries.java")])
         (pathlib.Path(args.project) / "target/persistence-observer-compile.log").write_text(compiled.stdout + compiled.stderr, encoding="utf-8")
         require(compiled.returncode == 0, "SG_PERSISTENCE_TOOL_FAILURE", "原生观察器编译失败，不是持久化反例")
+        (classes / "PersistenceQueries.xml").write_bytes((HERE / "PersistenceQueries.xml").read_bytes())
         for name, value in credentials.items():
             for field, suffix in (("jdbc_url", "URL"), ("username", "USER"), ("password", "PASSWORD")):
                 child["DF_GATE_" + name.upper() + "_" + suffix] = value[field]

@@ -2,6 +2,7 @@ package @@PACKAGE@@.bootstrap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import @@PACKAGE@@.infrastructure.persistence.RecordMapper;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -9,7 +10,6 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -46,8 +46,7 @@ class RuntimeLimitsTest {
         new SpringApplicationBuilder(Application.class)
             .web(WebApplicationType.NONE)
             .run("--spring.datasource.hikari.data-source-properties.socketTimeout=20")) {
-      var mapper =
-          context.getBean(@@PACKAGE@@.infrastructure.persistence.RecordMapper.class);
+      var mapper = context.getBean(RecordMapper.class);
       long start = System.nanoTime();
       var failure =
           assertThrows(
@@ -65,8 +64,8 @@ class RuntimeLimitsTest {
   void transactionDeadlineRollsBack() {
     try (var context =
         new SpringApplicationBuilder(Application.class).web(WebApplicationType.NONE).run()) {
-      var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
-      jdbc.update("DELETE FROM probe_entry");
+      var jdbc = new DatabaseFixture(context);
+      jdbc.clear();
       var transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
       long start = System.nanoTime();
       assertThrows(
@@ -74,12 +73,12 @@ class RuntimeLimitsTest {
           () ->
               transaction.executeWithoutResult(
                   status -> {
-                    jdbc.update("INSERT INTO probe_entry VALUES (7000,'before-timeout')");
+                    jdbc.beforeDeadline();
                     waitPastDeadline();
-                    jdbc.update("INSERT INTO probe_entry VALUES (7001,'after-timeout')");
+                    jdbc.afterDeadline();
                   }));
       assertTrue((System.nanoTime() - start) / 1_000_000_000.0 < 13);
-      assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM probe_entry", Integer.class));
+      assertEquals(0, jdbc.count());
     }
   }
 

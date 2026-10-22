@@ -224,9 +224,10 @@ def observe(args, source, credentials, compilation):
             ET.SubElement(root, "operation", name=method, parallel=str(parallel).lower())
         ET.ElementTree(root).write(request, encoding="utf-8", xml_declaration=True)
         classpath = os.pathsep.join(compilation["classpath"])
-        compiled = execute(["javac", "--release", "21", "-proc:none", "-encoding", "UTF-8", "-cp", classpath, "-d", str(classes), str(HERE / "PersistenceAdapterInventory.java")])
+        compiled = execute(["javac", "--release", "21", "-proc:none", "-encoding", "UTF-8", "-cp", classpath, "-d", str(classes), str(HERE / "PersistenceAdapterInventory.java"), str(HERE / "PersistenceQueries.java")])
         (pathlib.Path(args.project) / "target/adapter-observer-compile.log").write_text(compiled.stdout + compiled.stderr, encoding="utf-8")
         require(compiled.returncode == 0, "SG_ADAPTER_TOOL_FAILURE", "观察器自身编译失败，不是有效反例")
+        (classes / "PersistenceQueries.xml").write_bytes((HERE / "PersistenceQueries.xml").read_bytes())
         child = dict(os.environ)
         for alias, value in credentials.items():
             for field, suffix in (("jdbc_url", "URL"), ("username", "USER"), ("password", "PASSWORD")):

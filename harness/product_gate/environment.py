@@ -17,19 +17,27 @@ from calibrate_source import ProbeFailure, digest, require
 
 PRODUCT = Path("platform")
 MODULE = Path("verification/smoke/boot-smoke")
+DOMAIN = Path("framework/domain-forge-domain")
 PERSISTENCE = Path("framework/domain-forge-persistence")
 TEMPLATE = Path("templates/ddd-service")
 FOUNDATION_FIXTURE = Path("verification/service-template")
-FOUNDATION_CONTRACT = Path("verification/contracts/service-template/0.2.0-2b.1")
-JAVA_MODULES = (MODULE, PERSISTENCE, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
+FOUNDATION_CONTRACT = Path("verification/contracts/service-template/0.3.0-iam.2")
+PREVIOUS_FOUNDATION_CONTRACT = Path("verification/contracts/service-template/0.2.0-2b.1")
+IAM = Path("services/iam")
+ACCESS_CONTRACT = Path("framework/access-control/domain-forge-access-control-contract")
+ACCESS_BACKEND = Path("framework/access-control/domain-forge-access-control-backend")
+IAM_CLIENT = Path("framework/domain-forge-iam-client")
+JAVA_MODULES = (DOMAIN, MODULE, PERSISTENCE, IAM, ACCESS_CONTRACT, ACCESS_BACKEND, IAM_CLIENT, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
 AGGREGATES = {
-    Path("."): ("framework", "domain-forge-bom", "verification"),
-    Path("framework"): ("domain-forge-web-support", "domain-forge-persistence"),
+    Path("."): ("framework", "domain-forge-bom", "verification", "services"),
+    Path("framework"): ("domain-forge-domain", "domain-forge-web-support", "domain-forge-persistence", "access-control", "domain-forge-iam-client"),
+    Path("framework/access-control"): ("domain-forge-access-control-contract", "domain-forge-access-control-backend"),
+    Path("services"): ("iam",),
     Path("verification"): ("smoke",),
     Path("verification/smoke"): ("boot-smoke",),
 }
-REACTOR = (Path("framework"), Path("framework/domain-forge-web-support"), PERSISTENCE, Path("domain-forge-bom"),
-           Path("verification"), Path("verification/smoke"), MODULE)
+REACTOR = (Path("framework"), DOMAIN, Path("framework/domain-forge-web-support"), PERSISTENCE, Path("domain-forge-bom"),
+           Path("verification"), Path("verification/smoke"), MODULE, Path("framework/access-control"), ACCESS_CONTRACT, ACCESS_BACKEND, IAM_CLIENT, Path("services"), IAM)
 CONSUMER_AGGREGATE = Path("verification/consumers")
 CONSUMERS = (Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent"))
 CONTRACTS = Path("verification/contracts/web-support/0.1.0-r2.1")
@@ -128,7 +136,7 @@ def foundation_sources(root):
     files = [path for relative in (TEMPLATE, FOUNDATION_FIXTURE) for path in (code / relative).rglob('*') if path.is_file()]
     require(all(not path.is_symlink() for relative in (TEMPLATE, FOUNDATION_FIXTURE, FOUNDATION_CONTRACT)
                 for path in (code / relative).rglob('*')), 'PG_INPUT', '基础模板输入不可为链接')
-    require(manifest.get('schema') == 1 and manifest.get('version') == '0.2.0-2b.1' and
+    require(manifest.get('schema') == 1 and manifest.get('version') == '0.3.0-iam.2' and
             manifest.get('inputs') == {path.relative_to(code).as_posix(): digest(path) for path in files},
             'PG_TEMPLATE_INPUT', '模板或夹具输入偏离版本化合同')
     expected = {'bare-modules.json', 'fixture-modules.json'}
@@ -152,6 +160,8 @@ def sources(root):
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
     required.update(str(module / "pom.xml") for module in (*REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE))
     required.update(str(consumer / name) for consumer in CONSUMERS for name in ("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties"))
+    required.update(str(Path("verification/iam") / name) for name in ("scenarios.py", "performance.py", "runtime_fixture.py", "IdentityLoad.java", "consumer.py"))
+    required.update(str(PREVIOUS_FOUNDATION_CONTRACT / name) for name in ("manifest.json", "bare-modules.json", "fixture-modules.json"))
     paths = []
     for path in code.rglob("*"):
         require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")

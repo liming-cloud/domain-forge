@@ -25,8 +25,10 @@ def model(root, project):
     aggregate = ET.parse(product_root(project) / "pom.xml").getroot()
     expected = {"modelVersion": "4.0.0", "groupId": "org.domainforge", "artifactId": "platform",
                 "version": "0.1.0", "packaging": "pom"}
-    require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate) ==
+    require(sorted(x.tag.rsplit("}", 1)[-1] for x in aggregate
+                   if x.tag.rsplit("}", 1)[-1] not in ("name", "description")) ==
             sorted([*expected, "modules", "properties", "dependencyManagement", "build"]) and
+            all(len(aggregate.findall("{*}" + key)) <= 1 for key in ("name", "description")) and
             all(aggregate.findtext("{*}" + key) == value for key, value in expected.items()) and
             [x.text for x in aggregate.findall("./{*}modules/{*}module")] == list(AGGREGATES[Path(".")]) and
             len(aggregate.find("{*}modules")) == len(AGGREGATES[Path(".")]),
@@ -63,8 +65,10 @@ def hierarchy(code):
                     all(parent.findtext("{*}" + key) == value for key, value in expected.items()),
                     "PG_BASELINE", "内部模块须直接继承所在层级 parent：" + str(relative))
         if relative in AGGREGATES and relative != Path("."):
-            require(sorted(x.tag.rsplit("}", 1)[-1] for x in document) ==
+            require(sorted(x.tag.rsplit("}", 1)[-1] for x in document
+                           if x.tag.rsplit("}", 1)[-1] not in ("name", "description")) ==
                     sorted(["modelVersion", "parent", "artifactId", "packaging", "modules"]) and
+                    all(len(document.findall("{*}" + key)) <= 1 for key in ("name", "description")) and
                     document.findtext("{*}modelVersion") == "4.0.0" and
                     document.findtext("{*}packaging") == "pom" and
                     [x.text for x in document.findall("./{*}modules/{*}module")] == list(AGGREGATES[relative]) and
@@ -84,12 +88,16 @@ def parent_management(root, document):
     """内部 parent 仅提供已支持的管理项；不混入依赖或聚合插件执行。"""
     lock = baseline(root)
     bom = document.findall("./{*}dependencyManagement/{*}dependencies/{*}dependency")
-    expected = {"groupId": "org.springframework.boot", "artifactId": "spring-boot-dependencies",
-                "version": "${spring-boot.version}", "type": "pom", "scope": "import"}
-    require(document.findtext("./{*}properties/{*}spring-boot.version") == lock["boot_version"] and
-            len(bom) == 1 and len(bom[0]) == len(expected) and
-            all(bom[0].findtext("{*}" + key) == value for key, value in expected.items()),
-            "PG_BASELINE", "内部 parent 须导入固定 Boot BOM，不以父继承或额外版本覆盖替代")
+    expected = [("org.springframework.boot", "spring-boot-dependencies", "spring-boot.version", lock["boot_version"]),
+                ("org.springframework.cloud", "spring-cloud-dependencies", "spring-cloud.version", lock["cloud_version"]),
+                ("com.alibaba.cloud", "spring-cloud-alibaba-dependencies", "spring-cloud-alibaba.version", lock["alibaba_version"])]
+    require(len(bom) == len(expected) and all(
+            len(item) == 5 and item.findtext("{*}groupId") == group and
+            item.findtext("{*}artifactId") == artifact and item.findtext("{*}version") == "${" + prop + "}" and
+            item.findtext("{*}type") == "pom" and item.findtext("{*}scope") == "import" and
+            document.findtext("./{*}properties/{*}" + prop) == version
+            for item, (group, artifact, prop, version) in zip(bom, expected)),
+            "PG_BASELINE", "内部 parent 须按固定顺序导入 Boot／Cloud／Alibaba BOM，不得混用版本或额外覆盖")
     require([x.tag.rsplit("}", 1)[-1] for x in document.find("{*}build")] == ["pluginManagement"] and
             [x.tag.rsplit("}", 1)[-1] for x in document.find("./{*}build/{*}pluginManagement")] == ["plugins"],
             "PG_BUILD_SCOPE", "内部 parent 只管理插件，不启用聚合执行或覆盖输出")
@@ -290,7 +298,7 @@ def quality(root, project, observed, tools, declaration="modules.json", contract
     diagnostics.extend(calibrate_architecture.violations(structural_contracts.owned(modules), types))
     diagnostics.extend(calibrate_maven_architecture.origin_violations(build, types))
     contracts = calibrate_maven_architecture.select_contracts(modules, types, bindings)
-    methods, errors, references = method_contracts.bind(build, bindings, contracts, paths)
+    methods, errors, references = method_contracts.bind(build, bindings, contracts, paths, sql_policy=True)
     diagnostics.extend(errors)
     declarations, errors = dependency_declarations.inspect(build, references, [])
     diagnostics.extend(errors)

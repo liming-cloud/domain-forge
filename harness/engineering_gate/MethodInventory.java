@@ -6,7 +6,9 @@ import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.LiteralTree;
 import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.DocTrees;
@@ -51,6 +53,16 @@ import javax.xml.stream.XMLStreamWriter;
 
 /** 使用公开 JDK 编译器 API 关联声明、擦除后的二进制签名和文档位置。 */
 final class MethodInventory extends TreePathScanner<Void, Void> {
+  private static final Set<String> SQL_ANNOTATIONS =
+      Set.of(
+          "org.apache.ibatis.annotations.Select",
+          "org.apache.ibatis.annotations.Insert",
+          "org.apache.ibatis.annotations.Update",
+          "org.apache.ibatis.annotations.Delete",
+          "org.apache.ibatis.annotations.SelectProvider",
+          "org.apache.ibatis.annotations.InsertProvider",
+          "org.apache.ibatis.annotations.UpdateProvider",
+          "org.apache.ibatis.annotations.DeleteProvider");
   private static final Map<TypeKind, String> PRIMITIVE_DESCRIPTORS =
       Map.of(
           TypeKind.BOOLEAN,
@@ -146,6 +158,70 @@ final class MethodInventory extends TreePathScanner<Void, Void> {
     return super.visitMemberSelect(tree, unused);
   }
 
+  /** 只拦已知 SQL 执行／拼接入口；普通同名业务方法不按名称猜测。 */
+  @Override
+  public Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
+    var element = trees.getElement(getCurrentPath());
+    if (element instanceof ExecutableElement method) {
+      String owner = ((TypeElement) method.getEnclosingElement()).getQualifiedName().toString();
+      String name = method.getSimpleName().toString();
+      boolean rawWrapper =
+          owner.startsWith("com.baomidou.mybatisplus.core.conditions.")
+              && Set.of(
+                      "apply",
+                      "last",
+                      "setSql",
+                      "inSql",
+                      "notInSql",
+                      "eqSql",
+                      "gtSql",
+                      "geSql",
+                      "ltSql",
+                      "leSql",
+                      "exists",
+                      "notExists",
+                      "having")
+                  .contains(name);
+      boolean rawJdbc =
+          owner.equals("java.sql.Connection")
+              && Set.of("prepareStatement", "prepareCall", "nativeSQL").contains(name);
+      rawJdbc |=
+          owner.equals("java.sql.Statement")
+              && !method.getParameters().isEmpty()
+              && method.getParameters().getFirst().asType().toString().equals("java.lang.String");
+      if (rawWrapper || rawJdbc) {
+        writeSqlViolation("SG_SQL_JAVA_API", owner + "." + name);
+      }
+    }
+    return super.visitMethodInvocation(tree, unused);
+  }
+
+  /** 检出直接 SQL 字符串／文本块；动态构造与执行语义仍需源码和真实数据库评审。 */
+  @Override
+  public Void visitLiteral(LiteralTree tree, Void unused) {
+    if (tree.getValue() instanceof String value
+        && value.matches(
+            "(?is)\\s*(select\\b.+\\bfrom\\b.*|insert\\s+into\\b.*"
+                + "|update\\s+\\S+\\s+set\\b.*|delete\\s+from\\b.*|merge\\s+into\\b.*)")) {
+      writeSqlViolation("SG_SQL_JAVA_TEXT", "SQL literal");
+    }
+    return super.visitLiteral(tree, unused);
+  }
+
+  /** 诊断只输出位置与 API，不将可能含敏感值的 SQL 文本复制到报告。 */
+  private void writeSqlViolation(String code, String target) {
+    var unit = getCurrentPath().getCompilationUnit();
+    long start = trees.getSourcePositions().getStartPosition(unit, getCurrentPath().getLeaf());
+    try {
+      output.writeEmptyElement("sql_violation");
+      output.writeAttribute("code", code);
+      output.writeAttribute("target", target);
+      output.writeAttribute("line", Long.toString(unit.getLineMap().getLineNumber(start)));
+    } catch (XMLStreamException failure) {
+      throw new IllegalStateException(failure);
+    }
+  }
+
   /** 源码、JDK 模块和真实类路径对象分别记录，不能按包名前缀猜测来源。 */
   private void writeReference() {
     var unit = getCurrentPath().getCompilationUnit();
@@ -159,6 +235,9 @@ final class MethodInventory extends TreePathScanner<Void, Void> {
     String owner = referenceOwner();
     if (!referenced.add(owner + ":" + name + ":" + usage)) {
       return;
+    }
+    if (usage.equals("annotation") && SQL_ANNOTATIONS.contains(name)) {
+      writeSqlViolation("SG_SQL_ANNOTATION", name);
     }
     try {
       output.writeEmptyElement("type_reference");
@@ -261,6 +340,50 @@ final class MethodInventory extends TreePathScanner<Void, Void> {
     } catch (URISyntaxException failure) {
       throw new IllegalArgumentException("源码引用的 JAR 来源无效", failure);
     }
+  }
+
+  /** 仅公开JDK定义的enum方法及record访问器可绑定类型声明；手写覆盖仍走方法说明。 */
+  @Override
+  public Void visitClass(ClassTree tree, Void unused) {
+    var owner = (TypeElement) trees.getElement(getCurrentPath());
+    var unit = getCurrentPath().getCompilationUnit();
+    for (var method : ElementFilter.methodsIn(owner.getEnclosedElements())) {
+      String kind = implicitKind(owner, method);
+      if (kind == null || trees.getTree(method) != null) continue;
+      try {
+        long start = trees.getSourcePositions().getStartPosition(unit, tree);
+        output.writeStartElement("method");
+        output.writeAttribute("id", memberId(method));
+        output.writeAttribute("owner", elements.getBinaryName(owner).toString());
+        output.writeAttribute("explicit", "false");
+        output.writeAttribute("generated_kind", kind);
+        output.writeAttribute("start", "-1");
+        output.writeAttribute("end", "-1");
+        output.writeAttribute("declaration_start", Long.toString(start));
+        output.writeAttribute("line", Long.toString(unit.getLineMap().getLineNumber(start)));
+        writeComment(unit, trees.getDocCommentTree(getCurrentPath()));
+        output.writeEndElement();
+      } catch (XMLStreamException failure) {
+        throw new IllegalStateException(failure);
+      }
+    }
+    return super.visitClass(tree, unused);
+  }
+
+  /** 精确来自真实声明元素，不按方法名或调用方自报的generated标记豁免普通方法。 */
+  private String implicitKind(TypeElement owner, ExecutableElement method) {
+    if (owner.getKind() == ElementKind.RECORD
+        && owner.getRecordComponents().stream()
+            .anyMatch(component -> component.getAccessor().equals(method))) {
+      return "record-accessor";
+    }
+    if (owner.getKind() == ElementKind.ENUM && method.getModifiers().contains(Modifier.STATIC)) {
+      String signature = memberId(method);
+      String type = elements.getBinaryName(owner).toString();
+      if (signature.equals(type + ".values():[L" + type + ";")) return "enum-values";
+      if (signature.equals(type + ".valueOf(java.lang.String):" + type)) return "enum-value-of";
+    }
+    return null;
   }
 
   /** 抽象方法、构造器及局部方法使用同一声明映射，隐式成员不伪造源码位置。 */

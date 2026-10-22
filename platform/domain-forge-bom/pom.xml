@@ -8,10 +8,15 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>domain-forge-bom</artifactId>
-  <version>0.2.0-2b.1</version>
+  <version>0.3.0-iam.2</version>
   <packaging>pom</packaging>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.domainforge</groupId>
+        <artifactId>domain-forge-domain</artifactId>
+        <version>0.3.0-iam.1</version>
+      </dependency>
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-web-support</artifactId>
@@ -27,7 +32,7 @@
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-persistence</artifactId>
-        <version>0.2.0-2b.1</version>
+        <version>0.2.1-min.1</version>
       </dependency>
       <dependency>
         <groupId>com.baomidou</groupId>
@@ -53,6 +58,40 @@
         <groupId>com.baomidou</groupId>
         <artifactId>mybatis-plus-jsqlparser</artifactId>
         <version>3.5.17</version>
+      </dependency>
+      <dependency>
+        <groupId>org.domainforge</groupId>
+        <artifactId>domain-forge-access-control-contract</artifactId>
+        <version>0.3.0-iam.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.domainforge</groupId>
+        <artifactId>domain-forge-access-control-backend</artifactId>
+        <version>0.3.0-iam.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.domainforge</groupId>
+        <artifactId>domain-forge-iam-client</artifactId>
+        <version>0.3.0-iam.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba.cloud</groupId>
+        <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+        <version>${spring-cloud-alibaba.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>cn.dev33</groupId>
+        <artifactId>sa-token-core</artifactId>
+        <version>1.46.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

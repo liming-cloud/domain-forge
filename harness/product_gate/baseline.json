@@ -49,6 +49,13 @@
     "web-modules.json": "2dcb64ffe4225e9461077c43c7c3d27fa50d463895625f6354b5b7fac05d332a",
     "consumer-a-modules.json": "de6d15647e2119887f8569d9dabb1def0288895d8663f7d3bb2e04f3a7f51d82",
     "consumer-b-modules.json": "b8e1b2584580592957ae1c2be4c46f5b12f88c418befb2e762e1a135b06044c5",
-    "persistence-modules.json": "6b89d66d54ab48d6751a9133812b59bbd4c692d75ca7fa743dadaff4b2fd3049"
-  }
+    "persistence-modules.json": "6b89d66d54ab48d6751a9133812b59bbd4c692d75ca7fa743dadaff4b2fd3049",
+    "access-contract-modules.json": "3cec5b0b152c5301cf1dc5d65ae2cc68aa8267492e8ea212e63f788986193bef",
+    "access-backend-modules.json": "e26b572ff87a2528326720268503ff3c2300b7cbd834e3aed0c7e139aeebfc8d",
+    "iam-modules.json": "de72396dfefe5f0a0e92953ea17f14d1c0ab4cf094d08a51865d3e1941c6b92e",
+    "domain-modules.json": "3a6b192b5047b6b896e5c3b030256aa3e9abc72b8c27906a596634f14961eb18",
+    "iam-client-modules.json": "6e16ebcc47f1556b5112668e19c358e62e06067b544058cc0daf22f18c791c92"
+  },
+  "cloud_version": "2025.1.3",
+  "alibaba_version": "2025.1.0.0"
 }

@@ -53,6 +53,33 @@ class ServiceTest { String verify() { return new Service().read(); } }''')
             self.assertIn(diagnostic, [item["code"] for item in report["diagnostics"]], report)
         return report
 
+    def generated_contract(self, source, member, test_body):
+        self.write("src/test-named-production/java/probe/Service.java", source)
+        self.write("verification/java/probe/ServiceTest.java", "package probe.service; class ServiceTest { " + test_body + " }")
+        self.definition["modules"][0]["contract_members"] = [member]
+
+    def test_native_record_accessor_binds_documented_record(self):
+        self.generated_contract("package probe.service; /** 当前主体的不可变名称。 */ public record Service(String name) {}",
+            "probe.service.Service.name():java.lang.String", 'String verify() { return new Service("ok").name(); }')
+        report = self.command()
+        self.assertEqual(report["method_contracts"][0]["generated_kind"], "record-accessor")
+
+    def test_native_enum_values_binds_documented_enum(self):
+        self.generated_contract("package probe.service; /** 访问失败的有限分类。 */ public enum Service { A, B }",
+            "probe.service.Service.values():[Lprobe.service.Service;", "int verify() { return Service.values().length; }")
+        report = self.command()
+        self.assertEqual(report["method_contracts"][0]["generated_kind"], "enum-values")
+
+    def test_generated_accessor_requires_real_type_documentation(self):
+        self.generated_contract("package probe.service; public record Service(String name) {}",
+            "probe.service.Service.name():java.lang.String", 'String verify() { return new Service("ok").name(); }')
+        self.command("SG_METHOD_JAVADOC")
+
+    def test_explicit_record_accessor_cannot_borrow_type_documentation(self):
+        self.generated_contract("package probe.service; /** 真实类型说明。 */ public record Service(String name) { public String name() { return name; } }",
+            "probe.service.Service.name():java.lang.String", 'String verify() { return new Service("ok").name(); }')
+        self.command("SG_METHOD_JAVADOC")
+
     def test_missing_selected_method_comment_fails_then_fresh_repair_passes(self):
         source = self.write("src/test-named-production/java/probe/Service.java", '''package probe.service;
 public class Service { public String read() { return "ok"; } }''')
@@ -282,6 +309,10 @@ def MethodSourceBindingSuite():
         "test_erased_generics_arrays_varargs_and_nested_binary_names_bind",
         "test_implicit_constructor_cannot_fake_source_documentation",
         "test_owned_declaration_adapter_keeps_comments_format_and_approved_metrics",
+        "test_native_record_accessor_binds_documented_record",
+        "test_native_enum_values_binds_documented_enum",
+        "test_generated_accessor_requires_real_type_documentation",
+        "test_explicit_record_accessor_cannot_borrow_type_documentation",
     )
     return unittest.defaultTestLoader.loadTestsFromNames(
         ["MethodContractCommands." + name for name in names], sys.modules[__name__])

@@ -201,7 +201,7 @@ public final class PersistenceAdapterInventory {
             System.getenv(prefix + "PASSWORD"));
     connection.setReadOnly(true);
     try (var statement = connection.createStatement()) {
-      statement.execute("SET TIME ZONE 'UTC'");
+      statement.execute(PersistenceQueries.timezone());
     }
     return connection;
   }
@@ -215,8 +215,7 @@ public final class PersistenceAdapterInventory {
     output.writeAttribute("table", table);
     try (var statement = connection.createStatement();
         var results =
-            statement.executeQuery(
-                "SELECT " + columns + " FROM public." + table + " ORDER BY 1 LIMIT 65")) {
+            statement.executeQuery(PersistenceQueries.snapshot("public", table, columns, true))) {
       output.writeAttribute("complete", "true");
       var metadata = results.getMetaData();
       for (int index = 1; index <= metadata.getColumnCount(); index++) {

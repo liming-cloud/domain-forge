@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="observer">
+  <update id="timezone">SET TIME ZONE 'UTC'</update>
+  <!-- 所有替换项均由观察器限制为固定标识符，绝不接收业务输入或任意片段。 -->
+  <select id="snapshot" resultType="map">
+    SELECT ${columns} FROM "${schema}"."${table}" LIMIT 101
+  </select>
+  <select id="adapterSnapshot" resultType="map">
+    SELECT ${columns} FROM "${schema}"."${table}" ORDER BY 1 LIMIT 65
+  </select>
+</mapper>

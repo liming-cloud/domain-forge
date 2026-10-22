@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.query.audit.AuditQueryMapper">
+  <select id="list" resultType="org.domainforge.iam.infrastructure.query.audit.AuditProjection">
+    SELECT id,operation_id::text,actor,target_id::text,action,outcome,occurred_at,recorded_at,source,provenance,missing_fields FROM iam_audit WHERE id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+</mapper>
