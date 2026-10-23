@@ -10,6 +10,11 @@
   <artifactId>domain-forge-cache</artifactId>
   <version>0.3.0-iam.2</version>
   <dependencies>
+    <!-- Redisson 编解码 API 的字节码直接引用 Netty ByteBuf，按规则显式声明。 -->
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-buffer</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
@@ -70,4 +75,16 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <!-- 集成测试依赖：redis，配置见 platform parent。 -->
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <configuration>
+          <filter>redis</filter>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

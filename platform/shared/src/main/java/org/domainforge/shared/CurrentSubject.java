@@ -16,15 +16,18 @@ public record CurrentSubject(
     if (projectId == null
         || !projectId.matches("[a-z][a-z0-9-]{2,63}")
         || accountId == null
-        || roles == null
-        || roles.size() > 128
-        || roles.stream().anyMatch(r -> r == null || !r.matches("[A-Za-z][A-Za-z0-9:_-]{0,127}"))
-        || permissions == null
-        || permissions.size() > 128
-        || permissions.stream().anyMatch(p -> p == null || !p.matches("[a-z][a-z0-9:-]{1,127}"))) {
+        || !bounded(roles, "[A-Za-z][A-Za-z0-9:_-]{0,127}")
+        || !bounded(permissions, "[a-z][a-z0-9:-]{1,127}")) {
       throw new IllegalArgumentException("当前主体合同无效");
     }
     permissions = Set.copyOf(permissions);
     roles = Set.copyOf(roles);
+  }
+
+  /** 集合非空引用、至多 128 项且每项匹配给定格式。 */
+  private static boolean bounded(Set<String> values, String format) {
+    return values != null
+        && values.size() <= 128
+        && values.stream().allMatch(value -> value != null && value.matches(format));
   }
 }

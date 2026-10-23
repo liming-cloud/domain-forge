@@ -90,23 +90,24 @@ public final class RedisLoginProtection implements LoginProtection {
     return new LoginPolicyStatus(state.policyDigest(), policyDigest, state.blockedUntil());
   }
 
+  /** 在事务内锁定防护状态；策略不符或代际变化时进入受控恢复并拒绝。 */
+  private boolean policyAllows(String generation) {
+    var state = mapper.lock();
+    if (state == null || state.generation() == null || !samePolicy(state)) return false;
+    if (!generation.equals(state.generation())) {
+      mapper.recover(generation, settings.recoverySeconds());
+      return false;
+    }
+    return state.allowed();
+  }
+
   /** 账号名和来源地址只以HMAC进入Redis键；地址由直接TCP连接提供。 */
   @Override
   public LoginReservation reserve(String name, String address) {
     if (address == null || address.length() > 64)
       throw new IamException(IamFailure.INVALID_REQUEST, "来源地址无效");
     String generation = generation();
-    boolean allowed =
-        transactions.execute(
-            () -> {
-              var state = mapper.lock();
-              if (state == null || state.generation() == null || !samePolicy(state)) return false;
-              if (!generation.equals(state.generation())) {
-                mapper.recover(generation, settings.recoverySeconds());
-                return false;
-              }
-              return state.allowed();
-            });
+    boolean allowed = transactions.execute(() -> policyAllows(generation));
     if (!allowed) throw new IamException(IamFailure.UNAVAILABLE, "登录防护处于受控恢复窗口");
     String accountKey = "iam:login:account:" + secrets.fingerprint("account", name);
     String addressKey = "iam:login:address:" + secrets.fingerprint("address", address);

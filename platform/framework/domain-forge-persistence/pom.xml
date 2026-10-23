@@ -112,6 +112,14 @@
   </dependencies>
   <build>
     <plugins>
+      <!-- 集成测试依赖：postgres，配置见 platform parent。 -->
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <configuration>
+          <filter>postgres</filter>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
