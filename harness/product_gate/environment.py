@@ -17,6 +17,9 @@ from calibrate_source import ProbeFailure, digest, require
 
 PRODUCT = Path("platform")
 MODULE = Path("verification/smoke/boot-smoke")
+SHARED = Path("shared")
+CACHE = Path("framework/domain-forge-cache")
+ACCESS = Path("framework/domain-forge-access-control")
 DOMAIN = Path("framework/domain-forge-domain")
 PERSISTENCE = Path("framework/domain-forge-persistence")
 TEMPLATE = Path("templates/ddd-service")
@@ -27,20 +30,22 @@ IAM = Path("services/iam")
 ACCESS_CONTRACT = Path("framework/access-control/domain-forge-access-control-contract")
 ACCESS_BACKEND = Path("framework/access-control/domain-forge-access-control-backend")
 IAM_CLIENT = Path("framework/domain-forge-iam-client")
-JAVA_MODULES = (DOMAIN, MODULE, PERSISTENCE, IAM, ACCESS_CONTRACT, ACCESS_BACKEND, IAM_CLIENT, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
+JAVA_MODULES = (SHARED, CACHE, MODULE, PERSISTENCE, IAM, ACCESS, IAM_CLIENT, Path("framework/domain-forge-web-support"), Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent/consumer-b"))
 AGGREGATES = {
-    Path("."): ("framework", "domain-forge-bom", "verification", "services"),
-    Path("framework"): ("domain-forge-domain", "domain-forge-web-support", "domain-forge-persistence", "access-control", "domain-forge-iam-client"),
-    Path("framework/access-control"): ("domain-forge-access-control-contract", "domain-forge-access-control-backend"),
+    Path("."): ("shared", "framework", "domain-forge-bom", "verification", "services"),
+    Path("framework"): ("domain-forge-cache", "domain-forge-web-support", "domain-forge-persistence", "domain-forge-access-control", "domain-forge-iam-client"),
     Path("services"): ("iam",),
     Path("verification"): ("smoke",),
     Path("verification/smoke"): ("boot-smoke",),
 }
-REACTOR = (Path("framework"), DOMAIN, Path("framework/domain-forge-web-support"), PERSISTENCE, Path("domain-forge-bom"),
-           Path("verification"), Path("verification/smoke"), MODULE, Path("framework/access-control"), ACCESS_CONTRACT, ACCESS_BACKEND, IAM_CLIENT, Path("services"), IAM)
+REACTOR = (SHARED, Path("framework"), CACHE, Path("framework/domain-forge-web-support"), PERSISTENCE,
+           ACCESS, IAM_CLIENT, Path("domain-forge-bom"), Path("verification"), Path("verification/smoke"),
+           MODULE, Path("services"), IAM)
+MIGRATED_OUTPUTS = (DOMAIN, Path("framework/access-control"), ACCESS_CONTRACT, ACCESS_BACKEND)
 CONSUMER_AGGREGATE = Path("verification/consumers")
 CONSUMERS = (Path("verification/consumers/consumer-a"), Path("verification/consumers/consumer-parent"))
-CONTRACTS = Path("verification/contracts/web-support/0.1.0-r2.1")
+CONTRACTS = Path("verification/contracts/web-support/0.3.0-iam.2")
+PREVIOUS_CONTRACTS = Path("verification/contracts/web-support/0.1.0-r2.1")
 CONTRACT_FILES = tuple(CONTRACTS / name for name in ("manifest.json", "consumer-a-openapi.json", "consumer-b-openapi.json"))
 
 
@@ -160,12 +165,14 @@ def sources(root):
     required = {"pom.xml", "mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties", str(MODULE / "pom.xml")}
     required.update(str(module / "pom.xml") for module in (*REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE))
     required.update(str(consumer / name) for consumer in CONSUMERS for name in ("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties"))
-    required.update(str(Path("verification/iam") / name) for name in ("scenarios.py", "performance.py", "runtime_fixture.py", "IdentityLoad.java", "consumer.py"))
+    required.update(str(Path("verification/iam") / name) for name in ("scenarios.py", "performance.py", "runtime_fixture.py", "IdentityLoad.java", "consumer.py", "session_safety.py"))
     required.update(str(PREVIOUS_FOUNDATION_CONTRACT / name) for name in ("manifest.json", "bare-modules.json", "fixture-modules.json"))
+    required.update(str(PREVIOUS_CONTRACTS / name) for name in ("manifest.json", "consumer-a-openapi.json", "consumer-b-openapi.json"))
     paths = []
     for path in code.rglob("*"):
         require(not path.is_symlink(), "PG_INPUT", "工程输入不可为符号链接")
-        if any(path.is_relative_to(code / module / "target") for module in (Path("."), *REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE)):
+        if any(path.is_relative_to(code / module / "target") for module in
+               (Path("."), *REACTOR, *JAVA_MODULES, *CONSUMERS, CONSUMER_AGGREGATE, *MIGRATED_OUTPUTS)):
             continue
         if path.is_file():
             relative = path.relative_to(code)

@@ -8,6 +8,7 @@ import cn.dev33.satoken.stp.StpLogic;
 import cn.dev33.satoken.stp.parameter.SaLoginParameter;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
@@ -15,6 +16,7 @@ import java.util.HexFormat;
 import java.util.Map;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
+import org.apache.ibatis.jdbc.ScriptRunner;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -68,11 +70,15 @@ public final class NativeSessionProbe {
     try (var input =
             NativeSessionProbe.class.getResourceAsStream("/session-probe/" + operation + ".sql");
         var connection =
-            DriverManager.getConnection(url(), "domainforge", required("POSTGRES_PASSWORD"));
-        var statement = connection.createStatement()) {
+            DriverManager.getConnection(url(), "domainforge", required("POSTGRES_PASSWORD"))) {
       String sql =
           new String(input.readAllBytes(), StandardCharsets.UTF_8).replace("${schema}", name);
-      for (String part : sql.split(";")) if (!part.isBlank()) statement.execute(part);
+      var runner = new ScriptRunner(connection);
+      runner.setAutoCommit(true);
+      runner.setStopOnError(true);
+      runner.setLogWriter(null);
+      runner.setErrorLogWriter(null);
+      runner.runScript(new StringReader(sql));
     }
   }
 

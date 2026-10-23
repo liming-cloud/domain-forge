@@ -266,7 +266,7 @@ def resource_mismatch(artifact, output, env, database):
     with Application(artifact, output, settings, 'migration-resource-mismatch') as app:
         result = app.failed()
     after = database.sql("SELECT tablename FROM pg_tables WHERE schemaname='wrong_target'")
-    require('迁移前要求唯一数据源且 Flyway 使用同一资源' in app.log.read_text() and before == after == '',
+    require('Flyway 必须使用明确绑定的 dataSource' in app.log.read_text() and before == after == '',
             'PG_MIGRATION_RESOURCE', '错误迁移资源未在写入前被拒绝')
     return dict(result, tables_before=[], tables_after=[])
 

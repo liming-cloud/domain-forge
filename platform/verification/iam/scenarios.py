@@ -25,11 +25,12 @@ parser = argparse.ArgumentParser(description="真实IAM、独立消费与故障�
 parser.add_argument("--code", type=Path, required=True)
 parser.add_argument("--consumer", type=Path, required=True)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--m2-safety", action="store_true", help="只执行 M2 当前生产装配的组合使用路径")
 args = parser.parse_args()
 code = args.code.resolve()
 art = args.output.resolve()
 art.mkdir(parents=True, exist_ok=True)
-tag = "iam-runtime"
+tag = "m2-runtime" if args.m2_safety else "iam-runtime"
 iam_artifact = code / "services/iam/target/iam-0.3.0-iam.2.jar"
 consumer_artifact = args.consumer.resolve()
 artifact_inputs = {
@@ -61,7 +62,7 @@ def port():
         return s.getsockname()[1]
 
 
-def start(name):
+def start(name, overrides=None):
     local = env | {
         "IAM_DISCOVERY_ENABLED": "true",
         "IAM_DISCOVERY_IP": "127.0.0.1",
@@ -69,6 +70,7 @@ def start(name):
         "SERVER_PORT": str(port()),
         "IAM_MANAGEMENT_PORT": str(port()),
     }
+    local.update(overrides or {})
     log = (private / f"{name}.log").open("w")
     process = subprocess.Popen(
         [
@@ -215,6 +217,210 @@ def sql(query):
         "-c",
         query,
     )
+
+
+def session_checks(prefix, token, expected):
+    """每次重新发起请求，覆盖双 IAM、下游只登录和权限入口。"""
+    for name, base, path in (("iam1", iam1, "/api/me"), ("iam2", iam2, "/api/me"),
+                             ("login-only", consumer, "/verification/me"),
+                             ("permission", consumer, "/verification/read")):
+        fixture.check(prefix + "-" + name, fixture.http(base, path, token=token), expected)
+
+
+def session_account(name):
+    """通过真实邀请、注册和权限命令建立每项前置，避免直接种一个能授权的账号。"""
+    invited = fixture.check(name + "-invite", fixture.http(iam1, "/api/invitations", {
+        "operationId": str(uuid.uuid4()), "loginName": name}, admin), 200)
+    credential = "M2 private 测试密码 2026!"
+    registered = fixture.check(name + "-register", fixture.http(iam2, "/api/auth/invitations/accept", {
+        "operationId": str(uuid.uuid4()), "loginName": name,
+        "invitationSecret": invited["secret"], "password": credential}), 200)
+    identity = registered["targetId"]
+    granted = fixture.check(name + "-grant", fixture.http(iam1, "/api/accounts/" + identity + "/permissions", {
+        "operationId": str(uuid.uuid4()), "expectedVersion": 1,
+        "permissions": ["iam:account:read"]}, admin, "PUT"), 200)
+    return identity, credential, granted["version"]
+
+
+def session_native_valid(token):
+    """直接观察本次 Redis 原生映射仍存在；令牌和原始值不写报告。"""
+    value = session_redis("GET", "Authorization:login:token:" + token)
+    assert value, "被检验的原生映射应仍存在"
+
+
+def session_redis(*arguments):
+    local = env | {"REDISCLI_AUTH": redispass}
+    return subprocess.check_output(["docker", "exec", "-e", "REDISCLI_AUTH", redis, "redis-cli",
+        "--no-auth-warning", "--raw", *arguments], env=local, text=True).strip()
+
+
+def session_wire():
+    """复用已有原始帧夹具，产品 JVM 只改变本次隔离 Redis 的网络路径。"""
+    module = code / "framework/domain-forge-access-control"
+    classpath = os.pathsep.join([str(module / "target/test-classes"), str(module / "target/classes"),
+                                (module / "target/m2-test-classpath.txt").read_text().strip()])
+    log = (private / "m2-wire.log").open("w")
+    process = subprocess.Popen(["java", "-cp", classpath,
+        "org.domainforge.access.backend.internal.RedisWireFault", redisport], env=env,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, bufsize=1)
+    processes.append((process, log))
+    ready = session_wire_read(process)
+    assert ready.startswith("READY "), "复用故障夹具未启动"
+    return process, ready.split()[1]
+
+
+def session_wire_read(process):
+    import select
+    readable, _, _ = select.select([process.stdout], [], [], 15)
+    assert readable, "测试控制管道超时"
+    return process.stdout.readline().strip()
+
+
+def session_wire_control(command, expected="RESULT OK"):
+    m2_wire.stdin.write(command + "\n")
+    m2_wire.stdin.flush()
+    assert session_wire_read(m2_wire) == expected, "故障控制结果不符合预期"
+
+
+def session_delayed_cleanup():
+    """当前生产 Logout 的 SQL 先提交、原生清理失败，再释放真正迟到的 SET。"""
+    import concurrent.futures
+    identity, credential, _ = session_account("m2.late")
+    first = login(iam1, "m2.late", credential)
+    retained = login(iam2, "m2.late", credential)
+    key = "Authorization:login:session:" + identity
+    session_wire_control("ARM SET HOLD_WRITE " + key)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(fixture.http, iam1, "/api/auth/logout", {"operationId": str(uuid.uuid4())}, first)
+        session_wire_control("CAPTURED", "RESULT true")
+        fixture.check("late-real-logout-sql-committed", pending.result(timeout=6), 200)
+    metric = fixture.http(management["iam1"], "/actuator/metrics/iam.session.cleanup.failures")
+    assert metric[0] == 200 and metric[1]["measurements"][0]["value"] == 1
+    newer = login(iam2, "m2.late", credential)
+    assert newer in session_redis("GET", key), "先证明新登录确实进入终端索引"
+    session_wire_control("RELEASE")
+    for _ in range(100):
+        snapshot = session_redis("GET", key)
+        if newer not in snapshot and retained in snapshot:
+            break
+        time.sleep(.02)
+    else:
+        raise AssertionError("未观察到原始迟到 SET 覆盖新索引")
+    session_native_valid(newer)
+    session_checks("late-logged-out-a-denied", first, 401)
+    session_checks("late-valid-b-kept", newer, 200)
+    session_checks("late-unrelated-session-kept", retained, 200)
+    fixture.check("late-real-logout-b", fixture.http(iam2, "/api/auth/logout",
+        {"operationId": str(uuid.uuid4())}, newer), 200)
+    session_checks("late-logout-b-denied", newer, 401)
+    session_checks("late-retained-c-kept", retained, 200)
+    cases.append({"case": "actual-production-delayed-session-set", "late_index_overwrite_observed": True,
+                  "cleanup_failure_counter": 1, "sql_revocation_preserved": True})
+
+
+def session_runtime():
+    """当前 RedisTemplate 打包组合；与目标 Redisson 隔离装配分别给证据。"""
+    for change in ("missing", "revoked", "expired"):
+        name = "m2." + change
+        _, credential, _ = session_account(name)
+        token = login(iam1, name, credential)
+        session_checks(change + "-before", token, 200)
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        statement = {"missing": "DELETE FROM iam_session_grant",
+                     "revoked": "UPDATE iam_session_grant SET revoked=true",
+                     "expired": "UPDATE iam_session_grant SET expires_at=clock_timestamp()-interval '1 second'"}[change]
+        sql(statement + " WHERE token_digest='" + digest + "'")
+        session_native_valid(token)
+        session_checks(change + "-after", token, 401)
+        session_checks(change + "-repeat", token, 401)
+        if change == "missing":
+            assert sql("SELECT count(*) FROM iam_session_grant WHERE token_digest='" + digest + "'") == "0"
+    session_delayed_cleanup()
+    session_lost_login_response()
+    session_logout_and_account_changes()
+    # 服务端统计区分预算设置与身份联合查询，不能把两次 SQL 说成一次数据库往返。
+    sql("SELECT pg_stat_statements_reset()")
+    session_checks("cost-four-fresh-requests", admin, 200)
+    joined = int(sql("SELECT coalesce(sum(calls),0)::bigint FROM pg_stat_statements WHERE query LIKE 'SELECT a.id::text AS account_id%iam_session_grant%'") )
+    budget = int(sql("SELECT coalesce(sum(calls),0)::bigint FROM pg_stat_statements WHERE query LIKE 'SELECT set_config(%'"))
+    assert joined == 4 and budget == 4, "完整检查应逐请求读取当前 SQL；预算另计"
+    cases.append({"case": "four-fresh-request-cost", "identity_join_queries": joined,
+                  "budget_queries": budget, "capacity_acceptance": False})
+    sql("ALTER TABLE iam_session_grant RENAME TO iam_session_grant_m2_unavailable")
+    try:
+        session_checks("sql-unavailable-after-warm-success", admin, 503)
+    finally:
+        sql("ALTER TABLE iam_session_grant_m2_unavailable RENAME TO iam_session_grant")
+    session_checks("sql-restored", admin, 200)
+    for name in ("iam1", "iam2"):
+        running[name].terminate()
+        running[name].wait(timeout=20)
+    for name, path in (("login-only", "/verification/me"), ("permission", "/verification/read")):
+        fixture.check("facts-http-unavailable-" + name, fixture.http(consumer, path, token=admin), 503)
+
+
+def session_lost_login_response():
+    """真实登录请求发完即丢弃应用响应；这不等于 PostgreSQL COMMIT 应答丢失。"""
+    import http.client
+    identity, credential, _ = session_account("m2.response")
+    prefix = "Authorization:login:token:"
+    before = set(session_redis("--scan", "--pattern", prefix + "*").splitlines())
+    address = urllib.parse.urlparse(iam2)
+    connection = http.client.HTTPSConnection(address.hostname, address.port, context=fixture.tls(), timeout=6)
+    try:
+        connection.request("POST", "/api/auth/login",
+            json.dumps({"loginName": "m2.response", "password": credential}), {"Content-Type": "application/json"})
+        # 不读取 HTTP 响应；独立夹具确认提交后关闭连接，明确限定为应用层响应被丢弃。
+        for _ in range(100):
+            added = set(session_redis("--scan", "--pattern", prefix + "*").splitlines()) - before
+            committed = sql("SELECT count(*) FROM iam_session_grant WHERE account_id='" + identity + "'")
+            if len(added) == 1 and committed == "1":
+                break
+            time.sleep(.05)
+        else:
+            raise AssertionError("没有观察到一次真实登录的原生与 SQL 副作用")
+    finally:
+        connection.close()
+    token = next(iter(added))[len(prefix):]
+    session_checks("lost-response-known-committed-identity", token, 200)
+    assert sql("SELECT count(*) FROM iam_session_grant WHERE account_id='" + identity + "'") == "1"
+    cases.append({"case": "actual-login-application-response-discarded", "client_read_response_bytes": 0,
+                  "observed_grants": 1, "observed_new_native_tokens": 1, "postgres_commit_ack_loss_tested": False})
+
+
+def session_logout_and_account_changes():
+    name = "m2.logout"
+    _, credential, _ = session_account(name)
+    first, second = login(iam1, name, credential), login(iam2, name, credential)
+    fixture.check("current-logout-a", fixture.http(iam1, "/api/auth/logout",
+        {"operationId": str(uuid.uuid4())}, first), 200)
+    session_checks("logout-a-rejected", first, 401)
+    session_checks("logout-b-still-valid", second, 200)
+    fixture.check("current-logout-b", fixture.http(iam2, "/api/auth/logout",
+        {"operationId": str(uuid.uuid4())}, second), 200)
+    session_checks("logout-b-rejected", second, 401)
+    for change in ("password", "disable"):
+        name = "m2." + change
+        identity, credential, version = session_account(name)
+        first, second = login(iam1, name, credential), login(iam2, name, credential)
+        if change == "password":
+            fixture.check("real-password-change", fixture.http(iam1, "/api/auth/password", {
+                "operationId": str(uuid.uuid4()), "oldPassword": credential,
+                "newPassword": credential + "changed"}, first), 200)
+            credential += "changed"
+        else:
+            result = fixture.check("real-disable", fixture.http(iam1, "/api/accounts/" + identity + "/state", {
+                "operationId": str(uuid.uuid4()), "expectedVersion": version, "enabled": False}, admin, "PUT"), 200)
+        session_native_valid(first)
+        session_native_valid(second)
+        session_checks(change + "-first-old-denied", first, 401)
+        session_checks(change + "-second-old-denied", second, 401)
+        if change == "disable":
+            fixture.check("real-reenable", fixture.http(iam2, "/api/accounts/" + identity + "/state", {
+                "operationId": str(uuid.uuid4()), "expectedVersion": result["version"], "enabled": True}, admin, "PUT"), 200)
+            session_checks("reenable-does-not-revive-old", second, 401)
+        session_checks(change + "-fresh-valid", login(iam2, name, credential), 200)
+        session_checks(change + "-unrelated-admin-valid", admin, 200)
 
 
 try:
@@ -372,7 +578,9 @@ try:
         }
     )
     nacos = fixture.start_nacos()
-    iam1 = start("iam1")
+    if args.m2_safety:
+        m2_wire, m2_wire_port = session_wire()
+    iam1 = start("iam1", {"IAM_REDIS_PORT": m2_wire_port} if args.m2_safety else None)
     iam2 = start("iam2")
     consumer = start_consumer()
     expected_ports = {int(urllib.parse.urlparse(base).port) for base in (iam1, iam2)}
@@ -393,6 +601,16 @@ try:
     )
     admin_id = me["id"]
     admin_version = me["version"]
+    if args.m2_safety:
+        session_runtime()
+        assert all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == checksum
+                   for path, checksum in artifact_inputs.items())
+        report = {"ok": True, "artifact_inputs": artifact_inputs, "cases": cases,
+                  "proof_scope": "当前生产 RedisTemplate DAO 的双 IAM 与独立下游组合使用路径；非目标 DAO 接线或性能验收",
+                  "production_dao_changed": False, "m2_complete": False, "private_logs": str(private)}
+        (art / (tag + ".json")).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+        print(json.dumps({"ok": True, "cases": len(cases), "scope": "m2-current-production"}))
+        raise SystemExit(0)
     assert (
         fixture.check(
             "independent-consumer-current-subject",

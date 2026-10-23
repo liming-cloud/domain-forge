@@ -1,18 +1,53 @@
 {
   "schema": 1,
-  "version": "0.2.1-min.1",
+  "version": "0.3.0-iam.2",
   "managed_dependencies": [
     [
       "org.domainforge",
-      "domain-forge-domain",
-      "0.3.0-iam.1",
+      "domain-forge-cache",
+      "0.3.0-iam.2",
+      "jar",
+      "compile"
+    ],
+    [
+      "org.redisson",
+      "redisson",
+      "4.8.0",
+      "jar",
+      "compile"
+    ],
+    [
+      "org.redisson",
+      "redisson-spring-boot-starter",
+      "4.8.0",
+      "jar",
+      "compile"
+    ],
+    [
+      "org.redisson",
+      "redisson-spring-data-40",
+      "4.8.0",
+      "jar",
+      "compile"
+    ],
+    [
+      "cn.dev33",
+      "sa-token-redisson",
+      "1.46.0",
+      "jar",
+      "compile"
+    ],
+    [
+      "org.domainforge",
+      "shared",
+      "0.3.0-iam.2",
       "jar",
       "compile"
     ],
     [
       "org.domainforge",
       "domain-forge-web-support",
-      "0.1.0-r2.1",
+      "0.3.0-iam.2",
       "jar",
       "compile"
     ],
@@ -26,7 +61,7 @@
     [
       "org.domainforge",
       "domain-forge-persistence",
-      "0.2.1-min.1",
+      "0.3.0-iam.2",
       "jar",
       "compile"
     ],
@@ -67,22 +102,8 @@
     ],
     [
       "org.domainforge",
-      "domain-forge-access-control-contract",
-      "0.3.0-iam.1",
-      "jar",
-      "compile"
-    ],
-    [
-      "org.domainforge",
-      "domain-forge-access-control-backend",
+      "domain-forge-access-control",
       "0.3.0-iam.2",
-      "jar",
-      "compile"
-    ],
-    [
-      "cn.dev33",
-      "sa-token-core",
-      "1.46.0",
       "jar",
       "compile"
     ],
@@ -106,6 +127,13 @@
       "2025.1.0.0",
       "pom",
       "import"
+    ],
+    [
+      "cn.dev33",
+      "sa-token-core",
+      "1.46.0",
+      "jar",
+      "compile"
     ]
   ],
   "postgres_image": "postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15",

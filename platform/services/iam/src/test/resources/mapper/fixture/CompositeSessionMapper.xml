@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.CompositeSessionSafetyIT$FixtureMapper">
+  <insert id="seed">
+    INSERT INTO iam_account(id,login_name,credential_digest,credential_version,version,enabled,permissions)
+    VALUES(CAST(#{account} AS uuid),#{account},'test-only-not-a-password',1,1,true,'iam:account:read')
+  </insert>
+  <update id="change">
+    UPDATE iam_account SET
+    <choose>
+      <when test="change == 'enabled'">enabled=true</when>
+      <when test="change == 'disabled'">enabled=false,credential_version=credential_version+1</when>
+      <otherwise>credential_version=credential_version+1</otherwise>
+    </choose>
+    WHERE id=CAST(#{account} AS uuid)
+  </update>
+  <update id="grant">
+    <choose>
+      <when test="change == 'missing'">DELETE FROM iam_session_grant</when>
+      <when test="change == 'revoked'">UPDATE iam_session_grant SET revoked=true</when>
+      <otherwise>UPDATE iam_session_grant SET expires_at=clock_timestamp()-interval '1 second'</otherwise>
+    </choose>
+    WHERE token_digest=#{digest}
+  </update>
+  <select id="version" resultType="long">
+    SELECT credential_version FROM iam_account WHERE id=CAST(#{account} AS uuid)
+  </select>
+</mapper>

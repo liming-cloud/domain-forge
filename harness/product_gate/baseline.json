@@ -46,15 +46,15 @@
   "python": "3.14.5",
   "module_contracts": {
     "modules.json": "feedd42af68e5cbeffda6991271422a2a8d2aa9a7b0c844a4868120604513b66",
-    "web-modules.json": "2dcb64ffe4225e9461077c43c7c3d27fa50d463895625f6354b5b7fac05d332a",
-    "consumer-a-modules.json": "de6d15647e2119887f8569d9dabb1def0288895d8663f7d3bb2e04f3a7f51d82",
-    "consumer-b-modules.json": "b8e1b2584580592957ae1c2be4c46f5b12f88c418befb2e762e1a135b06044c5",
+    "web-modules.json": "81ab3077d776880067b23fb0ece13e220fb864696cb0e69fdf5ce2422b2af7f0",
+    "consumer-a-modules.json": "6e2d8d1da16025cbd041298968eed60c97fd07a285b8cde0a476d12d10fbe59b",
+    "consumer-b-modules.json": "f175c6498e1f1d5769961b2632a5ac5e78e57c0dae39d7ba74358447454b0e12",
     "persistence-modules.json": "6b89d66d54ab48d6751a9133812b59bbd4c692d75ca7fa743dadaff4b2fd3049",
     "access-contract-modules.json": "3cec5b0b152c5301cf1dc5d65ae2cc68aa8267492e8ea212e63f788986193bef",
-    "access-backend-modules.json": "e26b572ff87a2528326720268503ff3c2300b7cbd834e3aed0c7e139aeebfc8d",
-    "iam-modules.json": "de72396dfefe5f0a0e92953ea17f14d1c0ab4cf094d08a51865d3e1941c6b92e",
-    "domain-modules.json": "3a6b192b5047b6b896e5c3b030256aa3e9abc72b8c27906a596634f14961eb18",
-    "iam-client-modules.json": "6e16ebcc47f1556b5112668e19c358e62e06067b544058cc0daf22f18c791c92"
+    "access-backend-modules.json": "252bc3c25a67f19a4d1c44d9c84273dfe6070ea7ba26a6783748fc3ac5679731",
+    "iam-modules.json": "486efd33b0e23c7bd82c02d644f328cb1cad03e4cacefba418b99a6f3106ceac",
+    "domain-modules.json": "0c0159baa5478abced9a37d40e5eee6024e221a294c70cea4d781cba5433306e",
+    "iam-client-modules.json": "a892d650d55dc252d78aedbdfd4c2ef1656d2ee7b61418223558a17e9a5773ce"
   },
   "cloud_version": "2025.1.3",
   "alibaba_version": "2025.1.0.0"

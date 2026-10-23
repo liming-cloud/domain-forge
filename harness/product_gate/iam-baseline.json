@@ -2,26 +2,6 @@
   "schema": 1,
   "version": "0.3.0-iam.2",
   "required_tests": {
-    "access-contract": [
-      "org.domainforge.access.api.CurrentSubjectTest#identityIsImmutableAndBounded"
-    ],
-    "access-backend": [
-      "org.domainforge.access.backend.internal.BackendStpLogicTest#anonymousOptionalLookupMatchesNativeContract",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#commonLocalModeUsesNativeAnnotationsAndRebuilds",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeStoreFailuresRemainUnavailable",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unsupportedDeclarationsFailAtStartup",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#modifiedNativeStrategiesFailAtStartup",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#secondContextCannotReplaceRunningNativeOwner",
-      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#changedTokenNeverReusesOldSuccessAfterFailure",
-      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#invalidIdentityUsesSanitizedNativeClassification",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeInvalidationNeverExposesTokenInException",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#nativeAndRequiresEveryPermissionAndRole",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#programmaticProviderReadSanitizesInvalidationAndOutage",
-      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendUsesExternalSourceWithoutTransportConfiguration",
-      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendWithoutSourceFailsStartup",
-      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#localModeKeepsNativeSessionsWithoutTransportConfiguration",
-      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unusedUnsupportedHandlersDoNotRestrictSupportedAccess"
-    ],
     "iam": [
       "org.domainforge.iam.interfaces.http.protocol.IamRequestFilterTest#boundsEveryMediaTypeBeforeController",
       "org.domainforge.iam.interfaces.http.protocol.IamRequestFilterTest#passesExactBoundWithoutChangingBytes",
@@ -46,6 +26,23 @@
     "iam-client": [
       "org.domainforge.iam.client.internal.CurrentStateClientTest#rejectsUnsafeTokenAndProject",
       "org.domainforge.iam.client.internal.CurrentStateClientTest#rejectsMalformedSuccessProtocol"
+    ],
+    "access-control": [
+      "org.domainforge.access.backend.internal.BackendStpLogicTest#anonymousOptionalLookupMatchesNativeContract",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#commonLocalModeUsesNativeAnnotationsAndRebuilds",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeStoreFailuresRemainUnavailable",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unsupportedDeclarationsFailAtStartup",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#modifiedNativeStrategiesFailAtStartup",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#secondContextCannotReplaceRunningNativeOwner",
+      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#changedTokenNeverReusesOldSuccessAfterFailure",
+      "org.domainforge.access.backend.internal.RequestCurrentSubjectTest#invalidIdentityUsesSanitizedNativeClassification",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#laterNativeInvalidationNeverExposesTokenInException",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#nativeAndRequiresEveryPermissionAndRole",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#programmaticProviderReadSanitizesInvalidationAndOutage",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendUsesExternalSourceWithoutTransportConfiguration",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#backendWithoutSourceFailsStartup",
+      "org.domainforge.access.backend.internal.BackendAccessConfigurationTest#localModeKeepsNativeSessionsWithoutTransportConfiguration",
+      "org.domainforge.access.backend.internal.NativeAccessIntegrationTest#unusedUnsupportedHandlersDoNotRestrictSupportedAccess"
     ]
   },
   "required_integration_tests": {

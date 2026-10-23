@@ -5,7 +5,10 @@
       "id": "consumer-b",
       "package": "example.consumer",
       "kind": "assembly",
-      "depends_on": [],
+      "depends_on": [
+        "web-support",
+        "shared"
+      ],
       "contract_types": [
         "example.consumer.b.ConsumerApplication"
       ],
@@ -15,6 +18,78 @@
       "api_categories": {},
       "api_uses": {},
       "query_bindings": []
+    },
+    {
+      "id": "web-support",
+      "package": "org.domainforge.web",
+      "kind": "component",
+      "depends_on": [
+        "shared"
+      ],
+      "contract_types": [
+        "org.domainforge.web.api.PlatformJsonApi",
+        "org.domainforge.web.api.BusinessRejectionMapping",
+        "org.domainforge.web.api.HttpFailureResponses",
+        "org.domainforge.web.api.HttpResponses"
+      ],
+      "contract_members": [
+        "org.domainforge.web.api.HttpResponses.accepted(java.lang.Object):org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.BusinessRejectionMapping.exceptionType():java.lang.Class",
+        "org.domainforge.web.api.BusinessRejectionMapping.map(java.lang.Exception):org.domainforge.shared.ApiResponse",
+        "org.domainforge.web.api.HttpFailureResponses.invalidRequest():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.unauthenticated():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.forbidden():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.unavailable():org.springframework.http.ResponseEntity",
+        "org.domainforge.web.api.HttpFailureResponses.internalError():org.springframework.http.ResponseEntity"
+      ],
+      "api_categories": {
+        "org.domainforge.web.api.PlatformJsonApi": "http",
+        "org.domainforge.web.api.BusinessRejectionMapping": "http",
+        "org.domainforge.web.api.HttpFailureResponses": "http",
+        "org.domainforge.web.api.HttpResponses": "http"
+      },
+      "api_uses": {},
+      "query_bindings": []
+    },
+    {
+      "id": "shared",
+      "package": "org.domainforge.shared",
+      "kind": "component",
+      "depends_on": [],
+      "contract_types": [
+        "org.domainforge.shared.Entity",
+        "org.domainforge.shared.AggregateRoot",
+        "org.domainforge.shared.ValueObject",
+        "org.domainforge.shared.ApiResponse",
+        "org.domainforge.shared.CurrentSubject"
+      ],
+      "contract_members": [
+        "org.domainforge.shared.ApiResponse.<init>(java.lang.String,java.lang.String,java.lang.Object):void",
+        "org.domainforge.shared.ApiResponse.success(java.lang.Object):org.domainforge.shared.ApiResponse",
+        "org.domainforge.shared.ApiResponse.rejected(java.lang.String,java.lang.String):org.domainforge.shared.ApiResponse",
+        "org.domainforge.shared.CurrentSubject.<init>(java.lang.String,java.util.UUID,java.util.Set):void",
+        "org.domainforge.shared.CurrentSubject.projectId():java.lang.String",
+        "org.domainforge.shared.CurrentSubject.accountId():java.util.UUID",
+        "org.domainforge.shared.CurrentSubject.permissions():java.util.Set",
+        "org.domainforge.shared.CurrentSubject.<init>(java.lang.String,java.util.UUID,java.util.Set,java.util.Set):void",
+        "org.domainforge.shared.CurrentSubject.roles():java.util.Set",
+        "org.domainforge.shared.ApiResponse.code():java.lang.String",
+        "org.domainforge.shared.ApiResponse.message():java.lang.String",
+        "org.domainforge.shared.ApiResponse.data():java.lang.Object"
+      ],
+      "api_categories": {
+        "org.domainforge.shared.Entity": "domain-marker",
+        "org.domainforge.shared.AggregateRoot": "domain-marker",
+        "org.domainforge.shared.ValueObject": "domain-marker",
+        "org.domainforge.shared.ApiResponse": "http",
+        "org.domainforge.shared.CurrentSubject": "neutral"
+      },
+      "api_uses": {},
+      "query_bindings": [],
+      "data_contracts": [
+        "org.domainforge.shared.ApiResponse",
+        "org.domainforge.shared.CurrentSubject"
+      ]
     }
   ]
 }

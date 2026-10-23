@@ -13,6 +13,7 @@ import web_build
 import web_http
 import web_advisory
 import web_negative
+import foundation_build
 
 
 def inspect(root, project, observed, argv, env, home, repository, cache, workspace, output, args):
@@ -46,8 +47,16 @@ def preserve_evidence(workspace, output):
 
 def inspect_product(root, project, observed, argv, env, home, repository, cache, workspace, output, args, result):
     code = product_root(project)
-    result['component'] = web_build.component(root, code, observed, repository, args.tools, output)
-    result['publication'] = web_build.publish(root, code, result['component'], argv, env, output, workspace / 'published')
+    result['shared'] = foundation_build.shared_component(root, code, observed, repository, args.tools, output)
+    publication = web_build.publish(root, code, {'shared': result['shared']}, argv, env, output, workspace / 'published')
+    component = web_build.isolated(root, code, web_build.WEB, 'web-support', False, publication,
+                                    repository, home, env, workspace, output, web_build.required_tests())
+    result['component'] = web_build.component(root, code, component, args.tools, output)
+    result['publication'] = web_build.publish(root, code,
+        {'domain-forge-web-support': {'pom': result['component']['poms']['domain-forge-web-support'],
+                                     'artifact': result['component']['artifact']},
+         'domain-forge-bom': {'pom': result['component']['poms']['domain-forge-bom']}},
+        argv, env, output, workspace / 'published', publication)
     result['tools'] = web_build.tool_bytes(root, repository)
     http_tools = getattr(args, 'http_tools', None)
     if not http_tools:
@@ -69,6 +78,6 @@ def inspect_product(root, project, observed, argv, env, home, repository, cache,
         for name, consumer in result['consumers'].items():
             scan = output / ('consumer-' + name + '-advisory'); scan.mkdir()
             result['advisory'][name] = web_advisory.scan(Path(consumer['project']), Path('consumer-b' if name == 'b' else '.'), consumer['observed'], consumer['argv'], env, args.advisory_data, scan)
-    result['counterexamples'] = web_negative.verify(root, result['consumers'], result['publication'], home, env, workspace)
+    result['counterexamples'] = web_negative.verify(root, result['consumers'], result['publication'], home, env, workspace, args.tools)
     result['ok'] = True
     return result

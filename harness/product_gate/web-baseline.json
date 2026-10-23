@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "candidate_version": "0.1.0-r2.1",
+  "candidate_version": "0.3.0-iam.2",
   "tools": {
     "flatten": {
       "group": "org.codehaus.mojo",

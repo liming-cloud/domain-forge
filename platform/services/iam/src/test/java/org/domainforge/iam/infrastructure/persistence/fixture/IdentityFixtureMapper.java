@@ -118,4 +118,13 @@ public interface IdentityFixtureMapper {
 
   // 只用于证明更晚恢复截止不会被维护或Redis重启缩短，不用于冒充实际窗口恢复。
   int extendProtectionWindow(int seconds);
+
+  /** 观察本次独立库里真正等待账号行锁的 SQL，不以线程尚未返回代替阻塞证据。 */
+  int waitingAccountLocks();
+
+  /** 在真实 COMMIT 阶段拒绝会话许可，区别于业务语句失败及提交后应用 EOF。 */
+  void installGrantCommitFailure();
+
+  /** 仅移除本次测试创建的延迟约束故障。 */
+  void removeGrantCommitFailure();
 }

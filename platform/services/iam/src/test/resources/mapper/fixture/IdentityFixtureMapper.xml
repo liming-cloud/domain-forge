@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper">
+  <select id="waitingAccountLocks" resultType="int">
+    SELECT count(*) FROM pg_stat_activity
+    WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%iam_account%'
+  </select>
+  <update id="installGrantCommitFailure">
+    CREATE FUNCTION composite_grant_commit_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'controlled deferred grant failure'; END $$;
+    CREATE CONSTRAINT TRIGGER composite_grant_commit_failure
+    AFTER INSERT ON iam_session_grant DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION composite_grant_commit_failure();
+  </update>
+  <update id="removeGrantCommitFailure">
+    DROP TRIGGER composite_grant_commit_failure ON iam_session_grant;
+    DROP FUNCTION composite_grant_commit_failure();
+  </update>
   <update id="reset">
     TRUNCATE iam_account, iam_invitation, iam_session_grant, iam_operation, iam_audit RESTART IDENTITY;
     UPDATE iam_administration_guard SET initialized=false WHERE id=1;

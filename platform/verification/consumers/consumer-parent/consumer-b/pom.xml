@@ -10,7 +10,6 @@
   <artifactId>consumer-b</artifactId>
   <dependencyManagement>
     <dependencies>
-<dependency><groupId>org.domainforge</groupId><artifactId>shared</artifactId><version>0.3.0-iam.2</version></dependency>
       <dependency>
         <groupId>org.domainforge</groupId>
         <artifactId>domain-forge-bom</artifactId>
@@ -21,6 +20,10 @@
     </dependencies>
   </dependencyManagement>
   <dependencies>
+    <dependency>
+      <groupId>org.domainforge</groupId>
+      <artifactId>shared</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.swagger.core.v3</groupId>
       <artifactId>swagger-annotations-jakarta</artifactId>

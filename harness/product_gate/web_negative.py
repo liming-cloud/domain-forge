@@ -62,10 +62,39 @@ def skipped_tests(root, consumer, home, env, workspace):
     require(False, 'PG_NEGATIVE_MISSED', '实际跳过测试未被拒绝')
 
 
-def verify(root, consumers, publication, home, env, workspace):
+def transitive_shared(root, consumer, home, env, workspace, tools):
+    """源码直接引用共享 API 时，只有传递依赖仍须被原声明检查拒绝。"""
+    import build
+    import environment
+    project = workspace / 'transitive-shared'
+    shutil.copytree(consumer['project'], project, ignore=shutil.ignore_patterns('target'))
+    pom = project / 'pom.xml'; model = ET.parse(pom)
+    dependencies = model.find('./{*}dependencies')
+    shared = [item for item in dependencies if item.findtext('{*}groupId') == 'org.domainforge'
+              and item.findtext('{*}artifactId') == 'shared']
+    require(len(shared) == 1, 'PG_NEGATIVE_INPUT', '共享直接依赖反例须准确删除一个声明')
+    dependencies.remove(shared[0]); model.write(pom, default_namespace='http://maven.apache.org/POM/4.0.0')
+    output = workspace / 'transitive-shared-evidence'; output.mkdir()
+    extension = calibrate_maven.observer(home, output); inventory = output / 'inventory.xml'
+    argv = [str(project / 'mvnw'), *consumer['argv'][1:]]
+    execution = command([*argv, '-Dmaven.ext.class.path=' + str(extension),
+        '-Ddomainforge.scope.output=' + str(inventory), 'verify'], project, output / 'verify.log', 600, env)
+    observed = web_build.observe(root, project, ET.parse(inventory).getroot(), Path(consumer['repository']), True,
+        ['example.consumer.a.ClientResultTest#clientMustNotTreatHttp200BusinessRejectionAsSuccess'])
+    declaration = build.component_contract(root, 'consumer-a', 'consumer-a-modules.json', observed, output,
+        {'shared': 'shared', 'web-support': 'domain-forge-web-support'}, web_build.lock(root)['candidate_version'])
+    quality = build.quality(root, project, observed, tools, declaration, environment.digest(declaration))
+    (output / 'quality.json').write_text(json.dumps(quality, ensure_ascii=False, indent=2) + '\n')
+    require(any(item['code'] == 'SG_UNDECLARED_LIBRARY' and item.get('target') == 'org.domainforge.shared.ApiResponse'
+                for item in quality['diagnostics']), 'PG_NEGATIVE_CAUSE', '仅传递依赖没有被实际源码声明检查拒绝')
+    return {'execution': execution, 'expected': 'SG_UNDECLARED_LIBRARY', 'diagnostics': quality['diagnostics']}
+
+
+def verify(root, consumers, publication, home, env, workspace, tools=None):
     require(set(consumers) == {'a', 'b'}, 'PG_CONSUMER_COVERAGE', '反例仍要求两个消费者的真实正向证据')
     output = workspace / 'web-negative'; output.mkdir()
     result = {name: resolution(root, name, consumers['a'], publication, home, env, output) for name in ('missing-artifact', 'wrong-version')}
     result['skipped-tests'] = skipped_tests(root, consumers['a'], home, env, output)
+    result['transitive-shared'] = transitive_shared(root, consumers['a'], home, env, output, tools)
     (output / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     return result

@@ -46,6 +46,40 @@ class TemplateInputTests(unittest.TestCase):
                 self.assertNotIn('fixture', path.as_posix().lower())
         self.assertFalse(list(self.output.rglob('*.sql')))
 
+    def test_current_contract_rejects_fixture_and_module_contract_drift(self):
+        environment.foundation_sources(ROOT)
+        root = self.workspace / 'snapshot'
+        for directory in (environment.TEMPLATE, environment.FOUNDATION_FIXTURE, environment.FOUNDATION_CONTRACT):
+            shutil.copytree(ROOT / environment.PRODUCT / directory, root / environment.PRODUCT / directory)
+        environment.foundation_sources(root)
+        fixture = root / environment.PRODUCT / environment.FOUNDATION_FIXTURE / 'migrations/V2__verification.sql'
+        contract = root / environment.PRODUCT / environment.FOUNDATION_CONTRACT / 'fixture-modules.json'
+        for path in (fixture, contract):
+            original = path.read_bytes()
+            path.write_bytes(original + b' ')
+            with self.subTest(path=path.name), self.assertRaises(environment.ProbeFailure) as failure:
+                environment.foundation_sources(root)
+            self.assertEqual(failure.exception.diagnostic['code'], 'PG_TEMPLATE_INPUT')
+            path.write_bytes(original)
+        environment.foundation_sources(root)
+
+    def test_component_binding_rejects_foreign_group_prefix_and_version_mismatch(self):
+        artifacts = {
+            'org/domainforge/' + name + '/0.3.0-iam.2/' + name + '-0.3.0-iam.2.jar': 'a' * 64
+            for name in ('shared', 'domain-forge-web-support', 'domain-forge-persistence')}
+        shared = 'org/domainforge/shared/0.3.0-iam.2/shared-0.3.0-iam.2.jar'
+        for index, wrong in enumerate((
+                'example/other/shared/0.3.0-iam.2/shared-0.3.0-iam.2.jar',
+                'org/domainforge/shared-helper/0.3.0-iam.2/shared-helper-0.3.0-iam.2.jar',
+                'org/domainforge/shared/0.3.0-iam.2/shared-9.0.0.jar')):
+            output = self.workspace / ('binding-' + str(index)); output.mkdir()
+            changed = dict(artifacts); changed[wrong] = changed.pop(shared)
+            with self.subTest(path=wrong):
+                with self.assertRaises(environment.ProbeFailure) as failure:
+                    foundation_build.module_contract(ROOT / environment.PRODUCT, {'artifacts': changed}, output, False)
+                self.assertEqual(failure.exception.diagnostic['code'], 'PG_COMPONENT_BINDING')
+                self.assertFalse((output / 'modules.json').exists())
+
     def test_existing_output_keeps_original_bytes(self):
         self.output.mkdir(); sentinel = self.output / 'owned.txt'; sentinel.write_bytes(b'keep')
         with self.assertRaises(ValueError):
@@ -135,7 +169,9 @@ class TemplateInputTests(unittest.TestCase):
         path = self.workspace / 'bom.xml'
         path.write_text(header + ''.join(dependencies) + '</dependencies></dependencyManagement></project>')
         web_build.consumer_pom(path, 'domain-forge-bom', baseline['version'], '4.0.8', baseline['managed_dependencies'])
-        for content in (''.join(dependencies[:2]+dependencies[3:]), ''.join(dependencies).replace('0.1.0-r2.1', baseline['version'])):
+        omitted = ''.join(item for item in dependencies if '<artifactId>domain-forge-persistence</artifactId>' not in item)
+        changed = ''.join(dependencies).replace('<version>' + baseline['version'] + '</version>', '<version>9.0.0</version>')
+        for content in (omitted, changed):
             path.write_text(header + content + '</dependencies></dependencyManagement></project>')
             with self.assertRaises(environment.ProbeFailure) as failure:
                 web_build.consumer_pom(path, 'domain-forge-bom', baseline['version'], '4.0.8', baseline['managed_dependencies'])

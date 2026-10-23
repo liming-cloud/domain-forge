@@ -38,6 +38,33 @@ class ProductInputTests(unittest.TestCase):
         target.write_text("<project/>\n")
         self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
 
+    def test_migrated_modules_include_new_sources_and_require_their_poms(self):
+        for relative in ("shared", "framework/domain-forge-cache", "framework/domain-forge-access-control"):
+            with self.subTest(module=relative):
+                source = self.code / relative / "src/main/java/NewInput.java"
+                source.write_text("class NewInput {}\n")
+                snapshot = environment.sources(self.root)
+                self.assertIn("platform/" + relative + "/src/main/java/NewInput.java", snapshot)
+                pom = self.code / relative / "pom.xml"
+                original = pom.read_bytes()
+                try:
+                    pom.unlink()
+                    self.reject("PG_INPUT", environment.sources, self.root)
+                finally:
+                    pom.write_bytes(original)
+
+    def test_migration_retains_old_outputs_but_rejects_old_source(self):
+        previous = self.code / "framework/access-control/domain-forge-access-control-backend"
+        artifact = previous / "target/previous.jar"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_bytes(b"preserved old output")
+        snapshot = environment.sources(self.root)
+        self.assertNotIn(str(artifact.relative_to(self.root)), snapshot)
+        source = previous / "src/main/java/Restored.java"
+        source.parent.mkdir(parents=True)
+        source.write_text("class Restored {}\n")
+        self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
+
     def test_legacy_root_cannot_shadow_product_inputs(self):
         legacy = self.root / "code/pom.xml"
         legacy.parent.mkdir(exist_ok=True)
@@ -45,13 +72,13 @@ class ProductInputTests(unittest.TestCase):
         self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
 
     def test_contract_resources_cannot_hide_unknown_input(self):
-        unknown = self.root / "platform/verification/contracts/web-support/0.1.0-r2.1/extra.json"
+        unknown = self.root / environment.PRODUCT / environment.CONTRACTS / "extra.json"
         unknown.parent.mkdir(parents=True, exist_ok=True)
         unknown.write_text("{}\n")
         self.reject("PG_BUILD_SCOPE", environment.sources, self.root)
 
     def test_missing_contract_cannot_pass_source_preflight(self):
-        contract = self.root / "platform/verification/contracts/web-support/0.1.0-r2.1/consumer-a-openapi.json"
+        contract = self.root / environment.PRODUCT / environment.CONTRACTS / "consumer-a-openapi.json"
         contract.unlink(missing_ok=True)
         self.reject("PG_INPUT", environment.sources, self.root)
 

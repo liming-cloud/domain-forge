@@ -17,6 +17,29 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** 测试专用单次链路故障：转发原始字节，不生成或修改 Redis 命令／会话内容。 */
 final class RedisWireFault implements AutoCloseable {
+  /** 私有标准管道供其他模块的隔离测试复用；不增加产品端点或改变故障帧。 */
+  public static void main(String[] arguments) throws Exception {
+    try (var fault = new RedisWireFault(Integer.parseInt(arguments[0]));
+        var input =
+            new java.io.BufferedReader(
+                new java.io.InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+      System.out.println("READY " + fault.port());
+      for (String line; (line = input.readLine()) != null; ) {
+        String[] fields = line.split(" ", 4);
+        switch (fields[0]) {
+          case "ARM" -> fault.arm(fields[1], fields[3], Mode.valueOf(fields[2]));
+          case "CAPTURED" -> {
+            System.out.println("RESULT " + fault.awaitCaptured());
+            continue;
+          }
+          case "RELEASE" -> fault.release();
+          default -> throw new IllegalArgumentException("未知测试控制命令");
+        }
+        System.out.println("RESULT OK");
+      }
+    }
+  }
+
   enum Mode {
     HOLD_WRITE,
     DROP_REPLY

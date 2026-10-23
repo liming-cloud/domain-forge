@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -439,6 +440,208 @@ class IdentityPersistenceIT {
     assertThrows(IamException.class, () -> auth.current(paused.token));
     assertThrows(IamException.class, () -> auth.current(original.token()));
     assertEquals(2, application.getBean(AccountRepository.class).find(account).credentialVersion());
+  }
+
+  // 实际 Login 在原生签发后、SQL 之前遇到禁用，不能给旧凭据登记许可或返回令牌。
+  @Test
+  void disableRaceRejectsAlreadyIssuedRedisToken() throws Exception {
+    UUID account = registerRaceAccount("race.disabled");
+    var auth =
+        application.getBean(
+            org.domainforge.iam.application.authorization.CurrentAuthorization.class);
+    String admin =
+        auth.current(
+                application
+                    .getBean(org.domainforge.iam.application.command.authentication.Login.class)
+                    .execute("initial.admin", PASSWORD, "127.0.0.31")
+                    .token())
+            .tokenDigest();
+    var paused =
+        new PausedNativeSessions(
+            application.getBean(
+                org.domainforge.iam.application.port.authentication.NativeSessions.class));
+    var login =
+        loginUsing(
+            paused,
+            application.getBean(
+                org.domainforge.iam.application.port.authentication.SessionStore.class));
+    try (var pool = Executors.newFixedThreadPool(1)) {
+      var future = pool.submit(() -> login.execute("race.disabled", PASSWORD, "127.0.0.32"));
+      assertTrue(paused.issued.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      try {
+        application
+            .getBean(org.domainforge.iam.application.command.account.ManageAccount.class)
+            .state(admin, UUID.randomUUID(), account, 1, false);
+      } finally {
+        paused.resume.countDown();
+      }
+      var failure =
+          assertThrows(
+              java.util.concurrent.ExecutionException.class,
+              () -> future.get(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertEquals(IamFailure.UNAUTHENTICATED, ((IamException) failure.getCause()).failure());
+    }
+    assertEquals(
+        0, sql.tokenSessionCount(application.getBean(SecretOperations.class).digest(paused.token)));
+    assertThrows(IamException.class, () -> auth.current(paused.token));
+    assertFalse(application.getBean(AccountRepository.class).find(account).enabled());
+  }
+
+  // 反向交错：Login 真正持有账号锁并写入未提交许可，改密必须等待，随后使新旧会话均失效。
+  @Test
+  void passwordChangeWaitingForActualLoginInvalidatesCommittedGrant() throws Exception {
+    changeWaitingForLogin(false);
+  }
+
+  // 相同生产顺序下禁用等待签发事务，禁止拿锁内原生探针替代本次实际用例。
+  @Test
+  void disableWaitingForActualLoginInvalidatesCommittedGrant() throws Exception {
+    changeWaitingForLogin(true);
+  }
+
+  private void changeWaitingForLogin(boolean disable) throws Exception {
+    String name = "race.waiting";
+    UUID account = registerRaceAccount(name);
+    var auth =
+        application.getBean(
+            org.domainforge.iam.application.authorization.CurrentAuthorization.class);
+    var normal =
+        application.getBean(org.domainforge.iam.application.command.authentication.Login.class);
+    var old = auth.current(normal.execute(name, PASSWORD, "127.0.0.33").token());
+    String admin =
+        auth.current(normal.execute("initial.admin", PASSWORD, "127.0.0.34").token()).tokenDigest();
+    var inserted = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    var login =
+        loginUsing(
+            application.getBean(
+                org.domainforge.iam.application.port.authentication.NativeSessions.class),
+            pausedGrants(inserted, release));
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var signed = pool.submit(() -> login.execute(name, PASSWORD, "127.0.0.35"));
+      assertTrue(inserted.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      var changed =
+          pool.submit(
+              () -> {
+                if (disable)
+                  return application
+                      .getBean(org.domainforge.iam.application.command.account.ManageAccount.class)
+                      .state(admin, UUID.randomUUID(), account, 1, false);
+                return application
+                    .getBean(
+                        org.domainforge.iam.application.command.authentication.ChangePassword.class)
+                    .execute(old, UUID.randomUUID(), PASSWORD, PASSWORD + " changed");
+              });
+      try {
+        awaitAccountWait();
+      } finally {
+        release.countDown();
+      }
+      var result = signed.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      assertNotNull(changed.get(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertThrows(IamException.class, () -> auth.current(result.token()));
+      assertThrows(IamException.class, () -> auth.require(old.tokenDigest(), null));
+    } finally {
+      release.countDown();
+    }
+    assertEquals(2, application.getBean(AccountRepository.class).find(account).credentialVersion());
+  }
+
+  private static void awaitAccountWait() throws Exception {
+    for (int attempt = 0; attempt < 100; attempt++) {
+      if (sql.waitingAccountLocks() > 0) return;
+      Thread.sleep(25);
+    }
+    fail("没有观察到真实账号行锁等待");
+  }
+
+  private static org.domainforge.iam.application.port.authentication.SessionStore pausedGrants(
+      java.util.concurrent.CountDownLatch inserted, java.util.concurrent.CountDownLatch release) {
+    var delegate =
+        application.getBean(org.domainforge.iam.application.port.authentication.SessionStore.class);
+    return new org.domainforge.iam.application.port.authentication.SessionStore() {
+      @Override
+      public void insert(org.domainforge.iam.application.port.authentication.SessionGrant grant) {
+        delegate.insert(grant);
+        inserted.countDown();
+        try {
+          assertTrue(release.await(8, java.util.concurrent.TimeUnit.SECONDS));
+        } catch (InterruptedException failure) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(failure);
+        }
+      }
+
+      @Override
+      public org.domainforge.iam.application.port.authentication.CurrentIdentity current(
+          String digest) {
+        return delegate.current(digest);
+      }
+
+      @Override
+      public void revoke(String digest) {
+        delegate.revoke(digest);
+      }
+    };
+  }
+
+  // 延迟约束在真正 COMMIT 失败；实际 Login 不返回 token、不重试且 SQL 无许可。
+  @Test
+  void actualLoginCommitFailureDoesNotPublishOrRegisterToken() {
+    registerRaceAccount("race.commit");
+    var observed =
+        new PausedNativeSessions(
+            application.getBean(
+                org.domainforge.iam.application.port.authentication.NativeSessions.class));
+    observed.resume.countDown();
+    var login =
+        loginUsing(
+            observed,
+            application.getBean(
+                org.domainforge.iam.application.port.authentication.SessionStore.class));
+    sql.installGrantCommitFailure();
+    try {
+      var failure =
+          assertThrows(
+              IamException.class, () -> login.execute("race.commit", PASSWORD, "127.0.0.36"));
+      assertEquals(IamFailure.UNKNOWN_RESULT, failure.failure());
+      assertNotNull(observed.token);
+      assertEquals(
+          0,
+          sql.tokenSessionCount(
+              application.getBean(SecretOperations.class).digest(observed.token)));
+      assertThrows(
+          IamException.class,
+          () ->
+              application
+                  .getBean(org.domainforge.iam.application.authorization.CurrentAuthorization.class)
+                  .current(observed.token));
+      assertEquals(0, sql.sessionCount());
+    } finally {
+      sql.removeGrantCommitFailure();
+    }
+  }
+
+  private static UUID registerRaceAccount(String name) {
+    return application
+        .getBean(AcceptInvitation.class)
+        .execute(UUID.randomUUID(), invite(name), name, PASSWORD)
+        .targetId();
+  }
+
+  private static org.domainforge.iam.application.command.authentication.Login loginUsing(
+      org.domainforge.iam.application.port.authentication.NativeSessions nativeSessions,
+      org.domainforge.iam.application.port.authentication.SessionStore sessions) {
+    return new org.domainforge.iam.application.command.authentication.Login(
+        application.getBean(AccountRepository.class),
+        application.getBean(org.domainforge.iam.application.port.authentication.Passwords.class),
+        application.getBean(
+            org.domainforge.iam.application.port.authentication.LoginProtection.class),
+        nativeSessions,
+        sessions,
+        application.getBean(SecretOperations.class),
+        application.getBean(Transactions.class),
+        application.getBean(org.domainforge.iam.application.port.operation.DatabaseTime.class));
   }
 
   // 已提交后确认丢失必须报未知；同一真实操作收据支持核对与重放且只产生一次副作用。

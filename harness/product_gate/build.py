@@ -282,6 +282,34 @@ def packaged(document, project, build, dependencies):
             "resources": sorted(resources), "dependencies": sorted(jars), "metadata_starters": metadata_starters}
 
 
+def component_contract(root, owner, declaration, observed, output, artifacts, version):
+    """把固定公开声明绑定到本次生产类路径，不接纳测试制品或变化后的字节。"""
+    source = root / "harness/product_gate" / declaration
+    require(digest(source) == baseline(root)["module_contracts"].get(declaration),
+            "PG_COMPONENT_BINDING", "组件声明摘要不符")
+    model = json.loads(source.read_text())
+    for module in model["modules"]:
+        if module["id"] == owner:
+            continue
+        artifact = artifacts.get(module["id"])
+        matches = {item["file"]: item for compilation in observed["build"]["compilations"]
+                   if compilation["purpose"] == "production" for item in compilation["dependencies"]
+                   if item["group"] == "org.domainforge" and item["artifact"] == artifact
+                   and item["version"] == version and item["extension"] == "jar"
+                   and not item.get("classifier") and item["scope"] in ("compile", "runtime")}
+        require(artifact and len(matches) == 1, "PG_COMPONENT_BINDING", "缺少唯一同次组件制品：" + module["id"])
+        path = Path(next(iter(matches)))
+        require(path.is_file() and not path.is_symlink() and
+                digest(path) == observed["build"]["classpath_artifacts"].get(str(path)),
+                "PG_COMPONENT_BINDING", "组件制品不属于本次编译字节")
+        module["artifact"] = {"group": "org.domainforge", "artifact": artifact,
+                              "version": version, "sha256": digest(path)}
+        module["depends_on"] = []
+    target = output / declaration
+    target.write_text(json.dumps(model, ensure_ascii=False, indent=2) + "\n")
+    return target
+
+
 def quality(root, project, observed, tools, declaration="modules.json", contract_sha256=None):
     """直接使用观察器的真实对象执行必要源码、依赖、合同与职责检查。"""
     build = observed["build"]

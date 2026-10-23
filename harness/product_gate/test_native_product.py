@@ -43,11 +43,10 @@ class NativeProductTests(unittest.TestCase):
         self.assertTrue(result["ok"], result["diagnostics"])
         self.assertGreater(self.observed["tests"]["count"], 0)
         self.assertEqual(self.observed["reactor"], [
-            ".", "framework", "framework/domain-forge-domain", "framework/domain-forge-web-support",
-            "framework/domain-forge-persistence", "domain-forge-bom", "verification",
-            "verification/smoke", "verification/smoke/boot-smoke", "framework/access-control",
-            "framework/access-control/domain-forge-access-control-contract",
-            "framework/access-control/domain-forge-access-control-backend", "framework/domain-forge-iam-client", "services", "services/iam",
+            ".", "shared", "framework", "framework/domain-forge-cache", "framework/domain-forge-web-support",
+            "framework/domain-forge-persistence", "framework/domain-forge-access-control",
+            "framework/domain-forge-iam-client", "domain-forge-bom", "verification",
+            "verification/smoke", "verification/smoke/boot-smoke", "services", "services/iam",
         ])
         self.assertEqual({item["purpose"] for item in result["bindings"]}, {"production", "test"})
 
@@ -101,7 +100,7 @@ class NativeProductTests(unittest.TestCase):
         document = ET.parse(pom)
         plugin = document.find("./{*}build/{*}plugins/{*}plugin")
         plugin.remove(plugin.find("{*}executions"))
-        document.write(pom)
+        document.write(pom, default_namespace="http://maven.apache.org/POM/4.0.0")
         with self.assertRaises(environment.ProbeFailure) as error:
             build.lifecycle(ROOT, project, *args, self.repository, output)
         self.assertEqual(error.exception.diagnostic["code"], "PG_BUILD_ARTIFACT")
@@ -168,7 +167,7 @@ class NativeProductTests(unittest.TestCase):
         for dependency in list(dependencies):
             if dependency.findtext("{*}artifactId") == "spring-core":
                 dependencies.remove(dependency)
-        document.write(pom)
+        document.write(pom, default_namespace="http://maven.apache.org/POM/4.0.0")
         observed = build.lifecycle(ROOT, project, *args, self.repository, output)
         quality = build.quality(ROOT, project, observed, self.tools)
         diagnostics = quality["diagnostics"]

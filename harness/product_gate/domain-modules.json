@@ -22,7 +22,10 @@
         "org.domainforge.shared.CurrentSubject.accountId():java.util.UUID",
         "org.domainforge.shared.CurrentSubject.permissions():java.util.Set",
         "org.domainforge.shared.CurrentSubject.<init>(java.lang.String,java.util.UUID,java.util.Set,java.util.Set):void",
-        "org.domainforge.shared.CurrentSubject.roles():java.util.Set"
+        "org.domainforge.shared.CurrentSubject.roles():java.util.Set",
+        "org.domainforge.shared.ApiResponse.code():java.lang.String",
+        "org.domainforge.shared.ApiResponse.message():java.lang.String",
+        "org.domainforge.shared.ApiResponse.data():java.lang.Object"
       ],
       "api_categories": {
         "org.domainforge.shared.Entity": "domain-marker",

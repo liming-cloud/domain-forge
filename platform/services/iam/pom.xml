@@ -51,6 +51,13 @@
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-engine</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.springframework</groupId><artifactId>spring-test</artifactId><scope>test</scope></dependency>
+    <!-- M2 隔离组合验证专用；不改变生产 RedisTemplate DAO 或运行时依赖。 -->
+    <dependency><groupId>cn.dev33</groupId><artifactId>sa-token-redisson</artifactId><version>1.46.0</version><scope>test</scope>
+      <exclusions><exclusion><groupId>org.redisson</groupId><artifactId>redisson</artifactId></exclusion></exclusions>
+    </dependency>
+    <!-- 原运行包已有同版 JSON 适配；显式 runtime 声明防止测试直接引用挤掉原传递运行库。 -->
+    <dependency><groupId>cn.dev33</groupId><artifactId>sa-token-jackson3</artifactId><version>1.46.0</version><scope>runtime</scope></dependency>
+    <dependency><groupId>org.redisson</groupId><artifactId>redisson</artifactId><version>${redisson.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.zaxxer</groupId><artifactId>HikariCP</artifactId><scope>runtime</scope></dependency>
   </dependencies>
   <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId>

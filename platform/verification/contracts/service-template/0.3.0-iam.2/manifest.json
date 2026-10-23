@@ -2,11 +2,11 @@
   "schema": 1,
   "version": "0.3.0-iam.2",
   "inputs": {
-    "templates/ddd-service/template.json": "a8278cc06ab024de551bc40ef3cd0ae16ca11f31e83b238615a81fcf00174057",
+    "templates/ddd-service/template.json": "4083b4cc0ca6b1988062d591b7d3e96f63dd65a99b16f2dc9e2d29691e46e6c5",
     "templates/ddd-service/generate.py": "99ed5c42bfa1dd6e7e2da63e50c7012ad9d25fba86099597738a56bfa1038abf",
-    "templates/ddd-service/01-使用说明.md": "8ece6664d1f7027b49e4ef576f6623589a034a749383fce83862de3397fa7a00",
+    "templates/ddd-service/01-使用说明.md": "e94e33c53a9fb659ea08cb4c43e9ea61362845881a22bd0ec067a3eac017ffc1",
     "templates/ddd-service/assets/mvnw.cmd": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c",
-    "templates/ddd-service/assets/pom.xml.tpl": "315c99d53306525b7170c69f17fa2dcf90728520e071df12e83425dbeff7a4e4",
+    "templates/ddd-service/assets/pom.xml.tpl": "aaf8c8428e048ac6015dad897aad8ac817f98f268f71c82c795d11947be07086",
     "templates/ddd-service/assets/AGENTS.md.tpl": "640357608c63d9ff9628c14c2f1d7f071177b96ec008dbf24716d3d0fb85bab8",
     "templates/ddd-service/assets/README.md.tpl": "8bac5c7fbd408c75c17e7234147ab2598aa6224c024f90066506f9d814c6a94d",
     "templates/ddd-service/assets/mvnw": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
@@ -18,7 +18,7 @@
     "templates/ddd-service/assets/.mvn/wrapper/maven-wrapper.properties": "9e702bcd7e68ba1cace0a3382a7082e6e1e1b321688a7a3fbf4d5ae7eb0af533",
     "verification/service-template/migrations/V2__verification.sql": "ab2014b4407b6272184b47c63066703e38736cf5237069e22e9b7382a327493f",
     "verification/service-template/src/main/java/@@PACKAGE_PATH@@/bootstrap/FixturePersistence.java.tpl": "5de95c90ce254192698ab07d9051ab5e12c4f2345b28ebc44557864588f146af",
-    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/interfaces/http/RecordController.java.tpl": "0227eef4afd4fdb1e4d912f04d52a2d8a56b5c0970273485099f34599a7006d2",
+    "verification/service-template/src/main/java/@@PACKAGE_PATH@@/interfaces/http/RecordController.java.tpl": "418fce64c198cb9405cfb65a9944f0734f6de5917068d6204e3a485a47ac1640",
     "verification/service-template/src/main/java/@@PACKAGE_PATH@@/domain/repository/RecordWriter.java.tpl": "fa0f88f735deee7fb4c1b630db66b9337d61206598fbc72d725422aa48937e8e",
     "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/SqlRecordWriter.java.tpl": "a9f087ece9e4bc283c38de4c2f366e8bf6c53eddb91d3687be1293645d9e3fa5",
     "verification/service-template/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/RecordPo.java.tpl": "4d97f701b901a433a324ad3ac3ec6cfa745a129eedf363ac3b4e5db483d07637",
@@ -37,7 +37,7 @@
     "verification/service-template/src/test/resources/mapper/verification/DatabaseFixture.xml": "5f00c56bbd37ad24f04663a20366fa3d4879f5f1645cc8dda28b87669f9be913"
   },
   "contracts": {
-    "bare-modules.json": "bf52a810c2b7cf66146090fe25df32f09344f92087209266843e53e46aed8f2b",
-    "fixture-modules.json": "79f23627a549325047a4cbb8e5b97e5313cfffc32afce6d5b28fa68e6a488376"
+    "bare-modules.json": "209b9aebdc7c85e8a5cdd55b65604c6c7c410d27753f972cd8aa67c19b45fea1",
+    "fixture-modules.json": "aec087e43854a77a37e11e0295afd96f8a171ab6be1dd59c72ccd1a2a24491c7"
   }
 }

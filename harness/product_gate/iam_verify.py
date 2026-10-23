@@ -21,18 +21,10 @@ def inspect(root, project, observed, foundation, argv, env, home, repository, wo
     result = {'ok': False, 'human_acceptance': False, 'remote_delivery_proven': False,
               'performance': 'separate fixed-resource local verification; not inferred from CI'}
     try:
-        owner = 'access-contract'
-        relative, declaration, _ = iam_build.MODULES[owner]
-        contract = web_build.observe(root, code / relative, ET.parse(observed['inventory']['path']).getroot(),
-                                     repository, False, iam_build.lock(root)['required_tests'][owner])
-        definition = iam_build.module_contract(root, owner, declaration, contract, directory)
-        contract['quality'] = build.quality(root, code / relative, contract, args.tools, definition, digest(definition))
-        require(contract['quality']['ok'], 'PG_SOURCE_QUALITY', '身份公开合同质量失败')
-        result[owner] = contract
         publication = dict(foundation['publication'])
         artifacts = dict(publication['artifacts'])
         target = Path(publication['repository'])
-        for owner in ['access-contract', 'access-backend', 'iam-client']:
+        for owner in ['access-control', 'iam-client']:
             relative, _, _ = iam_build.MODULES[owner]
             name = relative.name
             pom = iam_build.consumer_pom(root, code / relative, name)
@@ -53,7 +45,7 @@ def inspect(root, project, observed, foundation, argv, env, home, repository, wo
         result['publication'] = publication
         publication_file = directory / 'publication.json'
         publication_file.write_text(json.dumps(publication, indent=2) + '\n')
-        for owner in ['access-backend', 'iam-client', 'iam']:
+        for owner in ['access-control', 'iam-client', 'iam']:
             relative, declaration, executable = iam_build.MODULES[owner]
             result[owner] = iam_build.isolated(root, code, relative, owner, declaration, executable,
                 publication, repository, home, env, args.tools, workspace, directory)
@@ -72,7 +64,7 @@ def inspect(root, project, observed, foundation, argv, env, home, repository, wo
             require(result['runtime']['ok'], 'PG_IAM_RUNTIME', 'IAM运行验证失败')
         if args.check in ('all', 'dependency-risk-gate'):
             result['advisory'] = {}
-            for owner in ['access-backend', 'iam-client', 'iam']:
+            for owner in ['access-control', 'iam-client', 'iam']:
                 module = result[owner]
                 scan = directory / (owner + '-advisory')
                 scan.mkdir()

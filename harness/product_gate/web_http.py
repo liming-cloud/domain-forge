@@ -66,7 +66,7 @@ def baseline_inputs(root):
 def contract_baseline(root, name, generated):
     directory = root / environment.PRODUCT / environment.CONTRACTS
     manifest = json.loads((directory / 'manifest.json').read_text())
-    require(manifest.get('schema') == 1 and manifest.get('version') == '0.1.0-r2.1' and
+    require(manifest.get('schema') == 1 and manifest.get('version') == '0.3.0-iam.2' and
             manifest.get('inputs') == baseline_inputs(root) and set(manifest.get('contracts', {})) == {'a', 'b'},
             'PG_HTTP_BASELINE', '首版合同未绑定当前真实输入或消费者不完整')
     path = directory / f'consumer-{name}-openapi.json'

@@ -54,7 +54,8 @@ class WebInputTests(unittest.TestCase):
             preparation = workspace / 'http-preparation/tools'; preparation.mkdir(parents=True); (preparation / 'prepare.log').write_text('preparation diagnostics')
             raise environment.ProbeFailure('PG_NATIVE_FAILURE', 'injected native failure')
         args = SimpleNamespace(tools='fixed', http_tools='fixed', check='all')
-        with patch.object(web_build, 'component', return_value={}), patch.object(web_build, 'publish', return_value={}), patch.object(web_build, 'tool_bytes', return_value={}), patch.object(web_build, 'consume', side_effect=fail):
+        component = {'poms': {'domain-forge-web-support': {}, 'domain-forge-bom': {}}, 'artifact': {}}
+        with patch.object(web_verify.foundation_build, 'shared_component', return_value={}), patch.object(web_build, 'isolated', return_value={}), patch.object(web_build, 'component', return_value=component), patch.object(web_build, 'publish', return_value={}), patch.object(web_build, 'tool_bytes', return_value={}), patch.object(web_build, 'consume', side_effect=fail):
             self.reject('PG_NATIVE_FAILURE', web_verify.inspect, ROOT, ROOT / 'platform/verification/smoke/boot-smoke', {}, [], {}, None, None, None, workspace, output, args)
         self.assertEqual((output / 'independent-builds/consumer-a-evidence/verify.log').read_text(), 'native failure evidence')
         self.assertTrue((output / 'independent-builds/consumer-a-runtime/http-runtime.log').is_file())
@@ -64,7 +65,7 @@ class WebInputTests(unittest.TestCase):
     def test_frozen_contract_rejects_manual_edit_and_input_drift(self):
         root = self.directory / 'root'; root.mkdir()
         shutil.copytree(ROOT / 'platform', root / 'platform', ignore=shutil.ignore_patterns('target'))
-        destination = root / 'platform/verification/contracts/web-support/0.1.0-r2.1'
+        destination = root / environment.PRODUCT / environment.CONTRACTS
         (root / 'harness/product_gate').mkdir(parents=True)
         for name in ('a', 'b'):
             shutil.copyfile(ROOT / f'harness/product_gate/consumer-{name}-scenarios.json', root / f'harness/product_gate/consumer-{name}-scenarios.json')
@@ -78,7 +79,7 @@ class WebInputTests(unittest.TestCase):
         scenario = root / 'harness/product_gate/consumer-a-scenarios.json'; scenario.write_text(scenario.read_text() + ' ')
         self.reject('PG_HTTP_BASELINE', web_http.contract_baseline, root, 'a', generated)
         shutil.copyfile(ROOT / 'harness/product_gate/consumer-a-scenarios.json', scenario)
-        source = root / 'platform/framework/domain-forge-web-support/src/main/java/org/domainforge/web/api/ApiResponse.java'
+        source = root / 'platform/shared/src/main/java/org/domainforge/shared/ApiResponse.java'
         source.write_text(source.read_text() + '// drift\n')
         self.reject('PG_HTTP_BASELINE', web_http.contract_baseline, root, 'a', generated)
 
@@ -175,8 +176,8 @@ class WebInputTests(unittest.TestCase):
         target = self.directory / 'published'
         version = web_build.lock(ROOT)['candidate_version']
         (target / 'org/domainforge/domain-forge-web-support' / version).mkdir(parents=True)
-        result = {'poms': {'domain-forge-web-support': {}}, 'artifact': {}}
-        self.reject('PG_IMMUTABLE_GAV', web_build.publish, ROOT, ROOT / 'code', result, [], {}, self.directory, target)
+        result = {'domain-forge-web-support': {'pom': {'version': version}}}
+        self.reject('PG_IMMUTABLE_GAV', web_build.publish, ROOT, ROOT / 'platform', result, [], {}, self.directory, target)
 
     def test_generated_pom_cannot_depend_on_internal_parent_or_variables(self):
         pom = self.directory / 'generated.xml'

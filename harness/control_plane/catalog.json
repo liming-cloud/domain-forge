@@ -430,6 +430,7 @@
     {"glob":"platform/verification/smoke/boot-smoke/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},
     {"glob":"platform/verification/smoke/boot-smoke/src/test/**","purpose":"test","scopes":["tests","source-coverage","build-gate"]},
     {"glob":"platform/verification/contracts/web-support/0.1.0-r2.1/*.json","purpose":"documentation","scopes":["http","contract","build-gate"]},
+    {"glob":"platform/verification/contracts/web-support/0.3.0-iam.2/*.json","purpose":"documentation","scopes":["http","contract","build-gate"]},
     {"glob":"platform/framework/web-support/pom.xml","purpose":"production","scopes":["build","dependency-risk","build-gate"]},
     {"glob":"platform/framework/web-support/src/main/java/**","purpose":"production","scopes":["java-types","java-methods","java-source","source-format","source-coverage","architecture","build-gate"]},
     {"glob":"platform/framework/web-support/src/main/resources/**","purpose":"production","scopes":["configuration","runtime","build-gate"]},

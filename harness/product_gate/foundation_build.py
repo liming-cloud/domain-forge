@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 import build
+import calibrate_lifecycle
 import calibrate_maven
 import environment
 from environment import command, digest, require
@@ -43,26 +44,34 @@ def component(root, code, observed, repository, tools, output):
     return result
 
 
-def domain_component(root, code, observed, repository, tools, output):
-    """领域标识是纯 Java 普通制品，独立消费不携带框架或内部 parent。"""
-    project = code / environment.DOMAIN
+def shared_component(root, code, observed, repository, tools, output):
+    """共享对象为普通制品，领域标识另以无框架编译用例约束。"""
+    project = code / environment.SHARED
     result = web_build.observe(root, project, ET.parse(observed['inventory']['path']).getroot(),
-        repository, False, ['org.domainforge.domain.api.JavaOnlyConsumptionTest#compilesWithoutFrameworkOrSharedBaseClass'])
+        repository, False, ['org.domainforge.shared.JavaOnlyConsumptionTest#compilesWithoutFrameworkOrSharedBaseClass',
+                            'org.domainforge.shared.CurrentSubjectTest#identityIsImmutableAndBounded'])
     result['quality'] = build.quality(root, project, result, tools, 'domain-modules.json')
     (output / 'domain-quality.json').write_text(json.dumps(result['quality'], ensure_ascii=False, indent=2))
     require(result['quality']['ok'], 'PG_SOURCE_QUALITY', '领域标识源码或精确结构不符')
     pom = project / 'target/.flattened-pom.xml'
     model = ET.parse(pom).getroot()
-    require(model.find('{*}parent') is None and not model.findall('./{*}dependencies/{*}dependency')
+    dependencies = model.findall('./{*}dependencies/{*}dependency')
+    require(all(model.find('{*}' + tag) is None for tag in
+                ('parent', 'repositories', 'pluginRepositories', 'build', 'profiles', 'modules', 'distributionManagement'))
+            and '${' not in pom.read_text() and len(dependencies) == 2
+            and {(item.findtext('{*}groupId'), item.findtext('{*}artifactId')) for item in dependencies} ==
+                {('com.fasterxml.jackson.core', 'jackson-annotations'), ('io.swagger.core.v3', 'swagger-annotations-jakarta')}
+            and all(calibrate_lifecycle.fixed_version(item.findtext('{*}version')) and
+                    item.findtext('{*}scope', 'compile') == 'compile' for item in dependencies)
             and model.findtext('{*}groupId') == 'org.domainforge'
-            and model.findtext('{*}artifactId') == 'domain-forge-domain'
-            and model.findtext('{*}version') == '0.3.0-iam.1',
-            'PG_CONSUMER_POM', '领域标识消费 POM 必须无运行依赖')
-    result['pom'] = {'path': str(pom), 'sha256': digest(pom)}
+            and model.findtext('{*}artifactId') == 'shared'
+            and model.findtext('{*}version') == lock(root)['version'],
+            'PG_CONSUMER_POM', '共享消费 POM 仅携带固定注解依赖，不得泄漏内部构建或执行框架')
+    result['pom'] = {'path': str(pom), 'sha256': digest(pom), 'version': lock(root)['version']}
     return result
 
 
-def publish(root, code, component, domain, publication, argv, env, output):
+def publish(root, code, component, publication, argv, env, output):
     """在既有 Web 独立消费结束后追加新坐标；绝不覆盖本轮已有 GAV。"""
     target = Path(publication['repository']); version = lock(root)['version']
     relative = 'org/domainforge/domain-forge-persistence/' + version + '/domain-forge-persistence-' + version
@@ -75,18 +84,10 @@ def publish(root, code, component, domain, publication, argv, env, output):
     artifacts = dict(publication['artifacts'])
     artifacts[relative + '.jar'] = component['artifact']['sha256']
     artifacts[relative + '.pom'] = component['pom']['sha256']
-    relative_domain = 'org/domainforge/domain-forge-domain/0.3.0-iam.1/domain-forge-domain-0.3.0-iam.1'
-    require(not (target / relative_domain).parent.exists(), 'PG_IMMUTABLE_GAV', '领域标识候选坐标已经存在')
-    command([*argv, '-N', '-f', code / 'pom.xml', ':'.join([tool['group'], tool['artifact'], tool['version'], 'deploy-file']),
-             '-Durl=' + target.as_uri(), '-DrepositoryId=foundation-verification',
-             '-Dfile=' + domain['artifact']['path'], '-DpomFile=' + domain['pom']['path'], '-DgeneratePom=false'],
-            code, output / 'domain-publish.log', 600, env)
-    artifacts[relative_domain + '.jar'] = domain['artifact']['sha256']
-    artifacts[relative_domain + '.pom'] = domain['pom']['sha256']
     require(all((target / path).is_file() and digest(target / path) == checksum for path, checksum in artifacts.items()),
             'PG_PUBLICATION', '本轮制品发布字节不符')
     require({p.name for p in (target / 'org/domainforge').iterdir()} ==
-            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'domain-forge-domain'},
+            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'shared'},
             'PG_PUBLICATION', '制品仓库出现未批准的平台坐标')
     return {'repository': str(target), 'artifacts': artifacts, 'execution': execution}
 
@@ -177,7 +178,7 @@ def consume(root, code, app, workspace, publication, repository, home, env, tool
                 metadata.is_file() and Path(path).name + '>foundation-verification=' in metadata.read_text(),
                 'PG_CONSUMER_ARTIFACT', '生成工程未从本轮仓库取回精确平台制品')
     require({p.name for p in (local / 'org/domainforge').iterdir() if p.is_dir()} ==
-            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'domain-forge-domain'},
+            {'domain-forge-web-support', 'domain-forge-bom', 'domain-forge-persistence', 'shared'},
             'PG_CONSUMER_PARENT', '生成工程消费了内部 parent 或未知平台制品')
     definition = module_contract(code, publication, output, fixture)
     quality = build.quality(root, app, observed, tools, definition, digest(definition))
@@ -195,10 +196,11 @@ def module_contract(code, publication, output, fixture):
     for module in declaration['modules']:
         if module['kind'] != 'component':
             continue
-        require(module['id'] in {'web-support', 'persistence', 'domain'}, 'PG_COMPONENT_BINDING', '未知模板组件')
-        name = 'domain-forge-' + module['id']
+        require(module['id'] in {'web-support', 'persistence', 'shared'}, 'PG_COMPONENT_BINDING', '未知模板组件')
+        name = 'shared' if module['id'] == 'shared' else 'domain-forge-' + module['id']
         matches = [(path, checksum) for path, checksum in publication['artifacts'].items()
-                   if Path(path).name.startswith(name + '-') and path.endswith('.jar')]
+                   if len(Path(path).parts) == 5 and Path(path).parts[:3] == ('org', 'domainforge', name)
+                   and Path(path).name == name + '-' + Path(path).parent.name + '.jar']
         require(len(matches) == 1, 'PG_COMPONENT_BINDING', '组件合同缺少唯一发布制品')
         path, checksum = matches[0]
         module['artifact'] = {'group': 'org.domainforge', 'artifact': name, 'version': Path(path).parent.name, 'sha256': checksum}

@@ -40,7 +40,7 @@
     {
       "source": "assets/pom.xml.tpl",
       "target": "pom.xml",
-      "sha256": "315c99d53306525b7170c69f17fa2dcf90728520e071df12e83425dbeff7a4e4",
+      "sha256": "aaf8c8428e048ac6015dad897aad8ac817f98f268f71c82c795d11947be07086",
       "render": true,
       "executable": false
     },
@@ -82,7 +82,7 @@
     {
       "source": "01-使用说明.md",
       "target": "docs/01-使用说明.md",
-      "sha256": "8ece6664d1f7027b49e4ef576f6623589a034a749383fce83862de3397fa7a00",
+      "sha256": "e94e33c53a9fb659ea08cb4c43e9ea61362845881a22bd0ec067a3eac017ffc1",
       "render": false,
       "executable": false
     }

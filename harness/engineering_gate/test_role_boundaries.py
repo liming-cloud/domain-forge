@@ -318,10 +318,10 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
         self.source("interfaces.http")
         self.strict_definition()
         root = HERE.parents[1]
-        api = root / "platform/framework/domain-forge-web-support/src/main/java/org/domainforge/web/api/ApiResponse.java"
+        api = root / "platform/shared/src/main/java/org/domainforge/shared/ApiResponse.java"
         self.case.write("src/test-named-production/java/web/ApiResponse.java", api.read_text().rstrip())
         source = self.case.project / "src/test-named-production/java/probe/Service.java"
-        source.write_text(source.read_text().replace('return "ok";', 'org.domainforge.web.api.ApiResponse.success("ok"); return "ok";'))
+        source.write_text(source.read_text().replace('return "ok";', 'org.domainforge.shared.ApiResponse.success("ok"); return "ok";'))
         pom = self.case.project / 'pom.xml'
         text = pom.read_text()
         extra = '<dependency><groupId>org.springframework</groupId><artifactId>spring-web</artifactId></dependency>'
@@ -330,13 +330,14 @@ class ServiceTest { String verify() { return new probe.service.infrastructure.qu
         extra += '<dependency><groupId>io.swagger.core.v3</groupId><artifactId>swagger-annotations-jakarta</artifactId><version>' + version + '</version></dependency>'
         bom = '<dependencyManagement><dependencies><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-dependencies</artifactId><version>' + calibrate_flyway.baseline()['boot_version'] + '</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>'
         pom.write_text(text.replace('<dependencies>', bom + '<dependencies>' + extra, 1))
-        component = json.loads((HERE.parent/'product_gate/web-modules.json').read_text())['modules'][0]
-        component['contract_types'] = ['org.domainforge.web.api.ApiResponse']
-        component['contract_members'] = [member for member in component['contract_members'] if member.startswith('org.domainforge.web.api.ApiResponse.')]
-        component['api_categories'] = {'org.domainforge.web.api.ApiResponse': 'http'}
+        component = json.loads((HERE.parent/'product_gate/domain-modules.json').read_text())['modules'][0]
+        component['contract_types'] = ['org.domainforge.shared.ApiResponse']
+        component['contract_members'] = [member for member in component['contract_members'] if member.startswith('org.domainforge.shared.ApiResponse.')]
+        component['api_categories'] = {'org.domainforge.shared.ApiResponse': 'http'}
+        component['data_contracts'] = ['org.domainforge.shared.ApiResponse']
         self.case.definition['modules'].append(component)
         service = self.case.definition['modules'][0]
-        service.update(depends_on=['web-support'], api_uses={'org.domainforge.web.api.ApiResponse': ['interfaces.http']})
+        service.update(depends_on=['shared'], api_uses={'org.domainforge.shared.ApiResponse': ['interfaces.http']})
         for role, diagnostic in [('interfaces.http', None), ('application', 'SG_COMPONENT_POSITION')]:
             if role == 'application':
                 self.fresh_copy()
