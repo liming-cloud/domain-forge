@@ -1,12 +1,23 @@
+# 单机部署参考：Nginx 是唯一公开入口，其余服务只在 backend 网络内可达。
+# 本地调试叠加 compose.local.yml（只在回环地址发布依赖端口）。用法见 deploy/README.md。
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:18.4-alpine3.24@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: domainforge
       POSTGRES_USER: domainforge
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?provide POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql
+    networks: [backend]
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -U domainforge -d domainforge']
       interval: 2s
@@ -14,13 +25,120 @@ services:
       retries: 30
   redis:
     image: redis:8.8.1-trixie@sha256:c88d347edef6249a6d2293f926f1eeb48bd40c57cbcd02c07f52e7f1fd2cb46b
+    restart: unless-stopped
+    logging: *logging
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?provide REDIS_PASSWORD}
+    # 只保存会话、登录防护计数与缓存，不持久化：重启后所有用户需重新登录。
     command: [sh, -c, 'exec redis-server --requirepass "$$REDIS_PASSWORD" --notify-keyspace-events E\$$gx --maxmemory 256mb --maxmemory-policy noeviction --save "" --appendonly no']
+    networks: [backend]
     healthcheck:
       test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
       interval: 2s
       timeout: 2s
       retries: 30
+  nacos:
+    # 只用作服务注册与发现；单机模式，内置存储持久化到卷，开启鉴权。
+    image: nacos/nacos-server:v3.1.1@sha256:13e74786507abbacebe080fae2fc9c05aa2591eb99c97a0a78ff0e72beb21b13
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:?provide NACOS_AUTH_TOKEN}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:?provide NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:?provide NACOS_AUTH_IDENTITY_VALUE}
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+      JVM_XMN: 128m
+    volumes:
+      - nacos-data:/home/nacos/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'curl -sf http://127.0.0.1:8848/nacos/v3/admin/core/state > /dev/null']
+      interval: 3s
+      timeout: 3s
+      retries: 60
+  nacos-init:
+    # 一次性任务：设置管理员密码并创建服务专用账号，成功后退出。
+    image: nacos/nacos-server:v3.1.1@sha256:13e74786507abbacebe080fae2fc9c05aa2591eb99c97a0a78ff0e72beb21b13
+    restart: "no"
+    logging: *logging
+    entrypoint: [sh, /init/init.sh]
+    environment:
+      NACOS_ADMIN_PASSWORD: ${NACOS_ADMIN_PASSWORD:?provide NACOS_ADMIN_PASSWORD}
+      NACOS_SERVICE_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
+      NACOS_SERVICE_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+    volumes:
+      - ./nacos/init.sh:/init/init.sh:ro
+    networks: [backend]
+    depends_on:
+      nacos:
+        condition: service_healthy
+  iam:
+    image: domain-forge/iam:${IAM_IMAGE_TAG:-local}
+    build:
+      context: ./iam
+      additional_contexts:
+        dist: ../platform/services/iam/target
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      IAM_DB_URL: jdbc:postgresql://postgres:5432/domainforge
+      IAM_DB_USER: domainforge
+      IAM_DB_PASSWORD: ${POSTGRES_PASSWORD:?provide POSTGRES_PASSWORD}
+      IAM_REDIS_HOST: redis
+      IAM_REDIS_PORT: "6379"
+      IAM_REDIS_PASSWORD: ${REDIS_PASSWORD:?provide REDIS_PASSWORD}
+      IAM_FINGERPRINT_KEY: ${IAM_FINGERPRINT_KEY:?provide IAM_FINGERPRINT_KEY}
+      IAM_DISCOVERY_ENABLED: "true"
+      IAM_NACOS_SERVER_ADDR: nacos:8848
+      IAM_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
+      IAM_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+      # 只信任 Nginx 固定地址给出的 X-Forwarded-For，登录防护按真实客户端地址计数。
+      SERVER_FORWARDHEADERSSTRATEGY: NATIVE
+      SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES: '172\.31\.250\.10'
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # 管理端口只绑定容器内回环地址，不对网络开放。
+      test: [CMD-SHELL, 'curl -sf http://127.0.0.1:9091/actuator/health/readiness > /dev/null']
+      interval: 3s
+      timeout: 3s
+      start_period: 30s
+      retries: 40
+  nginx:
+    image: nginx:1.30-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+    restart: unless-stopped
+    logging: *logging
+    ports: ["${NGINX_HTTP_BIND:-127.0.0.1}:${NGINX_HTTP_PORT:-8080}:80"]
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      backend:
+        ipv4_address: 172.31.250.10
+    depends_on:
+      iam:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/healthz']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+networks:
+  backend:
+    # Nginx 的固定地址与 IAM 的可信代理配置一致；修改网段时两处同步。
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+
 volumes:
   postgres-data:
+  nacos-data:
