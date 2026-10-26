@@ -2,13 +2,8 @@ package org.domainforge.iam.infrastructure.configuration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-
 /**
- * 登录防护的有限部署输入；只有共享计数策略参与跨实例摘要。
+ * 登录防护与密码计算的有限部署输入；配置变更随服务重启生效，越界值阻止启动。
  */
 @ConfigurationProperties(prefix = "iam.login-protection", ignoreUnknownFields = false)
 public record LoginProtectionSettings(
@@ -34,35 +29,5 @@ public record LoginProtectionSettings(
 
     private static void range(String name, int value, int minimum, int maximum) {
         if (value < minimum || value > maximum) throw new IllegalArgumentException("登录防护配置越界: " + name);
-    }
-
-    /**
-     * 固定字段次序、单位和版本；本机哈希资源变化不改变共享策略身份。
-     */
-    public String digest() {
-        String canonical =
-                "iam-login-policy-v1:"
-                        + accountAttempts
-                        + ":"
-                        + accountWindowSeconds
-                        + ":"
-                        + addressAttempts
-                        + ":"
-                        + addressWindowSeconds;
-        try {
-            return HexFormat.of()
-                    .formatHex(
-                            MessageDigest.getInstance("SHA-256")
-                                    .digest(canonical.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException failure) {
-            throw new IllegalStateException("运行环境缺少SHA-256", failure);
-        }
-    }
-
-    /**
-     * Redis状态丢失至少等待全部当前窗口；SQL另保留已存在的更晚截止。
-     */
-    public int recoverySeconds() {
-        return Math.max(accountWindowSeconds, addressWindowSeconds);
     }
 }

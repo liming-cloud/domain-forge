@@ -105,8 +105,10 @@ class NativeCachingIT {
         }
     }
 
+    // 已知缺陷证据：原生 L1 对缺失键的附属记录不受容量约束，这是 L1 改用 Caffeine 的原因之一。
+    // 若升级后此断言失败，说明原生实现已修复，应重新评估 L1 选型。
     @Test
-    void nativeL1MetadataMustRemainBoundedForAbsentKeys() throws Exception {
+    void nativeL1MetadataIsNotBoundedForAbsentKeys() throws Exception {
         var config =
                 new org.redisson.config.Config()
                         .setProtocol(Protocol.RESP3)
@@ -138,15 +140,17 @@ class NativeCachingIT {
             var field = local.getClass().getDeclaredField("name2cacheKey");
             field.setAccessible(true);
             int retained = ((java.util.Map<?, ?>) field.get(local)).size();
-            assertTrue(retained <= 8, "L1 容量 8／TTL 100ms 后附属键记录仍保留 " + retained);
+            assertTrue(retained > 8, "原生 L1 附属键记录已受容量约束（保留 " + retained + "），重新评估 L1 选型");
         } finally {
             local.destroy();
             client.shutdown();
         }
     }
 
+    // 已知缺陷证据：原生 L1 超过自身 TTL 后仍返回本地旧值，不重新读取 Redis。
+    // 若升级后此断言失败，说明原生实现已修复，应重新评估 L1 选型。
     @Test
-    void nativeL1ExpiryMustFetchAgainEvenWithoutInvalidation() throws Exception {
+    void nativeL1KeepsServingAfterOwnTtlWithoutInvalidation() throws Exception {
         String user = "expiry_" + UUID.randomUUID().toString().replace("-", "");
         String password = UUID.randomUUID().toString();
         redis("ACL", "SETUSER", user, "on", ">" + password, "~*", "&*", "+@all");
@@ -182,7 +186,7 @@ class NativeCachingIT {
             redis("ACL", "SETUSER", user, "-get");
             assertThrows(RuntimeException.class, remote::get, "故障必须确实阻止原生 GET");
             Thread.sleep(400);
-            assertThrows(RuntimeException.class, cached::get, "L1 超过自身 TTL 后必须重新读取 Redis；不得无限返回本地旧值");
+            assertEquals("live-l2", cached.get(), "原生 L1 超过 TTL 后已重新读取 Redis，重新评估 L1 选型");
         } finally {
             redis("ACL", "SETUSER", user, "+get");
             client.getBucket(key).delete();

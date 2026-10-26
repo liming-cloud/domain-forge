@@ -4,13 +4,14 @@ import org.domainforge.shared.AggregateRoot;
 
 import java.util.Locale;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * 账号维护自身凭据、启用状态及直接权限；不向公开查询导出凭据。
+ *
+ * <p>账号 ID 为应用分配的雪花 long，创建前即确定，便于同一事务内关联邀请与审计。
  */
 public record Account(
-        UUID id,
+        long id,
         String loginName,
         String credentialDigest,
         long credentialVersion,
@@ -33,7 +34,7 @@ public record Account(
      * 从已保存状态恢复账号也须校验不变量，不能通过构造绕过权限目录。
      */
     public Account {
-        if (id == null || credentialVersion < 1 || version < 1) {
+        if (id <= 0 || credentialVersion < 1 || version < 1) {
             throw new IllegalArgumentException("账号身份与版本无效");
         }
         loginName = normalizeLoginName(loginName);
@@ -57,7 +58,7 @@ public record Account(
     /**
      * 创建受邀普通账号，初始无管理权限且不关联隐式组织。
      */
-    public static Account register(UUID id, String loginName, String digest) {
+    public static Account register(long id, String loginName, String digest) {
         return new Account(id, loginName, digest, 1, 1, true, Set.of());
     }
 

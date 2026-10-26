@@ -21,7 +21,7 @@ public final class RetentionCleanup {
     private final Counter failures;
 
     /**
-     * 共用单库连接池，最多四条有界删除；不增加无界重试或后台工作队列。
+     * 共用单库连接池，最多三条有界删除；不增加无界重试或后台工作队列。
      */
     public RetentionCleanup(
             RetentionMapper mapper, PlatformTransactionManager manager, MeterRegistry metrics) {
@@ -43,10 +43,7 @@ public final class RetentionCleanup {
                     transaction.execute(
                             status -> {
                                 mapper.budget();
-                                return mapper.receipts()
-                                        + mapper.sessions()
-                                        + mapper.invitations()
-                                        + mapper.audits();
+                                return mapper.sessions() + mapper.invitations() + mapper.audits();
                             });
             deleted.increment(count);
             return count;

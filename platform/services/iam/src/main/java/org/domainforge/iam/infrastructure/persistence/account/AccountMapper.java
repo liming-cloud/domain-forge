@@ -10,7 +10,7 @@ public interface AccountMapper {
     /**
      * 返回指定账号当前存储状态，不存在返回null。
      */
-    AccountRow find(String id);
+    AccountRow find(long id);
 
     /**
      * 登录名已由领域规则规范化，不在SQL拼接外部输入。
@@ -20,7 +20,7 @@ public interface AccountMapper {
     /**
      * 锁定账号直到当前事务结束。
      */
-    AccountRow lock(String id);
+    AccountRow lock(long id);
 
     /**
      * 唯一键拒绝同名账号，包括并发注册。

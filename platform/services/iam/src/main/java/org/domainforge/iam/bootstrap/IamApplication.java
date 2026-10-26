@@ -1,7 +1,6 @@
 package org.domainforge.iam.bootstrap;
 
 import org.domainforge.iam.interfaces.cli.AdministratorCommand;
-import org.domainforge.iam.interfaces.cli.LoginPolicyCommand;
 import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
@@ -10,7 +9,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.annotation.Import;
 
 /**
- * 每项目一个IAM上下文部署，服务实现不作为其他上下文运行依赖。
+ * 一套系统一个 IAM 服务；服务实现不作为其他上下文的运行依赖。
  */
 @SpringBootApplication(scanBasePackages = "org.domainforge.iam")
 @Import(DomainForgePersistenceConfiguration.class)
@@ -21,11 +20,6 @@ public class IamApplication {
     public static void main(String[] args) {
         if (args.length > 0 && "initialize-admin".equals(args[0])) {
             AdministratorCommand.run(
-                    java.util.Arrays.copyOfRange(args, 1, args.length), IamApplication::maintenanceContext);
-            return;
-        }
-        if (args.length > 0 && "login-policy".equals(args[0])) {
-            LoginPolicyCommand.run(
                     java.util.Arrays.copyOfRange(args, 1, args.length), IamApplication::maintenanceContext);
             return;
         }

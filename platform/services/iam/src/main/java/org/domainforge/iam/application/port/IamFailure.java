@@ -9,6 +9,5 @@ public enum IamFailure {
     FORBIDDEN,
     CONFLICT,
     RATE_LIMITED,
-    UNAVAILABLE,
-    UNKNOWN_RESULT
+    UNAVAILABLE
 }

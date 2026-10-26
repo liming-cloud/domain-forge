@@ -7,7 +7,6 @@ import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.TreeSet;
-import java.util.UUID;
 
 /**
  * MyBatis账号仓储将表表示还原为领域快照并验证实际更新行数。
@@ -28,8 +27,8 @@ public class SqlAccounts implements AccountRepository {
     }
 
     @Override
-    public Account find(UUID id) {
-        return domain(mapper.find(id.toString()));
+    public Account find(long id) {
+        return domain(mapper.find(id));
     }
 
     @Override
@@ -38,8 +37,8 @@ public class SqlAccounts implements AccountRepository {
     }
 
     @Override
-    public Account lock(UUID id) {
-        return domain(mapper.lock(id.toString()));
+    public Account lock(long id) {
+        return domain(mapper.lock(id));
     }
 
     @Override

@@ -3,7 +3,6 @@ package org.domainforge.iam.domain.model;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AccountTest {
     @Test
     void registrationHasNoImplicitGrantAndNormalizesOnlyLoginName() {
-        Account account = Account.register(UUID.randomUUID(), "Reader.A", "opaque-hash");
+        Account account = Account.register(1L, "Reader.A", "opaque-hash");
         assertEquals("reader.a", account.loginName());
         assertTrue(account.enabled());
         assertEquals(Set.of(), account.permissions());
@@ -22,7 +21,7 @@ class AccountTest {
 
     @Test
     void passwordAndDisableInvalidatePreviousCredentialVersion() {
-        Account account = Account.register(UUID.randomUUID(), "reader.a", "hash-before");
+        Account account = Account.register(1L, "reader.a", "hash-before");
         Account changed = account.changePassword("hash-after");
         assertEquals(2, changed.credentialVersion());
         assertEquals("hash-after", changed.credentialDigest());
@@ -36,7 +35,7 @@ class AccountTest {
 
     @Test
     void grantsAreFiniteImmutableAndCurrentWithoutPasswordChange() {
-        Account account = Account.register(UUID.randomUUID(), "reader.a", "hash");
+        Account account = Account.register(1L, "reader.a", "hash");
         Account granted = account.changePermissions(Set.of("iam:account:read"));
         assertEquals(account.credentialVersion(), granted.credentialVersion());
         assertTrue(granted.version() > account.version());
@@ -48,14 +47,20 @@ class AccountTest {
     void invalidNamesAndEmptyCredentialsCannotBecomeAccounts() {
         for (String value : new String[]{"ab", " user", "用户账号", "a/b", "a".repeat(65)})
             assertThrows(
-                    IllegalArgumentException.class, () -> Account.register(UUID.randomUUID(), value, "hash"));
+                    IllegalArgumentException.class, () -> Account.register(1L, value, "hash"));
         assertThrows(
-                IllegalArgumentException.class, () -> Account.register(UUID.randomUUID(), "reader.a", ""));
+                IllegalArgumentException.class, () -> Account.register(1L, "reader.a", ""));
+    }
+
+    @Test
+    void identityMustBePositive() {
+        assertThrows(IllegalArgumentException.class, () -> Account.register(0L, "reader.a", "hash"));
+        assertThrows(IllegalArgumentException.class, () -> Account.register(-1L, "reader.a", "hash"));
     }
 
     @Test
     void diagnosticRepresentationNeverContainsCredentialDigest() {
-        Account account = Account.register(UUID.randomUUID(), "reader.a", "private-credential-digest");
+        Account account = Account.register(1L, "reader.a", "private-credential-digest");
         assertFalse(account.toString().contains("private-credential-digest"));
     }
 }

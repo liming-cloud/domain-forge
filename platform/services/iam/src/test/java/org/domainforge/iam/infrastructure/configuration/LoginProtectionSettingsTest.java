@@ -8,7 +8,8 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LoginProtectionSettingsTest {
     private static LoginProtectionSettings bind(Map<String, Object> values) {
@@ -44,22 +45,5 @@ class LoginProtectionSettingsTest {
             }
         }
         assertEquals(new LoginProtectionSettings(5, 600, 30, 60, 2, 8, 1000), bind(defaults));
-    }
-
-    // 本实例资源不改变共享摘要；四项共享参数任一改变均必须重新登记。
-    @Test
-    void sharedIdentityExcludesLocalResources() {
-        var policy = bind(defaults());
-        assertEquals(policy.digest(), new LoginProtectionSettings(5, 600, 30, 60, 1, 1, 100).digest());
-        for (var changed :
-                new LoginProtectionSettings[]{
-                        new LoginProtectionSettings(4, 600, 30, 60, 2, 8, 1000),
-                        new LoginProtectionSettings(5, 601, 30, 60, 2, 8, 1000),
-                        new LoginProtectionSettings(5, 600, 29, 60, 2, 8, 1000),
-                        new LoginProtectionSettings(5, 600, 30, 61, 2, 8, 1000)
-                }) {
-            assertNotEquals(policy.digest(), changed.digest());
-        }
-        assertEquals(3600, new LoginProtectionSettings(1, 3600, 1, 600, 1, 1, 100).recoverySeconds());
     }
 }

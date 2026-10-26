@@ -7,8 +7,6 @@ import org.domainforge.iam.application.query.account.AccountQueries;
 import org.domainforge.iam.application.query.account.AccountView;
 import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
 /**
  * AccountQueries直接落实受保护的投影，不为简单查询强制装载领域聚合。
  */
@@ -27,8 +25,8 @@ public class SqlAccountQueries implements AccountQueries {
      * 不存在的可信主体不伪装为匿名账号。
      */
     @Override
-    public AccountView self(UUID id) {
-        AccountProjection row = mapper.self(id.toString());
+    public AccountView self(long id) {
+        AccountProjection row = mapper.self(id);
         if (row == null) throw new IamException(IamFailure.UNAUTHENTICATED, "当前主体无效");
         return row.view();
     }
@@ -37,10 +35,11 @@ public class SqlAccountQueries implements AccountQueries {
      * 业务投影每次恰好一条SQL；不静默修剪超大或非法分页输入。
      */
     @Override
-    public AccountPage list(UUID after, int limit) {
-        if (limit < 1 || limit > 100) throw new IamException(IamFailure.INVALID_REQUEST, "分页大小须为1至100");
+    public AccountPage list(long after, int limit) {
+        if (after < 0 || limit < 1 || limit > 100)
+            throw new IamException(IamFailure.INVALID_REQUEST, "分页游标须非负且大小须为1至100");
         var items =
-                mapper.list(after == null ? null : after.toString(), limit).stream()
+                mapper.list(after, limit).stream()
                         .map(AccountProjection::view)
                         .toList();
         return new AccountPage(items, items.size() == limit ? items.getLast().id() : null);

@@ -33,7 +33,7 @@ public final class RequestCurrentIdentity implements CurrentIdentityAccess {
     public CurrentIdentity current() {
         var subject = access.current();
         CurrentIdentity identity = source.privateIdentity(logic.getTokenValue());
-        if (!subject.accountId().equals(identity.accountId()))
+        if (subject.accountId() != identity.accountId())
             throw new AccessException(AccessFailure.UNAUTHENTICATED);
         return identity;
     }

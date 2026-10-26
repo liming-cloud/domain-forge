@@ -2,8 +2,6 @@ package org.domainforge.iam.interfaces.http.registration;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.servlet.http.HttpServletRequest;
-import org.domainforge.iam.application.command.registration.InvitationIssued;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
 import org.domainforge.shared.ApiResponse;
@@ -13,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 管理邀请入口不发送邮件或创建预设密码；秘密仅首次交付给有权管理者。
+ * 管理邀请入口不发送邮件或创建预设密码；秘密仅在创建时交付给有权管理者。
  */
 @RestController
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -30,19 +28,13 @@ public final class InvitationController {
     }
 
     /**
-     * 响应丢失后重放secret为空，须显式替换旧邀请；已消费邀请不能重发。
+     * 秘密只在本次响应返回；丢失后须显式重发，replacesInvitationId 使旧邀请失效。
      */
     @SaCheckPermission("iam:invitation:create")
     @PostMapping("/api/invitations")
-    @Operation(summary = "创建或重发注册邀请", description = "秘密只首次返回；重放返回已创建事实，replacesInvitationId显式使旧邀请失效")
-    public ApiResponse<InvitationIssued> issue(
-            @RequestBody InvitationRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                invitations.execute(
-                        identity.current().tokenDigest(),
-                        input.operationId(),
-                        input.loginName(),
-                        input.replacesInvitationId()));
+    @Operation(summary = "创建或重发注册邀请", description = "秘密只返回一次；replacesInvitationId显式使旧邀请失效")
+    public ApiResponse<InvitationResponse> issue(@RequestBody InvitationRequest input) {
+        return ApiResponse.success(InvitationResponse.of(invitations.execute(
+                identity.current().tokenDigest(), input.loginName(), input.replacesInvitationId())));
     }
 }

@@ -8,7 +8,6 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.shared.CurrentSubject;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.stereotype.Component;
 
@@ -20,17 +19,12 @@ import org.springframework.stereotype.Component;
 public final class IamCurrentSubjectSource implements CurrentSubjectSource {
     private static final String PRIVATE_IDENTITY = IamCurrentSubjectSource.class.getName();
     private final CurrentAuthorization authorization;
-    private final String projectId;
 
     /**
-     * 项目由部署配置固定；本地模式不创建HTTP客户端或读取远程IAM资源。
+     * IAM 直接读取本地数据库，不创建 HTTP 客户端或读取远程 IAM 资源。
      */
-    public IamCurrentSubjectSource(
-            CurrentAuthorization authorization, @Value("${iam.project-id}") String projectId) {
-        if (projectId == null || !projectId.matches("[a-z][a-z0-9-]{2,63}"))
-            throw new IllegalArgumentException("项目标识无效");
+    public IamCurrentSubjectSource(CurrentAuthorization authorization) {
         this.authorization = authorization;
-        this.projectId = projectId;
     }
 
     /**
@@ -43,7 +37,7 @@ public final class IamCurrentSubjectSource implements CurrentSubjectSource {
         try {
             CurrentIdentity identity = authorization.current(token);
             CurrentSubject subject =
-                    new CurrentSubject(projectId, identity.accountId(), identity.permissions());
+                    new CurrentSubject(identity.accountId(), identity.permissions());
             storage.set(PRIVATE_IDENTITY, new PrivateIdentity(token, identity));
             return subject;
         } catch (IamException failure) {

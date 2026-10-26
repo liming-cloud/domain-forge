@@ -6,8 +6,6 @@ import org.domainforge.iam.domain.model.RegistrationInvitation;
 import org.domainforge.iam.domain.repository.InvitationRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
 /**
  * 邀请仓储验证更新结果，不能吞掉并发终态冲突。
  */
@@ -32,8 +30,8 @@ public class SqlInvitations implements InvitationRepository {
     }
 
     @Override
-    public RegistrationInvitation lock(UUID id) {
-        return domain(mapper.lock(id.toString()));
+    public RegistrationInvitation lock(long id) {
+        return domain(mapper.lock(id));
     }
 
     @Override

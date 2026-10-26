@@ -19,6 +19,14 @@
     <property name="max" value="120"/>
     <property name="ignorePattern" value="^(package|import) "/>
   </module>
+  <!--
+    IntelliJ 把多行 try-with-resources 的后续资源对齐到第一个资源（列对齐），
+    Checkstyle 的 Indentation 只能按固定缩进检查，无法表达列对齐，因此不检查 try 资源的缩进。
+  -->
+  <module name="SuppressionSingleFilter">
+    <property name="checks" value="Indentation"/>
+    <property name="message" value="^'try resource'"/>
+  </module>
   <module name="TreeWalker">
     <module name="Indentation">
       <property name="basicOffset" value="4"/>

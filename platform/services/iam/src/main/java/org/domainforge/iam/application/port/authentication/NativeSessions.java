@@ -1,7 +1,5 @@
 package org.domainforge.iam.application.port.authentication;
 
-import java.util.UUID;
-
 /**
  * 原生会话技术出口，只有SQL许可交集成立后才可对外确认身份。
  */
@@ -9,12 +7,12 @@ public interface NativeSessions {
     /**
      * 创建独立八小时令牌，禁止共享已有令牌或自动续期。
      */
-    String issue(UUID accountId);
+    String issue(long accountId);
 
     /**
-     * 验证当前原生状态，失效返回null；存储不可用必须报告故障。
+     * 验证当前原生状态，返回登录的账号 ID；会话失效返回 null，存储不可用必须报告故障。
      */
-    UUID subject(String token);
+    Long subject(String token);
 
     /**
      * 清理指定原生令牌；SQL撤销事实不能依赖此操作成功。

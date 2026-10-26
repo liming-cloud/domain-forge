@@ -2,7 +2,6 @@ package org.domainforge.iam.bootstrap;
 
 import cn.dev33.satoken.stp.StpLogic;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.domainforge.access.backend.configuration.LocalAccessConfiguration;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
@@ -13,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 
 import java.util.Base64;
 
@@ -22,7 +20,6 @@ import java.util.Base64;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(LoginProtectionSettings.class)
-@Import(LocalAccessConfiguration.class)
 public class IamSecurityConfiguration {
     /**
      * 无默认指纹密钥，非法部署输入拒绝启动。

@@ -24,7 +24,7 @@ public interface SessionMapper {
      */
     int insert(
             @Param("digest") String digest,
-            @Param("account") String account,
+            @Param("account") long account,
             @Param("version") long version,
             @Param("expires") Instant expires);
 

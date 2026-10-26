@@ -1,130 +1,80 @@
 package org.domainforge.iam.application.command.account;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
+import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
-import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.application.port.operation.AdministrationGuard;
-import org.domainforge.iam.application.port.operation.CommandReceipts;
-import org.domainforge.iam.application.port.operation.CommandResult;
-import org.domainforge.iam.application.port.operation.Transactions;
 import org.domainforge.iam.domain.model.Account;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
 
 /**
  * 管理命令协调有限权限、当前资格和最后完整管理者，不把跨账号规则塞进聚合。
+ *
+ * <p>每个命令是一个数据库事务：先取管理守卫，再在事务内重新核对操作者资格，最后锁目标账号；
+ * 业务变更与审计一起提交，任一步失败整体回滚。
  */
 @Service
-public final class ManageAccount {
-    private final Transactions transactions;
+public class ManageAccount {
     private final AdministrationGuard guard;
     private final CurrentAuthorization authorization;
     private final AccountRepository accounts;
-    private final CommandReceipts receipts;
-    private final SecretOperations secrets;
     private final AuditTrail audit;
 
     /**
-     * 共享同一管理守卫，锁顺序固定为守卫、收据、目标账号。
+     * 锁顺序固定为管理守卫、目标账号。
      */
     public ManageAccount(
-            Transactions transactions,
             AdministrationGuard guard,
             CurrentAuthorization authorization,
             AccountRepository accounts,
-            CommandReceipts receipts,
-            SecretOperations secrets,
             AuditTrail audit) {
-        this.transactions = transactions;
         this.guard = guard;
         this.authorization = authorization;
         this.accounts = accounts;
-        this.receipts = receipts;
-        this.secrets = secrets;
         this.audit = audit;
     }
 
     /**
-     * 分配整个明确集合；未知码或自身当前不持有的权限均不能分配。
+     * 整体替换目标账号的直接权限；未知码或操作者自身当前不持有的权限均不能分配。
      */
-    public CommandResult permissions(
-            String tokenDigest, UUID operation, UUID target, long version, Set<String> permissions) {
-        validateIdentity(operation, target, version);
+    @Transactional
+    public CommandResult permissions(String tokenDigest, long target, long version, Set<String> permissions) {
+        validateTarget(target, version);
         if (permissions == null || !Account.MANAGEMENT_PERMISSIONS.containsAll(permissions))
             throw new IamException(IamFailure.INVALID_REQUEST, "权限不在目录中");
         Set<String> desired = Set.copyOf(permissions);
-        String action = "account.permissions";
-        String fingerprint =
-                secrets.fingerprint(
-                        action,
-                        target.toString(),
-                        Long.toString(version),
-                        String.join(",", new TreeSet<>(desired)));
-        Change committed =
-                transactions.execute(
-                        () -> {
-                            guard.lock();
-                            var actor = authorization.require(tokenDigest, "iam:grant:manage");
-                            if (!actor.permissions().containsAll(desired))
-                                throw new IamException(IamFailure.FORBIDDEN, "不能分配自身未持有的权限");
-                            CommandResult previous =
-                                    receipts.previous("account:" + actor.accountId(), operation, fingerprint);
-                            if (previous != null) return new Change(previous, null);
-                            Account current = lockAccount(target, version);
-                            Account changed = current.changePermissions(desired);
-                            return saveChange(
-                                    current,
-                                    changed,
-                                    actor.accountId(),
-                                    fingerprint,
-                                    new CommandResult(operation, target, changed.version(), action));
-                        });
-        return completed(committed);
+        guard.lock();
+        var actor = authorization.require(tokenDigest, "iam:grant:manage");
+        if (!actor.permissions().containsAll(desired))
+            throw new IamException(IamFailure.FORBIDDEN, "不能分配自身未持有的权限");
+        Account current = lockAccount(target, version);
+        return save(current, current.changePermissions(desired), actor.accountId(), "account.permissions");
     }
 
     /**
-     * 状态变更提升凭据版本；重新启用不能恢复旧会话。
+     * 启用或禁用账号；状态变化提升凭据版本，旧会话失效，重新启用也不能恢复旧会话。
      */
-    public CommandResult state(
-            String tokenDigest, UUID operation, UUID target, long version, boolean enabled) {
-        validateIdentity(operation, target, version);
-        String action = "account.state";
-        String fingerprint =
-                secrets.fingerprint(
-                        action, target.toString(), Long.toString(version), Boolean.toString(enabled));
-        Change committed =
-                transactions.execute(
-                        () -> {
-                            guard.lock();
-                            var actor = authorization.require(tokenDigest, "iam:account:state");
-                            CommandResult previous =
-                                    receipts.previous("account:" + actor.accountId(), operation, fingerprint);
-                            if (previous != null) return new Change(previous, null);
-                            Account current = lockAccount(target, version);
-                            Account changed = current.changeEnabled(enabled);
-                            return saveChange(
-                                    current,
-                                    changed,
-                                    actor.accountId(),
-                                    fingerprint,
-                                    new CommandResult(operation, target, changed.version(), action));
-                        });
-        return completed(committed);
+    @Transactional
+    public CommandResult state(String tokenDigest, long target, long version, boolean enabled) {
+        validateTarget(target, version);
+        guard.lock();
+        var actor = authorization.require(tokenDigest, "iam:account:state");
+        Account current = lockAccount(target, version);
+        return save(current, current.changeEnabled(enabled), actor.accountId(), "account.state");
     }
 
-    private void validateIdentity(UUID operation, UUID target, long version) {
-        if (operation == null || target == null || version < 1)
-            throw new IamException(IamFailure.INVALID_REQUEST, "命令身份与版本无效");
+    private static void validateTarget(long target, long version) {
+        if (target <= 0 || version < 1) throw new IamException(IamFailure.INVALID_REQUEST, "目标账号与版本无效");
     }
 
-    private Account lockAccount(UUID target, long version) {
+    private Account lockAccount(long target, long version) {
         Account account = accounts.lock(target);
         if (account == null || account.version() != version)
             throw new IamException(IamFailure.CONFLICT, "账号不存在或版本已变化");
@@ -132,39 +82,18 @@ public final class ManageAccount {
     }
 
     /**
-     * 两条命令共享持久化责任；权限与业务状态转换在各自用例中显式完成。
+     * 保存变更并在同一事务写审计；变更会使最后一个完整管理者失去资格时拒绝。
      */
-    private Change saveChange(
-            Account current, Account changed, UUID actor, String fingerprint, CommandResult result) {
+    private CommandResult save(Account current, Account changed, long actor, String action) {
         if (current.isCompleteAdministrator()
                 && !changed.isCompleteAdministrator()
                 && accounts.completeAdministrators() <= 1) {
             throw new IamException(IamFailure.CONFLICT, "必须保留至少一个完整管理者");
         }
-        accounts.update(changed, current.version());
-        receipts.save("account:" + actor, fingerprint, result);
-        return new Change(result, actor);
-    }
-
-    /**
-     * 事务确认返回后才记录实际变更；重放保留原事实，不再次发送完成审计。
-     */
-    private CommandResult completed(Change committed) {
-        CommandResult result = committed.result();
-        if (committed.actor() != null)
-            audit.record(
-                    new AuditEvent(
-                            result.operationId(),
-                            committed.actor().toString(),
-                            result.targetId(),
-                            result.action(),
-                            "completed"));
-        return result;
-    }
-
-    /**
-     * actor来自事务内当前授权；空actor表示已存在的幂等结果。
-     */
-    private record Change(CommandResult result, UUID actor) {
+        if (changed != current) {
+            accounts.update(changed, current.version());
+            audit.record(new AuditEvent(Long.toString(actor), changed.id(), action));
+        }
+        return new CommandResult(changed.id(), changed.version());
     }
 }

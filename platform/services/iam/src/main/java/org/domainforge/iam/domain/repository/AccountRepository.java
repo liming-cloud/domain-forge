@@ -2,8 +2,6 @@ package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.Account;
 
-import java.util.UUID;
-
 /**
  * 账号聚合仓储，账号不存在时读取返回null，写入冲突不可当成功。
  */
@@ -11,7 +9,7 @@ public interface AccountRepository {
     /**
      * 读取当前账号；不得从跨请求缓存恢复允许依据。
      */
-    Account find(UUID id);
+    Account find(long id);
 
     /**
      * 读取用于密码校验的账号快照，密码计算后仍须再次锁定核对版本。
@@ -21,7 +19,7 @@ public interface AccountRepository {
     /**
      * 在调用方事务中取得账号排他锁；管理操作须先持有管理守卫。
      */
-    Account lock(UUID id);
+    Account lock(long id);
 
     /**
      * 创建新账号；唯一登录名由数据库兜底。

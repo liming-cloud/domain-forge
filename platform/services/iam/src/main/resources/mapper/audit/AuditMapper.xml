@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.audit.AuditMapper">
-    <select id="budget" resultType="java.lang.String">
-        SELECT set_config('statement_timeout', '500ms', true)
-    </select>
     <insert id="insert">
-        INSERT INTO iam_audit(operation_id,actor,target_id,action,outcome,source) VALUES(CAST(#{operation} AS
-        uuid),#{actor},CAST(#{target} AS uuid),#{action},#{outcome},'observed') ON
-        CONFLICT(operation_id,actor,target_id,action,source) DO NOTHING
+        INSERT INTO iam_audit (id, actor, target_id, action)
+        VALUES (#{id}, #{actor}, #{target}, #{action})
     </insert>
 </mapper>

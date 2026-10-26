@@ -10,7 +10,7 @@ import org.domainforge.iam.application.command.authentication.LoginResult;
 import org.domainforge.iam.application.command.authentication.Logout;
 import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
-import org.domainforge.iam.application.port.operation.CommandResult;
+import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.registration.RegistrationRequest;
 import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -18,10 +18,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
 /**
- * 认证HTTP适配不接受客户端主体，只把原生当前身份和直接来源地址交给应用。
+ * 认证 HTTP 适配不接受客户端主体，只把原生当前身份和直接来源地址交给应用。
  */
 @RestController
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -33,7 +31,7 @@ public final class AuthController {
     private final CurrentIdentityAccess identity;
 
     /**
-     * 装配实际应用用例；不在控制器访问Mapper、Redis或密码编码器。
+     * 装配实际应用用例；不在控制器访问 Mapper、Redis 或密码编码器。
      */
     public AuthController(
             Login login,
@@ -49,30 +47,24 @@ public final class AuthController {
     }
 
     /**
-     * 仅直接TCP来源用于防护，不接受Forwarded头声明的来源地址。
+     * 仅直接 TCP 来源用于防护，不接受 Forwarded 头声明的来源地址。
      */
     @SaIgnore
     @PostMapping("/api/auth/login")
     @Operation(summary = "登录", description = "默认保护启用；返回的原生Bearer令牌只在SQL提交确认后交付")
-    public ApiResponse<LoginResult> login(
-            @RequestBody LoginRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", UUID.randomUUID());
-        return ApiResponse.success(
-                login.execute(input.loginName(), input.password(), request.getRemoteAddr()));
+    public ApiResponse<LoginResult> login(@RequestBody LoginRequest input, HttpServletRequest request) {
+        return ApiResponse.success(login.execute(input.loginName(), input.password(), request.getRemoteAddr()));
     }
 
     /**
-     * 注册须有效邀请；同操作ID与相同输入重放不会再次建号。
+     * 注册须有效邀请；同一邀请只能成功一次，返回新账号 ID 与版本。
      */
     @SaIgnore
     @PostMapping("/api/auth/invitations/accept")
-    @Operation(summary = "接受注册邀请", description = "邀请秘密放请求体；operationId用于24小时内同输入重试")
-    public ApiResponse<CommandResult> register(
-            @RequestBody RegistrationRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                registration.execute(
-                        input.operationId(), input.invitationSecret(), input.loginName(), input.password()));
+    @Operation(summary = "接受注册邀请", description = "邀请秘密放请求体；邀请已使用或过期时返回409")
+    public ApiResponse<ChangeResponse> register(@RequestBody RegistrationRequest input) {
+        return ApiResponse.success(ChangeResponse.of(
+                registration.execute(input.invitationSecret(), input.loginName(), input.password())));
     }
 
     /**
@@ -81,12 +73,9 @@ public final class AuthController {
     @SaCheckLogin
     @PostMapping("/api/auth/password")
     @Operation(summary = "修改本人密码", description = "当前会话及旧密码必需；SQL提交后所有旧会话立即拒绝")
-    public ApiResponse<CommandResult> password(
-            @RequestBody PasswordChangeRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                passwords.execute(
-                        identity.current(), input.operationId(), input.oldPassword(), input.newPassword()));
+    public ApiResponse<ChangeResponse> password(@RequestBody PasswordChangeRequest input) {
+        return ApiResponse.success(ChangeResponse.of(
+                passwords.execute(identity.current(), input.oldPassword(), input.newPassword())));
     }
 
     /**
@@ -95,10 +84,8 @@ public final class AuthController {
     @SaCheckLogin
     @PostMapping("/api/auth/logout")
     @Operation(summary = "退出当前会话")
-    public ApiResponse<CommandResult> logout(
-            @RequestBody OperationRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                logout.execute(identity.current(), identity.token(), input.operationId()));
+    public ApiResponse<Void> logout() {
+        logout.execute(identity.current(), identity.token());
+        return ApiResponse.success(null);
     }
 }

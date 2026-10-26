@@ -3,30 +3,29 @@ package org.domainforge.iam.infrastructure.persistence.invitation;
 import org.domainforge.iam.domain.model.RegistrationInvitation;
 
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * 邀请存储状态与领域分离，公开接口不返回本对象。
  */
 public record InvitationRow(
-        String id,
+        long id,
         String loginName,
         String secretDigest,
         Instant expiresAt,
-        String createdBy,
-        String consumedBy,
+        long createdBy,
+        Long consumedBy,
         boolean invalidated) {
     /**
-     * 将邀请身份转换为驱动可绑定的UUID字符串。
+     * 将领域邀请转换为存储表示。
      */
     static InvitationRow from(RegistrationInvitation invitation) {
         return new InvitationRow(
-                invitation.id().toString(),
+                invitation.id(),
                 invitation.loginName(),
                 invitation.secretDigest(),
                 invitation.expiresAt(),
-                invitation.createdBy().toString(),
-                invitation.consumedBy() == null ? null : invitation.consumedBy().toString(),
+                invitation.createdBy(),
+                invitation.consumedBy(),
                 invitation.invalidated());
     }
 
@@ -35,12 +34,12 @@ public record InvitationRow(
      */
     RegistrationInvitation toDomain() {
         return new RegistrationInvitation(
-                UUID.fromString(id),
+                id,
                 loginName,
                 secretDigest,
                 expiresAt,
-                UUID.fromString(createdBy),
-                consumedBy == null ? null : UUID.fromString(consumedBy),
+                createdBy,
+                consumedBy,
                 invalidated);
     }
 

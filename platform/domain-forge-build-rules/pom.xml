@@ -71,6 +71,58 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
             </plugin>
+            <!--
+              本模块不继承 platform parent，需自行接入与 parent 相同的 Checkstyle 检查（版本保持一致）。
+              测试目录中的 fixture 故意违反架构规则，只检查格式，不检查说明与复杂度。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>14.3.0</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <consoleOutput>true</consoleOutput>
+                    <failOnViolation>true</failOnViolation>
+                    <violationSeverity>warning</violationSeverity>
+                    <inputEncoding>UTF-8</inputEncoding>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-main</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <configLocation>${project.basedir}/src/main/resources/checkstyle/main.xml</configLocation>
+                            <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                            <outputFile>${project.build.directory}/checkstyle-main.xml</outputFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>checkstyle-format</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <configLocation>${project.basedir}/src/main/resources/checkstyle/format.xml</configLocation>
+                            <sourceDirectories>
+                                <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
+                                <sourceDirectory>${project.build.testSourceDirectory}</sourceDirectory>
+                            </sourceDirectories>
+                            <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                            <outputFile>${project.build.directory}/checkstyle-format.xml</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

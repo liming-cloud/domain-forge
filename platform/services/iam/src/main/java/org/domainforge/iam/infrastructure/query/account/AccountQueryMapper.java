@@ -12,10 +12,10 @@ public interface AccountQueryMapper {
     /**
      * 本人查询只按可信身份绑定主键。
      */
-    AccountProjection self(String id);
+    AccountProjection self(long id);
 
     /**
      * 固定排序和绑定游标，不能将客户端字段作为SQL排序片段。
      */
-    List<AccountProjection> list(@Param("after") String after, @Param("limit") int limit);
+    List<AccountProjection> list(@Param("after") long after, @Param("limit") int limit);
 }

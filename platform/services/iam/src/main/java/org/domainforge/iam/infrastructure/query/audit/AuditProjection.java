@@ -3,38 +3,15 @@ package org.domainforge.iam.infrastructure.query.audit;
 import org.domainforge.iam.application.query.audit.AuditView;
 
 import java.time.Instant;
-import java.util.UUID;
 
 /**
- * 审计表投影隔离驱动UUID转换，缺失信息保持为空而非推断补齐。
+ * 审计表投影，字段与查询 SQL 的列顺序一致。
  */
-public record AuditProjection(
-        long id,
-        String operationId,
-        String actor,
-        String targetId,
-        String action,
-        String outcome,
-        Instant occurredAt,
-        Instant recordedAt,
-        String source,
-        String provenance,
-        String missingFields) {
+public record AuditProjection(long id, String actor, long targetId, String action, Instant occurredAt) {
     /**
-     * 将真实存储字段完整转交技术无关视图。
+     * 将存储字段转为技术无关视图。
      */
     AuditView view() {
-        return new AuditView(
-                id,
-                UUID.fromString(operationId),
-                actor,
-                UUID.fromString(targetId),
-                action,
-                outcome,
-                occurredAt,
-                recordedAt,
-                source,
-                provenance,
-                missingFields);
+        return new AuditView(id, actor, targetId, action, occurredAt);
     }
 }

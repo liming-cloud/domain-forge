@@ -6,7 +6,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
 import org.domainforge.access.api.CurrentAccess;
-import org.domainforge.access.backend.configuration.AccessControlConfiguration;
+import org.domainforge.access.internal.RequestCurrentSubject;
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
@@ -16,7 +16,6 @@ import org.domainforge.iam.infrastructure.security.JcaSecretOperations;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -49,7 +48,7 @@ class RequestCurrentIdentityTest {
         var previous = StpUtil.getStpLogic();
         var logic = new StpLogic("login");
         var reads = new AtomicInteger();
-        UUID account = UUID.randomUUID();
+        long account = 42L;
         var secrets = new JcaSecretOperations(new byte[32]);
         var stored =
                 new AtomicReference<>(
@@ -77,12 +76,12 @@ class RequestCurrentIdentityTest {
         NativeSessions nativeSessions =
                 new NativeSessions() {
                     @Override
-                    public String issue(UUID id) {
+                    public String issue(long id) {
                         throw new UnsupportedOperationException();
                     }
 
                     @Override
-                    public UUID subject(String token) {
+                    public Long subject(String token) {
                         return account;
                     }
 
@@ -97,11 +96,10 @@ class RequestCurrentIdentityTest {
                     }
                 };
         var source =
-                new IamCurrentSubjectSource(
-                        new CurrentAuthorization(nativeSessions, sessions, secrets), "test-project");
-        var configuration = new AccessControlConfiguration();
-        var subjects = configuration.requestCurrentSubject(source);
-        var access = configuration.currentAccess(subjects, logic);
+                new IamCurrentSubjectSource(new CurrentAuthorization(nativeSessions, sessions, secrets));
+        // 与 access-control 自动装配相同的组装方式
+        var subjects = new RequestCurrentSubject(source);
+        CurrentAccess access = () -> subjects.current(logic.getTokenValue());
         var privateAccess = new RequestCurrentIdentity(access, logic, source);
         try {
             SaTokenContextMockUtil.setMockContext();

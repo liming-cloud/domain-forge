@@ -2,8 +2,6 @@ package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.RegistrationInvitation;
 
-import java.util.UUID;
-
 /**
  * 注册邀请仓储；消费邀请与创建账号必须参与同一业务事务。
  */
@@ -16,7 +14,7 @@ public interface InvitationRepository {
     /**
      * 按管理操作指定身份锁定邀请，不存在返回null。
      */
-    RegistrationInvitation lock(UUID id);
+    RegistrationInvitation lock(long id);
 
     /**
      * 保存新邀请，不保存或记录原始秘密。

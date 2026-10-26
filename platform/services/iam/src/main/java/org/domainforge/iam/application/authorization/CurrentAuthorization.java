@@ -8,8 +8,6 @@ import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
 /**
  * 原生会话与SQL当前事实必须同时有效；管理事务再次校验SQL，不沿用入口权限。
  */
@@ -38,10 +36,10 @@ public final class CurrentAuthorization {
      */
     public CurrentIdentity current(String token) {
         if (token == null || token.isBlank() || token.length() > 4096) throw unauthenticated();
-        UUID nativeSubject = nativeSessions.subject(token);
+        Long nativeSubject = nativeSessions.subject(token);
         if (nativeSubject == null) throw unauthenticated();
         CurrentIdentity current = require(secrets.digest(token), null);
-        if (!nativeSubject.equals(current.accountId())) throw unauthenticated();
+        if (nativeSubject != current.accountId()) throw unauthenticated();
         return current;
     }
 

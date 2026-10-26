@@ -3,30 +3,29 @@ package org.domainforge.iam.domain.model;
 import org.domainforge.shared.AggregateRoot;
 
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * 注册邀请只允许绑定的登录名在有效期内消费一次；秘密仅以摘要保存。
  */
 public record RegistrationInvitation(
-        UUID id,
+        long id,
         String loginName,
         String secretDigest,
         Instant expiresAt,
-        UUID createdBy,
-        UUID consumedBy,
+        long createdBy,
+        Long consumedBy,
         boolean invalidated)
         implements AggregateRoot {
     /**
      * 恢复状态也校验必要身份、秘密摘要和互斥的终态。
      */
     public RegistrationInvitation {
-        if (id == null
-                || createdBy == null
+        if (id <= 0
+                || createdBy <= 0
                 || expiresAt == null
                 || secretDigest == null
                 || !secretDigest.matches("[a-f0-9]{64}")
-                || (consumedBy != null && invalidated)) {
+                || (consumedBy != null && (consumedBy <= 0 || invalidated))) {
             throw new IllegalArgumentException("邀请状态无效");
         }
         loginName = Account.normalizeLoginName(loginName);
@@ -35,8 +34,8 @@ public record RegistrationInvitation(
     /**
      * 消费后的状态由调用方与新账号在同一事务中保存。
      */
-    public RegistrationInvitation consume(UUID accountId, Instant now) {
-        if (accountId == null || now == null) throw new IllegalArgumentException("消费身份与时间不可为空");
+    public RegistrationInvitation consume(long accountId, Instant now) {
+        if (accountId <= 0 || now == null) throw new IllegalArgumentException("消费身份与时间不可为空");
         if (consumedBy != null || invalidated || !now.isBefore(expiresAt)) {
             throw new IllegalStateException("邀请已失效或已消费");
         }

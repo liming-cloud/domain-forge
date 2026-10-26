@@ -5,13 +5,12 @@ import org.domainforge.iam.domain.model.Account;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.UUID;
 
 /**
  * 账号表投影；权限存储编码不传播到领域或HTTP。
  */
 public record AccountRow(
-        String id,
+        long id,
         String loginName,
         String credentialDigest,
         long credentialVersion,
@@ -23,7 +22,7 @@ public record AccountRow(
      */
     static AccountRow from(Account account) {
         return new AccountRow(
-                account.id().toString(),
+                account.id(),
                 account.loginName(),
                 account.credentialDigest(),
                 account.credentialVersion(),
@@ -37,7 +36,7 @@ public record AccountRow(
      */
     Account toDomain() {
         return new Account(
-                UUID.fromString(id),
+                id,
                 loginName,
                 credentialDigest,
                 credentialVersion,

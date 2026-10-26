@@ -34,13 +34,8 @@ public final class AdministratorCommand {
         if (login == null) throw new IllegalArgumentException("缺少明确登录名");
         char[] password = readPassword(passwordFile);
         try (var context = start.get()) {
-            var result =
-                    context.getBean(InitializeAdministrator.class).execute(login, new String(password));
-            System.out.println(
-                    "administrator_initialized accountId="
-                            + result.targetId()
-                            + " operationId="
-                            + result.operationId());
+            long accountId = context.getBean(InitializeAdministrator.class).execute(login, new String(password));
+            System.out.println("administrator_initialized accountId=" + accountId);
         } finally {
             Arrays.fill(password, '\0');
         }

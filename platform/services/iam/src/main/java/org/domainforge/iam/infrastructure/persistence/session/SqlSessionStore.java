@@ -33,7 +33,7 @@ public class SqlSessionStore implements SessionStore {
     public void insert(SessionGrant grant) {
         mapper.insert(
                 grant.tokenDigest(),
-                grant.accountId().toString(),
+                grant.accountId(),
                 grant.credentialVersion(),
                 grant.expiresAt());
     }

@@ -13,7 +13,7 @@ public interface InvitationMapper {
     /**
      * 管理重发也锁同一邀请，不能和接受并发成功。
      */
-    InvitationRow lock(String id);
+    InvitationRow lock(long id);
 
     /**
      * 新邀请和旧邀请失效在调用方同一事务中提交。

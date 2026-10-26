@@ -35,8 +35,8 @@ platform/mvnw -f platform/pom.xml verify
 # 本机没有 Docker 时跳过集成测试（CI 会完整执行）
 platform/mvnw -f platform/pom.xml verify -DskipITs -Ddocker.skip=true
 
-# 自动整理格式
-platform/mvnw -f platform/pom.xml spotless:apply
+# 格式以 .editorconfig（IntelliJ 风格）为准；没有 IntelliJ 时只整理自己改动的文件
+platform/mvnw -f platform/pom.xml spotless:apply -DspotlessFiles='.*/MyClass.java'
 
 # 文档链接检查
 python3 scripts/check_doc_links.py

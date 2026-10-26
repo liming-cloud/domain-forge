@@ -134,13 +134,6 @@
                             <IAM_REDIS_PASSWORD>${it.password}</IAM_REDIS_PASSWORD>
                             <IAM_FINGERPRINT_KEY>AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=</IAM_FINGERPRINT_KEY>
                         </environmentVariables>
-                        <excludes>
-                            <!-- M2 会话安全专项探针与待删除的 iam-client 传输测试，P2 定稿后处理。 -->
-                            <exclude>**/NativeSessionSafetyIT.java</exclude>
-                            <exclude>**/SerializedSessionSafetyIT.java</exclude>
-                            <exclude>**/CompositeSessionSafetyIT.java</exclude>
-                            <exclude>**/CurrentStateTransportIT.java</exclude>
-                        </excludes>
                     </configuration>
                     <executions>
                         <execution>
@@ -193,6 +186,11 @@
                                             <arg>${it.password}</arg>
                                             <arg>--notify-keyspace-events</arg>
                                             <arg>E$gx</arg>
+                                            <!-- 与 deploy/compose.yml 一致：IAM 登录防护要求有上限的 noeviction 节点。 -->
+                                            <arg>--maxmemory</arg>
+                                            <arg>256mb</arg>
+                                            <arg>--maxmemory-policy</arg>
+                                            <arg>noeviction</arg>
                                             <arg>--save</arg>
                                             <arg>""</arg>
                                             <arg>--appendonly</arg>

@@ -3,19 +3,14 @@ package org.domainforge.iam.interfaces.http.account;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.servlet.http.HttpServletRequest;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.iam.application.command.account.ManageAccount;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
-import org.domainforge.iam.application.port.operation.CommandResult;
-import org.domainforge.iam.application.query.account.AccountPage;
 import org.domainforge.iam.application.query.account.AccountQueries;
-import org.domainforge.iam.application.query.account.AccountView;
+import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 /**
  * 账号纯查询走应用查询出口，管理命令必须同时经过原生策略与事务内当前资格检查。
@@ -43,24 +38,24 @@ public final class AccountController {
     }
 
     /**
-     * 本人身份来自服务端当前会话，接口不接收accountId参数。
+     * 本人身份来自服务端当前会话，接口不接收 accountId 参数。
      */
     @SaCheckLogin
     @GetMapping("/api/me")
     @Operation(summary = "读取本人最小资料")
-    public ApiResponse<AccountView> me() {
-        return ApiResponse.success(queries.self(access.current().accountId()));
+    public ApiResponse<AccountResponse> me() {
+        return ApiResponse.success(AccountResponse.of(queries.self(access.current().accountId())));
     }
 
     /**
-     * 单次业务投影SQL，固定UUID升序和最多100项，不执行总数查询。
+     * 单次业务投影 SQL，按 ID 升序、最多 100 项，不执行总数查询；after 为上一页的 nextCursor。
      */
     @SaCheckPermission("iam:account:read")
     @GetMapping("/api/accounts")
     @Operation(summary = "分页查询账号")
-    public ApiResponse<AccountPage> accounts(
-            @RequestParam(required = false) UUID after, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(queries.list(after, limit));
+    public ApiResponse<AccountPageResponse> accounts(
+            @RequestParam(defaultValue = "0") long after, @RequestParam(defaultValue = "20") int limit) {
+        return ApiResponse.success(AccountPageResponse.of(queries.list(after, limit)));
     }
 
     /**
@@ -69,16 +64,9 @@ public final class AccountController {
     @SaCheckPermission("iam:grant:manage")
     @PutMapping("/api/accounts/{id}/permissions")
     @Operation(summary = "变更直接权限")
-    public ApiResponse<CommandResult> permissions(
-            @PathVariable UUID id, @RequestBody PermissionRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                management.permissions(
-                        identity.current().tokenDigest(),
-                        input.operationId(),
-                        id,
-                        input.expectedVersion(),
-                        input.permissions()));
+    public ApiResponse<ChangeResponse> permissions(@PathVariable long id, @RequestBody PermissionRequest input) {
+        return ApiResponse.success(ChangeResponse.of(management.permissions(
+                identity.current().tokenDigest(), id, input.expectedVersion(), input.permissions())));
     }
 
     /**
@@ -87,15 +75,8 @@ public final class AccountController {
     @SaCheckPermission("iam:account:state")
     @PutMapping("/api/accounts/{id}/state")
     @Operation(summary = "变更账号启用状态")
-    public ApiResponse<CommandResult> state(
-            @PathVariable UUID id, @RequestBody AccountStateRequest input, HttpServletRequest request) {
-        request.setAttribute("iam.operationId", input.operationId());
-        return ApiResponse.success(
-                management.state(
-                        identity.current().tokenDigest(),
-                        input.operationId(),
-                        id,
-                        input.expectedVersion(),
-                        input.enabled()));
+    public ApiResponse<ChangeResponse> state(@PathVariable long id, @RequestBody AccountStateRequest input) {
+        return ApiResponse.success(ChangeResponse.of(management.state(
+                identity.current().tokenDigest(), id, input.expectedVersion(), input.enabled())));
     }
 }

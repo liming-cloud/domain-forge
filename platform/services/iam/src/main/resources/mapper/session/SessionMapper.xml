@@ -4,16 +4,24 @@
     <select id="budget" resultType="java.lang.String">
         SELECT set_config('statement_timeout', '500ms', true)
     </select>
+    <!-- 许可有效的全部条件：未撤销、未过期、账号启用且凭据版本一致。 -->
     <select id="current" resultType="org.domainforge.iam.infrastructure.persistence.session.IdentityRow">
-        SELECT a.id::text AS account_id,a.credential_version,a.permissions FROM iam_session_grant g JOIN iam_account a
-        ON a.id=g.account_id WHERE g.token_digest=#{digest} AND NOT g.revoked AND g.expires_at&gt;clock_timestamp() AND
-        a.enabled AND a.credential_version=g.credential_version
+        SELECT a.id AS account_id, a.credential_version, a.permissions
+        FROM iam_session_grant g
+                 JOIN iam_account a ON a.id = g.account_id
+        WHERE g.token_digest = #{digest}
+          AND NOT g.revoked
+          AND g.expires_at &gt; clock_timestamp()
+          AND a.enabled
+          AND a.credential_version = g.credential_version
     </select>
     <insert id="insert">
-        INSERT INTO iam_session_grant(token_digest,account_id,credential_version,expires_at,revoked)
-        VALUES(#{digest},CAST(#{account} AS uuid),#{version},#{expires},false)
+        INSERT INTO iam_session_grant (token_digest, account_id, credential_version, expires_at, revoked)
+        VALUES (#{digest}, #{account}, #{version}, #{expires}, false)
     </insert>
     <update id="revoke">
-        UPDATE iam_session_grant SET revoked=true WHERE token_digest=#{digest}
+        UPDATE iam_session_grant
+        SET revoked = true
+        WHERE token_digest = #{digest}
     </update>
 </mapper>

@@ -30,7 +30,11 @@ public final class ArchitectureRules {
                     "org.springframework.beans.factory.annotation.Qualifier",
                     "org.springframework.transaction.annotation.Transactional",
                     "org.springframework.transaction.annotation.Propagation",
-                    "org.springframework.transaction.annotation.Isolation");
+                    "org.springframework.transaction.annotation.Isolation",
+                    // 编程式短事务（慢操作放在事务外时使用），见持久化规范 P-11
+                    "org.springframework.transaction.support.TransactionOperations",
+                    "org.springframework.transaction.support.TransactionCallback",
+                    "org.springframework.transaction.TransactionStatus");
 
     private static final List<String> FORBIDDEN_JDK = List.of("java.sql", "java.net.http");
 
@@ -185,7 +189,7 @@ public final class ArchitectureRules {
                     || componentApi(targetPackage)
                     || APPLICATION_SPRING_TYPES.contains(name)
                     ? null
-                    : "应用层只能依赖 JDK、shared、组件 api 包及允许的 Spring 装配／事务注解";
+                    : "应用层只能依赖 JDK、shared、组件 api 包及允许的 Spring 装配／事务类型";
             case "interfaces" -> startsWithAny(targetPackage, INTERFACES_FORBIDDEN)
                     ? "入口层不得直接使用 SQL／Mapper／Redis 客户端"
                     : null;

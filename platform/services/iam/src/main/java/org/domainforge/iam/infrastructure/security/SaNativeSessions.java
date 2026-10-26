@@ -9,8 +9,6 @@ import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 /**
  * 会话签发和验证交给Sa-Token原生Redis实现，不自行解析或签发令牌协议。
  */
@@ -34,10 +32,10 @@ public final class SaNativeSessions implements NativeSessions {
      * createLoginSession不提前把令牌写入响应，SQL提交前客户端拿不到有效登录结果。
      */
     @Override
-    public String issue(UUID accountId) {
+    public String issue(long accountId) {
         try {
             return nativeLogic.createLoginSession(
-                    accountId.toString(), new SaLoginParameter().setTimeout(28800).setIsShare(false));
+                    Long.toString(accountId), new SaLoginParameter().setTimeout(28800).setIsShare(false));
         } catch (RuntimeException e) {
             throw unavailable();
         }
@@ -47,10 +45,10 @@ public final class SaNativeSessions implements NativeSessions {
      * 原生状态无效返回null，Redis故障与认证失败不混淆。
      */
     @Override
-    public UUID subject(String token) {
+    public Long subject(String token) {
         try {
             Object id = nativeLogic.getLoginIdByToken(token);
-            return id == null ? null : UUID.fromString(id.toString());
+            return id == null ? null : Long.valueOf(id.toString());
         } catch (IllegalArgumentException e) {
             return null;
         } catch (RuntimeException e) {
