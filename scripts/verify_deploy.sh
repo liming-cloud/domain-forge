@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
 #   首次部署与管理员初始化 → 普通重启保留数据 → 备份 → 备份后继续变更 →
-#   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效。
+#   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
+#   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退。
+# 新版本镜像在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 # 结果以接口行为判定，不以容器启动或备份文件存在代替；结束时删除本次创建的容器、卷和临时文件。
 #
 # 用法：scripts/verify_deploy.sh            # 先 clean package 构建 IAM jar
@@ -14,9 +16,14 @@ export COMPOSE_PROJECT_NAME="dfverify$$"
 port=$(python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 base="http://127.0.0.1:$port"
 env_file="$work/df.env"
+tag_v1="verify$$-v1"
+tag_v2="verify$$-v2"
+tag_v3="verify$$-v3"
 compose() { docker compose -f "$repo/deploy/compose.yml" --env-file "$env_file" "$@"; }
 cleanup() {
     compose down -v --remove-orphans > /dev/null 2>&1 || true
+    docker image rm -f "domain-forge/iam:$tag_v3" "domain-forge/iam:$tag_v2" "domain-forge/iam:$tag_v1" \
+        > /dev/null 2>&1 || true
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -25,6 +32,12 @@ step() { echo "== $*"; }
 fail() { echo "deploy_check=failed: $*" >&2; exit 1; }
 secret() { python3 -I -c 'import secrets; print(secrets.token_hex(24))'; }
 key() { python3 -I -c 'import base64, secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())'; }
+sql() { compose exec -T postgres psql -U domainforge -d domainforge -tAc "$1"; }
+set_tag() {
+    sed "s/^IAM_IMAGE_TAG=.*/IAM_IMAGE_TAG=$1/" "$env_file" > "$env_file.next"
+    chmod 600 "$env_file.next"
+    mv "$env_file.next" "$env_file"
+}
 field() { python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"][sys.argv[1]])' "$1"; }
 
 # post <路径> <JSON> [令牌]：输出响应体，HTTP 状态写入 $work/status
@@ -58,6 +71,7 @@ NACOS_ADMIN_PASSWORD=$(secret)
 NACOS_SERVICE_USERNAME=domainforge
 NACOS_SERVICE_PASSWORD=$(secret)
 IAM_FINGERPRINT_KEY=$(key)
+IAM_IMAGE_TAG=$tag_v1
 NGINX_HTTP_BIND=127.0.0.1
 NGINX_HTTP_PORT=$port
 EOF
@@ -133,7 +147,70 @@ step "核对恢复结果"
 admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
 
+step "构建模拟新版本镜像"
+mkdir -p "$work/v2" "$work/v3"
+cat > "$work/v2/V9000__deploy_upgrade_probe.sql" <<'EOF'
+-- 验证专用：向后兼容的迁移，只新增表，旧版本应用可以继续运行。
+CREATE TABLE deploy_upgrade_probe (id bigint PRIMARY KEY);
+EOF
+cat > "$work/v2/Dockerfile" <<EOF
+FROM domain-forge/iam:$tag_v1
+COPY V9000__deploy_upgrade_probe.sql /app/migration/
+ENV SPRING_FLYWAY_LOCATIONS=classpath:db/migration,filesystem:/app/migration
+EOF
+cat > "$work/v3/V9001__deploy_upgrade_broken.sql" <<'EOF'
+-- 验证专用：执行到第二条语句失败，整个迁移应在事务内回滚。
+CREATE TABLE deploy_upgrade_broken (id bigint PRIMARY KEY);
+SELECT missing_column FROM deploy_upgrade_broken;
+EOF
+cat > "$work/v3/Dockerfile" <<EOF
+FROM domain-forge/iam:$tag_v2
+COPY V9001__deploy_upgrade_broken.sql /app/migration/
+EOF
+docker build -q -t "domain-forge/iam:$tag_v2" "$work/v2" > /dev/null
+docker build -q -t "domain-forge/iam:$tag_v3" "$work/v3" > /dev/null
+
+step "升级到新增迁移的版本"
+set_tag "$tag_v2"
+"$repo/deploy/upgrade.sh" "$env_file" "$work/upgrade-backups" > "$work/upgrade.out" 2> "$work/upgrade.log" \
+    || { cat "$work/upgrade.log"; fail "升级脚本"; }
+pre_upgrade_dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' "$work/upgrade.out")
+[ -s "$pre_upgrade_dump" ] || fail "升级前应自动备份"
+[ "$(sql "select count(*) from flyway_schema_history where version = '9000' and success")" = "1" ] \
+    || fail "新版本迁移应已执行"
+[ "$(login alice "$alice_pw")" = "200" ] || fail "升级后 alice 登录"
+
+step "应用回退（保留新增迁移）"
+set_tag "$tag_v1"
+compose up -d --no-build --wait iam nginx > /dev/null 2>&1 || fail "应用回退后未健康"
+[ "$(login alice "$alice_pw")" = "200" ] || fail "应用回退后 alice 登录"
+[ "$(sql "select to_regclass('deploy_upgrade_probe') is not null")" = "t" ] || fail "应用回退不应改动数据库"
+
+step "迁移失败的升级"
+set_tag "$tag_v3"
+started=$(date +%s)
+if "$repo/deploy/upgrade.sh" "$env_file" "$work/upgrade-backups" > /dev/null 2>&1; then
+    fail "迁移失败时升级脚本应以非零退出"
+fi
+failed_upgrade=$(($(date +%s) - started))
+[ "$(sql "select count(*) from flyway_schema_history where version = '9001'")" = "0" ] || fail "失败迁移不应留下记录"
+[ "$(sql "select to_regclass('deploy_upgrade_broken') is null")" = "t" ] || fail "失败迁移应整体回滚"
+set_tag "$tag_v2"
+compose up -d --no-build --wait iam nginx > /dev/null 2>&1 || fail "失败后回到上一版本未健康"
+[ "$(login alice "$alice_pw")" = "200" ] || fail "失败后回到上一版本 alice 登录"
+
+step "数据回退：恢复升级前备份并回到旧版本"
+set_tag "$tag_v1"
+rollback_line=$("$repo/deploy/restore.sh" "$env_file" "$pre_upgrade_dump" --yes 2> "$work/rollback.log" | tail -1) \
+    || { cat "$work/rollback.log"; fail "数据回退"; }
+[ "$(sql "select count(*) from flyway_schema_history where version = '9000'")" = "0" ] || fail "数据回退后不应有新版本迁移"
+[ "$(sql "select to_regclass('deploy_upgrade_probe') is null")" = "t" ] || fail "数据回退后不应有新版本的表"
+[ "$(login alice "$alice_pw")" = "200" ] || fail "数据回退后 alice 登录"
+
 echo "first_start_seconds=$first_start"
 echo "$backup_line" | sed "s#$work/##"
 echo "$restore_line" | sed "s#$work/##"
+grep '^upgrade=' "$work/upgrade.out"
+echo "failed_upgrade_seconds=$failed_upgrade"
+echo "$rollback_line" | sed "s#$work/##; s/^restored=/data_rollback=/"
 echo "deploy_check=passed"

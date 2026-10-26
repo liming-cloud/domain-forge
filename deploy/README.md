@@ -1,6 +1,6 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：IAM、PostgreSQL、Redis、Nacos（只用作服务注册与发现）、Nginx。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。升级回退与 HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
+单机基线：IAM、PostgreSQL、Redis、Nacos（只用作服务注册与发现）、Nginx。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
@@ -13,7 +13,7 @@
 
 ## 前提
 
-- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM jar）。
+- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM jar）；`python3`（`upgrade.sh` 读取 Compose 配置）。
 - 网段 `172.31.250.0/24` 未被主机其他网络占用。冲突时同步修改 `compose.yml` 中的网段、Nginx 固定地址和 IAM 的 `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES`。
 
 ## 首次部署
@@ -88,7 +88,46 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 备份含密码摘要与敏感输入指纹，按机密数据保存；异地副本、加密与保留周期由运维负责，本参考不提供定时任务。
 
-**验证**：`scripts/verify_deploy.sh`（CI 每次执行）在独立 Compose 项目中走完首次部署 → 管理员初始化 → 写入数据 → 普通重启 → 备份 → 备份后继续变更 → 删除数据库卷 → 恢复，并按接口行为核对：备份前的账号和密码可用，备份后注册的账号与改密不存在，恢复前的会话被拒绝，审计可查询。2026-10-26 本机实测（Apple Silicon，Docker 29.2）：首次启动 31—73 秒（含构建镜像时较长）；初始数据量下备份 1 秒内、约 33 KB，恢复（含 IAM 重启）19—20 秒。耗时随数据量增长，生产数据量下的耗时需在部署环境实测。
+
+## 升级与回退
+
+镜像标签由环境文件中的 `IAM_IMAGE_TAG` 决定，建议使用应用版本号，旧版本镜像保留到确认不再回退。
+
+```bash
+# 1. 构建新版本 jar 与镜像（标签取自命令行，覆盖环境文件中的值）
+platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam -am
+IAM_IMAGE_TAG=<新版本> docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env build iam
+
+# 2. 把环境文件中的 IAM_IMAGE_TAG 改为新版本，然后升级：先备份，再替换 iam 并等待健康
+deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
+```
+
+替换期间入口返回 502；IAM 启动时 Flyway 执行新版本的迁移。脚本失败时以非零退出并打印升级前备份的路径。
+
+| 情况 | 回退方式 | 数据 |
+|---|---|---|
+| 新版本没有迁移，或迁移只新增（表、可空列、索引），旧版本仍能读写 | **应用回退**：`IAM_IMAGE_TAG` 改回旧版本，`docker compose ... up -d --no-build --wait iam nginx` | 保留升级后的全部数据；旧版本忽略它不认识的新迁移 |
+| 迁移执行失败 | 同上，回到旧版本即可 | 不受影响：PostgreSQL 迁移在事务内执行，失败时整体回滚，不留历史记录 |
+| 迁移改变或删除了旧版本依赖的结构，或新版本写入了旧版本无法处理的数据 | **数据回退**：`IAM_IMAGE_TAG` 改回旧版本，用升级前备份执行 `restore.sh` | 回到升级前，升级后的变更全部丢失，所有用户重新登录 |
+
+应用回退与数据恢复分开判断：不承诺任意数据库变更都能自动逆转，也不提供 Flyway undo。发布新版本时须在说明中写明其迁移属于上表哪一类。
+
+## 部署场景验证
+
+`scripts/verify_deploy.sh`（CI 每次执行）在独立 Compose 项目中按接口行为核对，不以容器启动或备份文件存在代替：
+
+| 场景 | 核对 |
+|---|---|
+| 首次部署、管理员初始化、普通重启 | 全部 healthy，仅 nginx 有主机端口；`/internal/`、管理端点经入口为 404；重启后账号仍可登录 |
+| 备份、备份后继续变更、删除数据库卷、恢复 | 备份前的账号和密码可用，备份后注册的账号与改密不存在，恢复前的会话被拒绝，审计可查询 |
+| 升级到带新增迁移的版本 | 自动生成升级前备份，迁移已执行，账号可登录 |
+| 应用回退 | 旧版本在新结构上正常运行，新增的表保留 |
+| 迁移失败的升级 | 脚本非零退出；失败迁移没有历史记录、没有残留表；回到上一版本后正常 |
+| 数据回退 | 用升级前备份恢复到旧版本后，新版本的迁移与表都不存在，账号可登录 |
+
+新版本由验证脚本在当前镜像上叠加验证专用迁移来模拟，不修改源码。
+
+2026-10-26 本机实测（Apple Silicon，Docker 29.2，初始数据量）：首次启动 21—73 秒（含构建镜像时较长）；备份 1 秒内、约 33 KB；恢复（含 IAM 重启）15—20 秒；升级 9 秒；迁移失败的升级 7 秒内报告失败；数据回退 15 秒。耗时随数据量增长，生产数据量下需在部署环境实测。
 
 ## 本地调试
 
