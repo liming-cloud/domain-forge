@@ -26,7 +26,10 @@ jobs:
           java-version: '21'
           cache: maven
       - name: 构建与验证
-        run: platform/mvnw -f platform/pom.xml -B -ntp verify
+        run: platform/mvnw -f platform/pom.xml -B -ntp verify 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+      - name: 失败摘要
+        if: failure()
+        run: scripts/report_failures.sh platform build.log
       - name: 保存测试报告
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -55,7 +58,10 @@ jobs:
       - name: 生成器单元测试
         run: python3 -m unittest discover -s platform/templates/ddd-service -p 'test_*.py'
       - name: 在干净副本中生成示例服务并执行完整门禁
-        run: scripts/verify_template.sh
+        run: scripts/verify_template.sh 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+      - name: 失败摘要
+        if: failure()
+        run: scripts/report_failures.sh platform build.log
 
   docs:
     name: 文档链接
