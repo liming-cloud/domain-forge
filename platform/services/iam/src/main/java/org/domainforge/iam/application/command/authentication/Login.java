@@ -9,7 +9,7 @@ import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
-import org.domainforge.iam.domain.model.Account;
+import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;

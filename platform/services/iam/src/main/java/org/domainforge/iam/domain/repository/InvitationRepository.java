@@ -1,6 +1,6 @@
 package org.domainforge.iam.domain.repository;
 
-import org.domainforge.iam.domain.model.RegistrationInvitation;
+import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 
 /**
  * 注册邀请仓储；消费邀请与创建账号必须参与同一业务事务。

@@ -10,6 +10,7 @@ import org.domainforge.iam.application.command.authentication.Logout;
 import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.command.registration.InvitationIssued;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
+import org.domainforge.iam.application.command.role.ManageRole;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -21,7 +22,10 @@ import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.bootstrap.IamApplication;
-import org.domainforge.iam.domain.model.Account;
+import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.model.role.DataScope;
+import org.domainforge.iam.domain.model.role.PermissionGrant;
+import org.domainforge.iam.domain.model.role.Role;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.iam.infrastructure.persistence.retention.RetentionCleanup;
@@ -131,8 +135,8 @@ class IdentityPersistenceIT {
 
     private static void grantAll(String adminToken, String name) {
         Account target = account(name);
-        bean(ManageAccount.class).permissions(
-                identity(adminToken).tokenDigest(), target.id(), target.version(), Account.MANAGEMENT_PERMISSIONS);
+        bean(ManageAccount.class).roles(
+                identity(adminToken).tokenDigest(), target.id(), target.version(), Set.of(Role.SYSTEM_ADMIN_ID));
     }
 
     private static void setEnabled(String actorToken, String name, boolean enabled) {
@@ -278,7 +282,7 @@ class IdentityPersistenceIT {
         assertEquals(1, sql.accountCount("first.admin") + sql.accountCount("second.admin"));
         assertEquals(1, sql.auditCount("administrator.initialize"));
         assertFailure(IamFailure.CONFLICT, () -> initializer.execute("third.admin", PASSWORD));
-        assertEquals(1L, bean(AccountRepository.class).completeAdministrators());
+        assertEquals(1L, bean(AccountRepository.class).systemAdministrators());
     }
 
     // 邀请、注册、登录主路径，每个关键变更与审计同时提交。
@@ -333,13 +337,13 @@ class IdentityPersistenceIT {
             assertThrows(RuntimeException.class, () -> bean(AcceptInvitation.class)
                     .execute(secret, "audit.member", PASSWORD));
             assertThrows(RuntimeException.class, () -> bean(ManageAccount.class)
-                    .permissions(identity(admin).tokenDigest(), before.id(), before.version(), Set.of()));
+                    .roles(identity(admin).tokenDigest(), before.id(), before.version(), Set.of()));
         } finally {
             sql.removeAuditFailure();
         }
         assertEquals(0, sql.accountCount("audit.member"));
         assertEquals(before.version(), account(ADMIN).version());
-        assertEquals(before.permissions(), account(ADMIN).permissions());
+        assertEquals(before.roleIds(), account(ADMIN).roleIds());
         bean(AcceptInvitation.class).execute(secret, "audit.member", PASSWORD);
         assertEquals(1, sql.accountCount("audit.member"));
     }
@@ -401,30 +405,32 @@ class IdentityPersistenceIT {
                     return "second";
                 });
         assertOneSucceeded(results, null);
-        assertEquals(1L, bean(AccountRepository.class).completeAdministrators());
+        assertEquals(1L, bean(AccountRepository.class).systemAdministrators());
     }
 
-    // 操作者不能分配自身不持有的权限，目录外权限码直接拒绝，未变化的请求不产生审计。
+    // 非系统管理员即使持有账号状态权限，也不能修改系统管理员账号或分配角色；版本过期冲突，未变化不审计。
     @Test
-    void permissionChangesRespectActorScopeAndVersion() {
+    void ordinaryAdministratorCannotTouchSystemAdministrators() {
         String admin = login(ADMIN, PASSWORD);
         register(admin, "limited.admin");
         register(admin, "target.member");
+        String adminDigest = identity(admin).tokenDigest();
+        long role = bean(ManageRole.class).create(adminDigest, "ACCOUNT_STATE", "账号状态").targetId();
+        bean(ManageRole.class).grants(adminDigest, role, 1, Set.of(
+                new PermissionGrant("iam:account:state", DataScope.NOT_APPLICABLE, Set.of())));
         Account limited = account("limited.admin");
         var manage = bean(ManageAccount.class);
-        manage.permissions(identity(admin).tokenDigest(), limited.id(), limited.version(), Set.of("iam:grant:manage"));
+        manage.roles(adminDigest, limited.id(), limited.version(), Set.of(role));
         String digest = identity(login("limited.admin", PASSWORD)).tokenDigest();
+        Account system = account(ADMIN);
+        assertFailure(IamFailure.FORBIDDEN, () -> manage.state(digest, system.id(), system.version(), false));
         Account target = account("target.member");
-        assertFailure(IamFailure.FORBIDDEN, () -> manage.permissions(
-                digest, target.id(), target.version(), Set.of("iam:audit:read")));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> manage.permissions(
-                digest, target.id(), target.version(), Set.of("iam:unknown")));
-        assertFailure(IamFailure.CONFLICT, () -> manage.permissions(
-                digest, target.id(), target.version() + 1, Set.of("iam:grant:manage")));
-        int audits = sql.auditCount("account.permissions");
-        var unchanged = manage.permissions(digest, target.id(), target.version(), Set.of());
-        assertEquals(target.version(), unchanged.version());
-        assertEquals(audits, sql.auditCount("account.permissions"));
+        assertFailure(IamFailure.FORBIDDEN, () -> manage.roles(digest, target.id(), target.version(), Set.of(role)));
+        assertFailure(IamFailure.CONFLICT, () -> manage.state(digest, target.id(), target.version() + 1, false));
+        int audits = sql.auditCount("account.state");
+        assertEquals(target.version(), manage.state(digest, target.id(), target.version(), true).version());
+        assertEquals(audits, sql.auditCount("account.state"));
+        assertEquals(target.version() + 1, manage.state(digest, target.id(), target.version(), false).version());
     }
 
     // 连续失败达到账号额度后，即使密码正确也在窗口内被限流。

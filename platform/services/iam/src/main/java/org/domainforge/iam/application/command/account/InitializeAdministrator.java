@@ -7,7 +7,7 @@ import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.Passwords;
 import org.domainforge.iam.application.port.operation.AdministrationGuard;
 import org.domainforge.iam.application.port.operation.Identifiers;
-import org.domainforge.iam.domain.model.Account;
+import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
@@ -43,15 +43,14 @@ public final class InitializeAdministrator {
     }
 
     /**
-     * 首次创建唯一管理者并返回其账号 ID；重复和并发落败均拒绝，不更改已有凭据或权限。
+     * 首次创建唯一系统管理员并返回其账号 ID；重复和并发落败均拒绝，不更改已有凭据或权限。
      */
     public long execute(String loginName, String password) {
         String name = Account.normalizeLoginName(loginName);
         String digest = passwords.encode(password);
         Long created = transactions.execute(status -> {
             if (guard.lock()) throw new IamException(IamFailure.CONFLICT, "项目已经初始化");
-            Account account = Account.register(identifiers.next(), name, digest)
-                    .changePermissions(Account.MANAGEMENT_PERMISSIONS);
+            Account account = Account.administrator(identifiers.next(), name, digest);
             accounts.insert(account);
             guard.markInitialized();
             audit.record(new AuditEvent("deployment-command", account.id(), "administrator.initialize"));

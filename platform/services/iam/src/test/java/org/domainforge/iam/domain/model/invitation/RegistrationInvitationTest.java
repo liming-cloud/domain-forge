@@ -1,4 +1,4 @@
-package org.domainforge.iam.domain.model;
+package org.domainforge.iam.domain.model.invitation;
 
 import org.junit.jupiter.api.Test;
 

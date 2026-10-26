@@ -2,10 +2,16 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.query.account.AccountQueryMapper">
     <select id="self" resultType="org.domainforge.iam.infrastructure.query.account.AccountProjection">
-        SELECT id, login_name, enabled, version, permissions FROM iam_account WHERE id = #{id}
+        SELECT id, login_name, enabled, version FROM iam_account WHERE id = #{id}
     </select>
     <select id="list" resultType="org.domainforge.iam.infrastructure.query.account.AccountProjection">
-        SELECT id, login_name, enabled, version, permissions FROM iam_account
+        SELECT id, login_name, enabled, version FROM iam_account
         WHERE id &gt; #{after} ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="relations" resultType="org.domainforge.iam.infrastructure.query.account.AccountRelationProjection">
+        SELECT 'role' AS kind, role_id AS target_id, false AS is_primary FROM iam_account_role WHERE account_id = #{id}
+        UNION ALL
+        SELECT 'member', unit_id, is_primary FROM iam_membership WHERE account_id = #{id}
+        ORDER BY 1, 2
     </select>
 </mapper>

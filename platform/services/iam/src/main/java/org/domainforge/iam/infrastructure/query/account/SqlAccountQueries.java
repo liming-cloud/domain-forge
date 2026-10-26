@@ -2,10 +2,14 @@ package org.domainforge.iam.infrastructure.query.account;
 
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.query.account.AccountDetail;
 import org.domainforge.iam.application.query.account.AccountPage;
 import org.domainforge.iam.application.query.account.AccountQueries;
 import org.domainforge.iam.application.query.account.AccountView;
 import org.springframework.stereotype.Repository;
+
+import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
  * AccountQueries直接落实受保护的投影，不为简单查询强制装载领域聚合。
@@ -38,10 +42,20 @@ public class SqlAccountQueries implements AccountQueries {
     public AccountPage list(long after, int limit) {
         if (after < 0 || limit < 1 || limit > 100)
             throw new IamException(IamFailure.INVALID_REQUEST, "分页游标须非负且大小须为1至100");
-        var items =
-                mapper.list(after, limit).stream()
-                        .map(AccountProjection::view)
-                        .toList();
+        var items = mapper.list(after, limit).stream().map(AccountProjection::view).toList();
         return new AccountPage(items, items.size() == limit ? items.getLast().id() : null);
+    }
+
+    @Override
+    public AccountDetail detail(long id) {
+        AccountProjection row = mapper.self(id);
+        if (row == null) return null;
+        var roles = new HashSet<Long>();
+        var memberships = new ArrayList<AccountDetail.MembershipView>();
+        for (AccountRelationProjection relation : mapper.relations(id)) {
+            if ("role".equals(relation.kind())) roles.add(relation.targetId());
+            else memberships.add(new AccountDetail.MembershipView(relation.targetId(), relation.primary()));
+        }
+        return new AccountDetail(row.view(), roles, memberships);
     }
 }

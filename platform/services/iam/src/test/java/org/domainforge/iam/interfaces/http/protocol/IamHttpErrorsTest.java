@@ -4,6 +4,7 @@ import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.TransactionSystemException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,7 @@ class IamHttpErrorsTest {
     void infrastructureFailuresDoNotLeakDetails() {
         assertStatus(503, "IAM_RESULT_UNKNOWN", new TransactionSystemException("commit failed"));
         assertStatus(503, "SERVICE_UNAVAILABLE", new DataAccessResourceFailureException("db down"));
+        assertStatus(409, "IAM_CONFLICT", new DuplicateKeyException("duplicate"));
         assertStatus(400, "INVALID_REQUEST", new IllegalArgumentException("secret detail"));
         var internal = errors.handle(new IllegalStateException("secret detail"));
         assertEquals(500, internal.getStatusCode().value());

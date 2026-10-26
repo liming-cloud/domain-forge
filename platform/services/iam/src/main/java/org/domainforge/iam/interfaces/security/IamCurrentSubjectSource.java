@@ -37,7 +37,7 @@ public final class IamCurrentSubjectSource implements CurrentSubjectSource {
         try {
             CurrentIdentity identity = authorization.current(token);
             CurrentSubject subject =
-                    new CurrentSubject(identity.accountId(), identity.permissions());
+                    new CurrentSubject(identity.accountId(), identity.permissions(), identity.roles());
             storage.set(PRIVATE_IDENTITY, new PrivateIdentity(token, identity));
             return subject;
         } catch (IamException failure) {

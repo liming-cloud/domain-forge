@@ -53,4 +53,13 @@ public final class CurrentAuthorization {
             throw new IamException(IamFailure.FORBIDDEN, "无权执行该操作");
         return current;
     }
+
+    /**
+     * 系统专属管理操作：除权限外还要求操作者当前持有启用的系统管理员角色。
+     */
+    public CurrentIdentity requireSystem(String tokenDigest, String permission) {
+        CurrentIdentity current = require(tokenDigest, permission);
+        if (!current.systemAdministrator()) throw new IamException(IamFailure.FORBIDDEN, "仅系统管理员可执行该操作");
+        return current;
+    }
 }

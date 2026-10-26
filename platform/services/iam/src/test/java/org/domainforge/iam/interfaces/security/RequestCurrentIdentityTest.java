@@ -53,7 +53,7 @@ class RequestCurrentIdentityTest {
         var stored =
                 new AtomicReference<>(
                         new CurrentIdentity(
-                                account, secrets.digest("first-token"), 1, Set.of("iam:account:read")));
+                                account, secrets.digest("first-token"), 1, Set.of("iam:account:read"), Set.of()));
         SessionStore sessions =
                 new SessionStore() {
                     @Override
@@ -109,7 +109,7 @@ class RequestCurrentIdentityTest {
             assertEquals("first-token", privateAccess.token());
             assertEquals(1, reads.get());
             assertFalse(access.current().toString().contains(secrets.digest("first-token")));
-            stored.set(new CurrentIdentity(account, secrets.digest("first-token"), 1, Set.of()));
+            stored.set(new CurrentIdentity(account, secrets.digest("first-token"), 1, Set.of(), Set.of()));
             assertEquals(Set.of("iam:account:read"), access.current().permissions());
             assertNewRequestAndChangedToken(access, logic, privateAccess, source, reads);
         } finally {

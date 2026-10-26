@@ -1,24 +1,17 @@
 package org.domainforge.iam.infrastructure.persistence.account;
 
-import org.domainforge.iam.domain.model.Account;
+import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.model.account.Membership;
 
-import java.util.Arrays;
 import java.util.Set;
-import java.util.TreeSet;
 
 /**
- * 账号表投影；权限存储编码不传播到领域或HTTP。
+ * 账号表投影；角色分配与成员归属分表保存。
  */
 public record AccountRow(
-        long id,
-        String loginName,
-        String credentialDigest,
-        long credentialVersion,
-        long version,
-        boolean enabled,
-        String permissions) {
+        long id, String loginName, String credentialDigest, long credentialVersion, long version, boolean enabled) {
     /**
-     * 转换领域快照为确定排序的有限权限表示。
+     * 转换领域快照的主表部分。
      */
     static AccountRow from(Account account) {
         return new AccountRow(
@@ -27,22 +20,14 @@ public record AccountRow(
                 account.credentialDigest(),
                 account.credentialVersion(),
                 account.version(),
-                account.enabled(),
-                String.join(",", new TreeSet<>(account.permissions())));
+                account.enabled());
     }
 
     /**
-     * 恢复领域模型再次校验权限目录，不默许数据库异常值。
+     * 与子表一起恢复领域模型，并再次校验不变量。
      */
-    Account toDomain() {
-        return new Account(
-                id,
-                loginName,
-                credentialDigest,
-                credentialVersion,
-                version,
-                enabled,
-                permissions.isEmpty() ? Set.of() : Set.copyOf(Arrays.asList(permissions.split(","))));
+    Account toDomain(Set<Long> roles, Set<Membership> memberships) {
+        return new Account(id, loginName, credentialDigest, credentialVersion, version, enabled, roles, memberships);
     }
 
     /**

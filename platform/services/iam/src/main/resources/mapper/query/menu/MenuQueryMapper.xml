@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.query.menu.MenuQueryMapper">
+    <select id="all" resultType="org.domainforge.iam.application.query.menu.MenuView">
+        WITH RECURSIVE tree (id, depth, ordering) AS (
+            SELECT id, 0, ARRAY [sort_order::bigint, id] FROM iam_menu_item WHERE parent_id IS NULL
+            UNION ALL
+            SELECT m.id, t.depth + 1, t.ordering || ARRAY [m.sort_order::bigint, m.id]
+            FROM iam_menu_item m
+                     JOIN tree t ON m.parent_id = t.id
+            WHERE t.depth &lt; 1000)
+        SELECT m.id, m.parent_id, m.type, m.code, m.name, m.path, m.sort_order, m.permission_code, m.enabled, m.version
+        FROM tree t
+                 JOIN iam_menu_item m ON m.id = t.id
+        ORDER BY t.ordering
+    </select>
+</mapper>

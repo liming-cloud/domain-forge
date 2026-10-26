@@ -1,6 +1,6 @@
 package org.domainforge.iam.infrastructure.persistence.invitation;
 
-import org.domainforge.iam.domain.model.RegistrationInvitation;
+import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 
 import java.time.Instant;
 

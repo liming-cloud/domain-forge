@@ -2,7 +2,7 @@ package org.domainforge.iam.infrastructure.persistence.invitation;
 
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
-import org.domainforge.iam.domain.model.RegistrationInvitation;
+import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 import org.domainforge.iam.domain.repository.InvitationRepository;
 import org.springframework.stereotype.Repository;
 

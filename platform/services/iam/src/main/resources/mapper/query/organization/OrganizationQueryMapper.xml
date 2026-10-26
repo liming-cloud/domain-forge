@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.query.organization.OrganizationQueryMapper">
+    <select id="tree" resultType="org.domainforge.iam.application.query.organization.OrganizationUnitView">
+        WITH RECURSIVE tree (id, parent_id, name, enabled, effective, version, depth) AS (
+            SELECT id, parent_id, name, enabled, enabled, version, 0 FROM iam_org_unit WHERE parent_id IS NULL
+            UNION ALL
+            SELECT u.id, u.parent_id, u.name, u.enabled, t.effective AND u.enabled, u.version, t.depth + 1
+            FROM iam_org_unit u
+                     JOIN tree t ON u.parent_id = t.id
+            WHERE t.depth &lt; 1000)
+        SELECT id, parent_id, name, enabled, effective, version FROM tree ORDER BY depth, id
+    </select>
+</mapper>

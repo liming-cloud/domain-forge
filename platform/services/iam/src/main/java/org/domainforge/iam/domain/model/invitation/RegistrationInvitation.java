@@ -1,5 +1,6 @@
-package org.domainforge.iam.domain.model;
+package org.domainforge.iam.domain.model.invitation;
 
+import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.shared.AggregateRoot;
 
 import java.time.Instant;

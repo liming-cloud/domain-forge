@@ -2,6 +2,8 @@ package org.domainforge.iam.infrastructure.persistence.account;
 
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * 账号持久化SQL仅以绑定值访问具体账号，管理守卫由应用提前取得。
  */
@@ -32,8 +34,20 @@ public interface AccountMapper {
      */
     int update(@Param("row") AccountRow row, @Param("expected") long expected);
 
+    List<Long> roles(long account);
+
+    List<MembershipRow> memberships(long account);
+
+    int deleteRoles(long account);
+
+    int insertRoles(@Param("account") long account, @Param("roles") List<Long> roles);
+
+    int deleteMemberships(long account);
+
+    int insertMemberships(@Param("account") long account, @Param("items") List<MembershipRow> items);
+
     /**
-     * 完整管理权限采用规范排序后的精确集合，无超级管理员旁路。
+     * 启用且持有系统管理员角色的账号数。
      */
-    long administrators(String permissions);
+    long systemAdministrators(long role);
 }

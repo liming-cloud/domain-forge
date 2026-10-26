@@ -2,44 +2,56 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.account.AccountMapper">
     <sql id="columns">
-        id,
-        login_name,
-        credential_digest,
-        credential_version,
-        version,
-        enabled,
-        permissions
+        id, login_name, credential_digest, credential_version, version, enabled
     </sql>
     <select id="find" resultType="org.domainforge.iam.infrastructure.persistence.account.AccountRow">
-        SELECT
-        <include refid="columns"/>
+        SELECT <include refid="columns"/>
         FROM iam_account WHERE id = #{id}
     </select>
     <select id="byName" resultType="org.domainforge.iam.infrastructure.persistence.account.AccountRow">
-        SELECT
-        <include refid="columns"/>
+        SELECT <include refid="columns"/>
         FROM iam_account WHERE login_name = #{name}
     </select>
     <select id="lock" resultType="org.domainforge.iam.infrastructure.persistence.account.AccountRow">
-        SELECT
-        <include refid="columns"/>
+        SELECT <include refid="columns"/>
         FROM iam_account WHERE id = #{id} FOR UPDATE
     </select>
     <insert id="insert">
-        INSERT INTO iam_account
-        (id, login_name, credential_digest, credential_version, version, enabled, permissions)
-        VALUES
-        (#{id}, #{loginName}, #{credentialDigest},
-        #{credentialVersion}, #{version}, #{enabled}, #{permissions})
+        INSERT INTO iam_account (id, login_name, credential_digest, credential_version, version, enabled)
+        VALUES (#{id}, #{loginName}, #{credentialDigest}, #{credentialVersion}, #{version}, #{enabled})
     </insert>
     <update id="update">
         UPDATE iam_account
-        SET credential_digest = #{row.credentialDigest},
-        credential_version = #{row.credentialVersion},
-        version = #{row.version}, enabled = #{row.enabled}, permissions = #{row.permissions}
+        SET credential_digest  = #{row.credentialDigest},
+            credential_version = #{row.credentialVersion},
+            version            = #{row.version},
+            enabled            = #{row.enabled}
         WHERE id = #{row.id} AND version = #{expected}
     </update>
-    <select id="administrators" resultType="long">
-        SELECT count(*) FROM iam_account WHERE enabled AND permissions=#{permissions}
+    <select id="roles" resultType="long">
+        SELECT role_id FROM iam_account_role WHERE account_id = #{account}
+    </select>
+    <select id="memberships" resultType="org.domainforge.iam.infrastructure.persistence.account.MembershipRow">
+        SELECT unit_id, is_primary FROM iam_membership WHERE account_id = #{account}
+    </select>
+    <delete id="deleteRoles">
+        DELETE FROM iam_account_role WHERE account_id = #{account}
+    </delete>
+    <insert id="insertRoles">
+        INSERT INTO iam_account_role (account_id, role_id) VALUES
+        <foreach collection="roles" item="role" separator=",">(#{account}, #{role})</foreach>
+    </insert>
+    <delete id="deleteMemberships">
+        DELETE FROM iam_membership WHERE account_id = #{account}
+    </delete>
+    <insert id="insertMemberships">
+        INSERT INTO iam_membership (account_id, unit_id, is_primary) VALUES
+        <foreach collection="items" item="item" separator=",">(#{account}, #{item.unitId}, #{item.primary})</foreach>
+    </insert>
+    <select id="systemAdministrators" resultType="long">
+        SELECT count(*)
+        FROM iam_account a
+                 JOIN iam_account_role r ON r.account_id = a.id
+        WHERE a.enabled AND r.role_id = #{role}
     </select>
 </mapper>

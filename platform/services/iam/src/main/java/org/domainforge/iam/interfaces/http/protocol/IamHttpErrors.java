@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.transaction.TransactionException;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * IAM 失败合同复用平台外壳：状态或版本冲突 409，限流 429，依赖不可用 503，提交结果未知 503（IAM_RESULT_UNKNOWN）。
+ * IAM 失败合同复用平台外壳：状态、版本或唯一约束冲突 409，限流 429，依赖不可用 503，提交结果未知 503（IAM_RESULT_UNKNOWN）。
  */
 @RestControllerAdvice(basePackages = "org.domainforge.iam.interfaces.http")
 @Order(Ordered.HIGHEST_PRECEDENCE + 100)
@@ -65,6 +66,8 @@ public final class IamHttpErrors {
         LOG.error("iam_request_failed failureType={}", failure.getClass().getSimpleName());
         if (failure instanceof TransactionSystemException)
             return response(503, "IAM_RESULT_UNKNOWN", "处理结果未知，请查询后再操作");
+        if (failure instanceof DataIntegrityViolationException)
+            return response(409, "IAM_CONFLICT", "数据已被并发修改，请重新读取后再操作");
         if (failure instanceof DataAccessException || failure instanceof TransactionException)
             return response(503, "SERVICE_UNAVAILABLE", "必要服务暂不可用");
         return response(500, "INTERNAL_ERROR", "服务内部错误");

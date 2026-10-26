@@ -21,12 +21,21 @@ public record CurrentSubject(
     }
 
     /**
-     * 只接受正数账号 ID 与有界的权限、角色集合，并复制集合；不携带令牌、HTTP 或持久化类型。
+     * 单次合同最多携带的角色数。
+     */
+    public static final int MAX_ROLES = 20;
+    /**
+     * 单次合同最多携带的精确权限数。
+     */
+    public static final int MAX_PERMISSIONS = 1000;
+
+    /**
+     * 只接受正数账号 ID 与有界的权限、角色集合，并复制集合；不携带令牌、HTTP 或持久化类型。超限明确失败，不截断。
      */
     public CurrentSubject {
         if (accountId <= 0
-                || !bounded(roles, "[A-Za-z][A-Za-z0-9:_-]{0,127}")
-                || !bounded(permissions, "[a-z][a-z0-9:-]{1,127}")) {
+                || !bounded(roles, MAX_ROLES, "[A-Za-z][A-Za-z0-9:_-]{0,127}")
+                || !bounded(permissions, MAX_PERMISSIONS, "[a-z][a-z0-9:-]{1,127}")) {
             throw new IllegalArgumentException("当前主体合同无效");
         }
         permissions = Set.copyOf(permissions);
@@ -34,11 +43,11 @@ public record CurrentSubject(
     }
 
     /**
-     * 集合非空引用、至多 128 项且每项匹配给定格式。
+     * 集合非空引用、不超过上限且每项匹配给定格式。
      */
-    private static boolean bounded(Set<String> values, String format) {
+    private static boolean bounded(Set<String> values, int limit, String format) {
         return values != null
-                && values.size() <= 128
+                && values.size() <= limit
                 && values.stream().allMatch(value -> value != null && value.matches(format));
     }
 }

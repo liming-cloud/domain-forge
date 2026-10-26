@@ -33,4 +33,26 @@ class CurrentSubjectTest {
         assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, Set.of(), Set.of("*")));
         assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, null));
     }
+
+    @Test
+    void boundsFollowContract() {
+        var roles = new HashSet<String>();
+        for (int index = 0; index < 21; index++) roles.add("R" + index);
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, Set.of(), roles));
+        var permissions = new HashSet<String>();
+        for (int index = 0; index < 1000; index++) permissions.add("sample:item:a" + index);
+        assertEquals(1000, new CurrentSubject(1L, permissions).permissions().size());
+        permissions.add("sample:item:overflow");
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, permissions));
+    }
+
+    @Test
+    void scopeIsBoundedAndAllCarriesNoUnits() {
+        assertEquals(true, CurrentScope.none().empty());
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(true, false, Set.of(1L)));
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(false, false, Set.of(0L)));
+        var units = new HashSet<Long>();
+        for (long id = 1; id <= 1001; id++) units.add(id);
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(false, false, units));
+    }
 }
