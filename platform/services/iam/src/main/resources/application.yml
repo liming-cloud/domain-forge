@@ -1,0 +1,104 @@
+# IAM 服务配置。凭据与连接目标只来自环境变量，没有默认值；缺失时启动失败。
+# Sa-Token 会话策略与 Redis 连接资源使用 access-control、cache 组件的默认值，这里只写差异。
+spring:
+  application:
+    name: iam
+  cloud:
+    nacos:
+      discovery:
+        # 本地可独立运行；微服务部署显式启用注册。后端为 HTTP，TLS 在入口终止。
+        enabled: ${IAM_DISCOVERY_ENABLED:false}
+        server-addr: ${IAM_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${IAM_NACOS_NAMESPACE:public}
+        group: ${IAM_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${IAM_NACOS_USERNAME:}
+        password: ${IAM_NACOS_PASSWORD:}
+        ip: ${IAM_DISCOVERY_IP:}
+  datasource:
+    url: ${IAM_DB_URL}
+    username: ${IAM_DB_USER}
+    password: ${IAM_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 0
+      connection-timeout: 3000
+      validation-timeout: 1000
+      data-source-properties:
+        connectTimeout: 3
+        socketTimeout: 5
+  flyway:
+    enabled: true
+    clean-disabled: true
+    baseline-on-migrate: false
+  transaction:
+    default-timeout: 10s
+  data:
+    redis:
+      host: ${IAM_REDIS_HOST}
+      port: ${IAM_REDIS_PORT}
+      password: ${IAM_REDIS_PASSWORD}
+      timeout: 300ms
+      connect-timeout: 300ms
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+mybatis-plus:
+  configuration:
+    default-statement-timeout: 5
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    local-cache-scope: STATEMENT
+  # 雪花 ID 的 worker-id／datacenter-id：多实例部署必须为每个实例设置不同的值
+  # （环境变量 MYBATIS_PLUS_GLOBAL_CONFIG_WORKER_ID、MYBATIS_PLUS_GLOBAL_CONFIG_DATACENTER_ID）；
+  # 未设置时按网卡与进程号推导，只适用于单实例。
+
+server:
+  forward-headers-strategy: none
+  max-http-request-header-size: 16KB
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  tomcat:
+    max-http-form-post-size: 16KB
+    connection-timeout: 5s
+
+management:
+  server:
+    address: 127.0.0.1
+    port: ${IAM_MANAGEMENT_PORT:9091}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,redis
+      status:
+        order: down,out-of-service,unknown,up
+
+springdoc:
+  api-docs:
+    enabled: ${IAM_API_DOCS_ENABLED:false}
+
+iam:
+  # 敏感输入 HMAC 的部署密钥（Base64，32 字节）。
+  fingerprint-key: ${IAM_FINGERPRINT_KEY}
+  # 登录防护默认值；只允许收紧，越界阻止启动。修改后重启生效。
+  login-protection:
+    account-attempts: ${IAM_LOGIN_ACCOUNT_ATTEMPTS:5}
+    account-window-seconds: ${IAM_LOGIN_ACCOUNT_WINDOW_SECONDS:600}
+    address-attempts: ${IAM_LOGIN_ADDRESS_ATTEMPTS:30}
+    address-window-seconds: ${IAM_LOGIN_ADDRESS_WINDOW_SECONDS:60}
+    hash-workers: ${IAM_LOGIN_HASH_WORKERS:2}
+    hash-queue-capacity: ${IAM_LOGIN_HASH_QUEUE_CAPACITY:8}
+    hash-wait-millis: ${IAM_LOGIN_HASH_WAIT_MILLIS:1000}

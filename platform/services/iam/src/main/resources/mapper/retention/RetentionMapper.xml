@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.retention.RetentionMapper">
+    <update id="budget">
+        SET LOCAL statement_timeout = '1000ms'
+    </update>
+    <delete id="sessions">
+        DELETE
+        FROM iam_session_grant
+        WHERE ctid IN (SELECT ctid
+                       FROM iam_session_grant
+                       WHERE expires_at &lt; clock_timestamp()
+                       ORDER BY expires_at
+                       LIMIT 1000 FOR UPDATE SKIP LOCKED)
+    </delete>
+    <delete id="invitations">
+        DELETE
+        FROM iam_invitation
+        WHERE ctid IN (SELECT ctid
+                       FROM iam_invitation
+                       WHERE expires_at &lt; clock_timestamp() - interval '24 hours'
+                       ORDER BY expires_at
+                       LIMIT 1000 FOR UPDATE SKIP LOCKED)
+    </delete>
+    <delete id="audits">
+        DELETE
+        FROM iam_audit
+        WHERE id IN (SELECT id
+                     FROM iam_audit
+                     WHERE occurred_at &lt; clock_timestamp() - interval '90 days'
+                     ORDER BY occurred_at, id
+                     LIMIT 1000 FOR UPDATE SKIP LOCKED)
+    </delete>
+</mapper>

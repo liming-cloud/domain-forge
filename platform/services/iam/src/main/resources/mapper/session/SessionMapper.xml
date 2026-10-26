@@ -1,16 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.session.SessionMapper">
-  <select id="budget" resultType="java.lang.String">
-    SELECT set_config('statement_timeout','500ms',true)
-  </select>
-  <select id="current" resultType="org.domainforge.iam.infrastructure.persistence.session.IdentityRow">
-    SELECT a.id::text AS account_id,a.credential_version,a.permissions FROM iam_session_grant g JOIN iam_account a ON a.id=g.account_id WHERE g.token_digest=#{digest} AND NOT g.revoked AND g.expires_at&gt;clock_timestamp() AND a.enabled AND a.credential_version=g.credential_version
-  </select>
-  <insert id="insert">
-    INSERT INTO iam_session_grant(token_digest,account_id,credential_version,expires_at,revoked) VALUES(#{digest},CAST(#{account} AS uuid),#{version},#{expires},false)
-  </insert>
-  <update id="revoke">
-    UPDATE iam_session_grant SET revoked=true WHERE token_digest=#{digest}
-  </update>
+    <select id="budget" resultType="java.lang.String">
+        SELECT set_config('statement_timeout', '500ms', true)
+    </select>
+    <!-- 许可有效的全部条件：未撤销、未过期、账号启用且凭据版本一致；角色与权限在同一语句快照中计算，
+         只计启用角色的授予。 -->
+    <select id="current" resultType="org.domainforge.iam.infrastructure.persistence.session.IdentityRow">
+        SELECT a.id AS account_id,
+               a.credential_version,
+               COALESCE((SELECT string_agg(DISTINCT r.code, ',')
+                         FROM iam_account_role ar
+                                  JOIN iam_role r ON r.id = ar.role_id AND r.enabled
+                         WHERE ar.account_id = a.id), '') AS roles,
+               COALESCE((SELECT string_agg(DISTINCT rg.permission_code, ',')
+                         FROM iam_account_role ar
+                                  JOIN iam_role r ON r.id = ar.role_id AND r.enabled
+                                  JOIN iam_role_grant rg ON rg.role_id = r.id
+                         WHERE ar.account_id = a.id), '') AS permissions
+        FROM iam_session_grant g
+                 JOIN iam_account a ON a.id = g.account_id
+        WHERE g.token_digest = #{digest}
+          AND NOT g.revoked
+          AND g.expires_at &gt; clock_timestamp()
+          AND a.enabled
+          AND a.credential_version = g.credential_version
+    </select>
+    <insert id="insert">
+        INSERT INTO iam_session_grant (token_digest, account_id, credential_version, expires_at, revoked)
+        VALUES (#{digest}, #{account}, #{version}, #{expires}, false)
+    </insert>
+    <update id="revoke">
+        UPDATE iam_session_grant
+        SET revoked = true
+        WHERE token_digest = #{digest}
+    </update>
 </mapper>

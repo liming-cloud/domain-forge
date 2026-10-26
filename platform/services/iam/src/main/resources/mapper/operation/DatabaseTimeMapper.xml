@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.operation.DatabaseTimeMapper">
-  <select id="now" resultType="java.time.Instant">
-    SELECT clock_timestamp()
-  </select>
+    <select id="now" resultType="java.time.Instant">
+        SELECT clock_timestamp()
+    </select>
 </mapper>

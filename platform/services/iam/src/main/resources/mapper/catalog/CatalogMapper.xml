@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.catalog.CatalogMapper">
+    <sql id="columns">code, namespace, name, scoped, system_only</sql>
+    <select id="find" resultType="org.domainforge.iam.infrastructure.persistence.catalog.PermissionRow">
+        SELECT <include refid="columns"/> FROM iam_permission WHERE code IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">#{code}</foreach>
+    </select>
+    <select id="namespace" resultType="org.domainforge.iam.infrastructure.persistence.catalog.PermissionRow">
+        SELECT <include refid="columns"/> FROM iam_permission WHERE namespace = #{namespace}
+    </select>
+    <select id="countOutside" resultType="long">
+        SELECT count(*) FROM iam_permission WHERE namespace &lt;&gt; #{namespace}
+    </select>
+    <select id="referenced" resultType="java.lang.String">
+        SELECT permission_code FROM iam_role_grant WHERE permission_code IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        UNION
+        SELECT permission_code FROM iam_menu_item WHERE permission_code IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">#{code}</foreach>
+    </select>
+    <delete id="deleteExcept">
+        DELETE FROM iam_permission WHERE namespace = #{namespace}
+        <if test="!keep.isEmpty()">
+            AND code NOT IN
+            <foreach collection="keep" item="code" open="(" separator="," close=")">#{code}</foreach>
+        </if>
+    </delete>
+    <insert id="upsert">
+        INSERT INTO iam_permission (code, namespace, name, scoped, system_only) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.code}, #{item.namespace}, #{item.name}, #{item.scoped}, #{item.systemOnly})
+        </foreach>
+        ON CONFLICT (code) DO UPDATE SET name = excluded.name, scoped = excluded.scoped
+    </insert>
+</mapper>

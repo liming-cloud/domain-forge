@@ -1,0 +1,12 @@
+# 依赖与漏洞提示：只开 PR 提醒，不阻断构建。
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /platform
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

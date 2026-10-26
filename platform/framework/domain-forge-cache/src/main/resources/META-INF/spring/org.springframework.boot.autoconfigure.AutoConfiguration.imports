@@ -1,1 +1,2 @@
 org.domainforge.cache.autoconfigure.CacheConfiguration
+org.domainforge.cache.autoconfigure.CacheOperationsConfiguration

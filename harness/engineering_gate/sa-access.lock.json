@@ -1,7 +1,0 @@
-{
-  "schema": 1,
-  "scope": "isolated-sa-token-transport-not-product-baseline",
-  "sa_token_version": "1.46.0",
-  "starter": "sa-token-spring-boot4-starter",
-  "dependency_plugin_version": "3.9.0"
-}

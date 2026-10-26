@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.persistence.autoconfigure.TransactionProbeMapper">
-  <insert id="insert">INSERT INTO transaction_probe (value) VALUES (#{value})</insert>
-  <select id="count" resultType="int">SELECT COUNT(*) FROM transaction_probe</select>
-  <select id="transactionId" resultType="string">SELECT pg_current_xact_id()::text</select>
-  <select id="schemaExists" resultType="int">SELECT COUNT(*) FROM pg_namespace WHERE nspname = #{name}</select>
+    <insert id="insert">
+        INSERT INTO transaction_probe (value) VALUES (#{value})
+    </insert>
+    <select id="count" resultType="int">
+        SELECT COUNT(*)
+        FROM transaction_probe
+    </select>
+    <select id="transactionId" resultType="string">
+        SELECT pg_current_xact_id()::text
+    </select>
+    <select id="schemaExists" resultType="int">
+        SELECT COUNT(*) FROM pg_namespace WHERE nspname = #{name}
+    </select>
 </mapper>

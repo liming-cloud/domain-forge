@@ -1,60 +1,35 @@
 package org.domainforge.iam.infrastructure.persistence.audit;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.domainforge.iam.application.port.operation.Identifiers;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-/** 普通审计独立提交，失败最多重试两次并保留独立告警，不回滚已成功业务。 */
+/**
+ * 审计与业务同库同事务写入；写入失败直接抛出，由调用方事务整体回滚。
+ */
 @Repository
 public class SqlAuditTrail implements AuditTrail {
-  private static final Logger LOG = LoggerFactory.getLogger("iam.audit.failure");
-  private final AuditMapper mapper;
-  private final TransactionTemplate transaction;
-  private final Counter failures;
+    private final AuditMapper mapper;
+    private final Identifiers identifiers;
 
-  /** 不创建第二个数据源；REQUIRES_NEW隔离审计事务及错误。 */
-  public SqlAuditTrail(
-      AuditMapper mapper, PlatformTransactionManager manager, MeterRegistry metrics) {
-    this.mapper = mapper;
-    transaction = new TransactionTemplate(manager);
-    transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    transaction.setTimeout(1);
-    failures = metrics.counter("iam.audit.incomplete");
-  }
-
-  /** 日志只包含关联ID和异常类别，绝不输出SQL参数或原始请求。 */
-  @Override
-  public void record(AuditEvent event) {
-    for (int attempt = 0; attempt < 3; attempt++) {
-      try {
-        transaction.execute(
-            status -> {
-              mapper.budget();
-              return mapper.insert(
-                  event.operationId().toString(),
-                  event.actor(),
-                  event.targetId().toString(),
-                  event.action(),
-                  event.outcome());
-            });
-        return;
-      } catch (RuntimeException failure) {
-        if (attempt == 2) {
-          failures.increment();
-          LOG.error(
-              "audit_incomplete operationId={} action={} failureType={}",
-              event.operationId(),
-              event.action(),
-              failure.getClass().getSimpleName());
-        }
-      }
+    /**
+     * 使用服务唯一数据源，不另建审计事务或连接。
+     */
+    public SqlAuditTrail(AuditMapper mapper, Identifiers identifiers) {
+        this.mapper = mapper;
+        this.identifiers = identifiers;
     }
-  }
+
+    /**
+     * 必须加入调用方已开启的事务；没有事务时拒绝，防止审计与业务分别提交。
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void record(AuditEvent event) {
+        if (mapper.insert(identifiers.next(), event.actor(), event.targetId(), event.action()) != 1)
+            throw new IllegalStateException("审计未写入");
+    }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.query.catalog.PermissionQueryMapper">
+    <select id="list" resultType="org.domainforge.iam.application.query.catalog.PermissionView">
+        SELECT code, name, scoped, system_only FROM iam_permission ORDER BY code
+    </select>
+</mapper>

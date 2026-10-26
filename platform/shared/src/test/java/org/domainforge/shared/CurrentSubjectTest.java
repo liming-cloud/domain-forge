@@ -1,37 +1,58 @@
 package org.domainforge.shared;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
-import org.junit.jupiter.api.Test;
 
-/** 合同边界验证可变集合和无效权限不能扩大已验证身份。 */
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/**
+ * 合同边界：可变集合和无效权限不能扩大已校验的身份。
+ */
 class CurrentSubjectTest {
-  // 调用方后续修改原始集合不改变当前主体，返回集合也不可改写。
-  @Test
-  void identityIsImmutableAndBounded() {
-    Set<String> input = new HashSet<>(Set.of("iam:account:read"));
-    Set<String> roles = new HashSet<>(Set.of("manager"));
-    var subject = new CurrentSubject("project-alpha", UUID.randomUUID(), input, roles);
-    input.add("iam:grant:manage");
-    roles.add("administrator");
-    assertEquals(Set.of("manager"), subject.roles());
-    assertThrows(UnsupportedOperationException.class, () -> subject.roles().clear());
-    assertEquals(
-        Set.of(), new CurrentSubject("project-alpha", UUID.randomUUID(), Set.of()).roles());
-    assertEquals(1, subject.permissions().size());
-    assertThrows(UnsupportedOperationException.class, () -> subject.permissions().clear());
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new CurrentSubject("bad project", UUID.randomUUID(), Set.of()));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new CurrentSubject("project-alpha", UUID.randomUUID(), Set.of("*")));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new CurrentSubject("project-alpha", UUID.randomUUID(), Set.of(), Set.of("*")));
-  }
+    @Test
+    void identityIsImmutableAndBounded() {
+        Set<String> input = new HashSet<>(Set.of("iam:account:read"));
+        Set<String> roles = new HashSet<>(Set.of("manager"));
+        var subject = new CurrentSubject(1001L, input, roles);
+        input.add("iam:grant:manage");
+        roles.add("administrator");
+        assertEquals(Set.of("manager"), subject.roles());
+        assertEquals(Set.of("iam:account:read"), subject.permissions());
+        assertThrows(UnsupportedOperationException.class, () -> subject.roles().clear());
+        assertThrows(UnsupportedOperationException.class, () -> subject.permissions().clear());
+        assertEquals(Set.of(), new CurrentSubject(1001L, Set.of()).roles());
+    }
+
+    @Test
+    void rejectsInvalidIdentity() {
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(0L, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, Set.of("*")));
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, Set.of(), Set.of("*")));
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, null));
+    }
+
+    @Test
+    void boundsFollowContract() {
+        var roles = new HashSet<String>();
+        for (int index = 0; index < 21; index++) roles.add("R" + index);
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, Set.of(), roles));
+        var permissions = new HashSet<String>();
+        for (int index = 0; index < 1000; index++) permissions.add("sample:item:a" + index);
+        assertEquals(1000, new CurrentSubject(1L, permissions).permissions().size());
+        permissions.add("sample:item:overflow");
+        assertThrows(IllegalArgumentException.class, () -> new CurrentSubject(1L, permissions));
+    }
+
+    @Test
+    void scopeIsBoundedAndAllCarriesNoUnits() {
+        assertEquals(true, CurrentScope.none().empty());
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(true, false, Set.of(1L)));
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(false, false, Set.of(0L)));
+        var units = new HashSet<Long>();
+        for (long id = 1; id <= 1001; id++) units.add(id);
+        assertThrows(IllegalArgumentException.class, () -> new CurrentScope(false, false, units));
+    }
 }

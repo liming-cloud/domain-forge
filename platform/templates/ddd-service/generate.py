@@ -1,104 +1,127 @@
 #!/usr/bin/env python3
-"""从固定资产创建独立服务；不覆盖工程，也不执行模板输入提供的命令。"""
+"""在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合。
+
+生成结果继承内部 parent，自动执行架构规则与质量门禁；生成后代码归该服务维护，模板升级不覆盖已有服务。
+"""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import re
-import shutil
+import sys
 
-KEYWORDS = set('abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package private protected public return short static strictfp super switch synchronized this throw throws transient try void volatile while true false null _ var yield record sealed permits'.split())
+TEMPLATE = Path(__file__).resolve().parent
+KEYWORDS = set(
+    'abstract assert boolean break byte case catch char class const continue default do double else enum extends '
+    'final finally float for goto if implements import instanceof int interface long native new package private '
+    'protected public return short static strictfp super switch synchronized this throw throws transient try void '
+    'volatile while true false null var yield record sealed permits'.split())
+RESERVED_NAMES = {'iam', 'services', 'framework', 'shared', 'platform'}
 
 
 def require(valid, message):
-    """拒绝非法输入，调用方可据此保持原工程不变。"""
+    """拒绝非法输入，调用方据此保持仓库不变。"""
     if not valid:
         raise ValueError(message)
 
 
-def ordinary_path(path):
-    """按词法路径检查全部父级，不能 resolve 后再丢失符号链接事实。"""
-    require(not any(part == '..' for part in path.parts), '路径不接受上级跳转')
-    require(not any(item.is_symlink() for item in (path, *path.parents)), '路径不接受符号链接')
-
-
-def render(value, values):
-    """替换封闭参数集合；不求值或把参数作为脚本执行。"""
+def render(text, values):
+    """替换封闭参数集合；不求值，也不把参数作为脚本执行。"""
     for key, replacement in values.items():
-        value = value.replace('@@' + key + '@@', replacement)
-    require('@@' not in value, '模板含未解析参数')
-    return value
+        text = text.replace('@@' + key + '@@', replacement)
+    require('@@' not in text, '模板含未解析参数')
+    return text
 
 
-def load_assets(source, values):
-    """先校验全部版本化资产，避免写到一半才发现缺失或污染。"""
-    ordinary_path(source)
-    ordinary_path(source / 'generate.py')
-    ordinary_path(source / 'template.json')
-    require(not any(p.is_symlink() for p in (source / 'assets').rglob('*')), '资产不接受符号链接')
-    manifest = json.loads((source / 'template.json').read_text())
-    require(manifest['schema'] == 1 and manifest['version'] == '0.3.0-iam.2', '模板版本不匹配')
+def values_for(name, package, namespace):
+    """校验输入并推导类名、环境变量前缀、数据库 schema 与权限命名空间。"""
+    require(re.fullmatch(r'[a-z][a-z0-9]*(?:-[a-z0-9]+)*', name) is not None and len(name) <= 40, '服务名须为小写字母、数字与 -')
+    require(name not in RESERVED_NAMES, '服务名与仓库已有模块冲突')
+    require(re.fullmatch(r'[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+', package) is not None, '包名格式无效')
+    require(not KEYWORDS.intersection(package.split('.')), '包名不能包含 Java 关键字')
+    namespace = namespace or re.sub(r'-service$', '', name)
+    require(re.fullmatch(r'[a-z][a-z0-9-]{1,31}', namespace) is not None and namespace != 'iam', '权限命名空间无效')
+    return {
+        'ARTIFACT': name,
+        'PACKAGE': package,
+        'PACKAGE_PATH': package.replace('.', '/'),
+        'APP_CLASS': ''.join(part.capitalize() for part in name.split('-')) + 'Application',
+        'SCHEMA': name.replace('-', '_'),
+        'ENV': name.replace('-', '_').upper(),
+        'NAMESPACE': namespace,
+    }
+
+
+def load_assets(with_example, values):
+    """先读取并渲染全部登记资产，避免写到一半才发现缺失；未登记或缺失的资产直接拒绝。"""
+    manifest = json.loads((TEMPLATE / 'template.json').read_text(encoding='utf-8'))
+    require(manifest['schema'] == 2, '模板清单版本不匹配')
+    listed = {entry['source'] for entry in manifest['assets']}
+    actual = {p.relative_to(TEMPLATE).as_posix() for p in (TEMPLATE / 'assets').rglob('*') if p.is_file()}
+    require(listed == actual, '模板含未登记或缺失资产')
     assets = []
-    targets = set()
     for entry in manifest['assets']:
-        origin = Path(entry['source'])
+        if entry['example'] and not with_example:
+            continue
         target = Path(render(entry['target'], values))
-        require(not origin.is_absolute() and not target.is_absolute(), '资产必须是相对路径')
-        ordinary_path(source / origin)
-        require('..' not in target.parts and target not in targets, '资产目标冲突或越界')
-        data = (source / origin).read_bytes()
-        require(hashlib.sha256(data).hexdigest() == entry['sha256'], '资产字节不匹配：' + str(origin))
-        if entry['render']:
-            data = render(data.decode('utf-8'), values).encode('utf-8')
-        assets.append((target, data, entry['executable']))
-        targets.add(target)
-    expected = {entry['source'] for entry in manifest['assets'] if entry['source'].startswith('assets/')}
-    actual = {p.relative_to(source).as_posix() for p in (source / 'assets').rglob('*') if p.is_file()}
-    require(expected == actual, '模板含未登记或缺失资产')
-    return manifest, assets
+        require(not target.is_absolute() and '..' not in target.parts, '资产目标越界')
+        assets.append((target, render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values)))
+    return manifest['version'], assets
 
 
-def generate(source, output, group, artifact, package):
-    """生成一个新目录；参数无副作用，只有本次取得所有权的输出才能回滚。"""
-    require(re.fullmatch(r'[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*', group) is not None, 'groupId 格式无效')
-    require(re.fullmatch(r'[a-z][a-z0-9]*(?:-[a-z0-9]+)*', artifact) is not None and len(artifact) <= 64, 'artifactId 格式无效')
-    require(re.fullmatch(r'[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+', package) is not None and not KEYWORDS.intersection(package.split('.')), '包名格式无效')
-    output = output.absolute()
-    ordinary_path(output)
-    require(output.name == artifact and output.parent.is_dir(), '输出目录名须为 artifactId，且父目录已经存在')
-    require(not output.exists(), '输出已存在，禁止覆盖')
-    values = {'GROUP': group, 'ARTIFACT': artifact, 'PACKAGE': package, 'PACKAGE_PATH': package.replace('.', '/')}
-    manifest, assets = load_assets(source, values)
-    output.mkdir()
+def add_module(services_pom, name):
+    """把新服务加入 services 聚合；已登记则拒绝。"""
+    text = services_pom.read_text(encoding='utf-8')
+    require('<module>' + name + '</module>' not in text, '服务已在聚合中登记')
+    marker = '    </modules>'
+    require(marker in text, 'services/pom.xml 中没有 modules 段')
+    services_pom.write_text(text.replace(marker, '        <module>' + name + '</module>\n' + marker), encoding='utf-8')
+
+
+def generate(root, name, package, namespace=None, with_example=False):
+    """生成服务目录并登记聚合；目标已存在时拒绝，失败时删除本次创建的文件。"""
+    values = values_for(name, package, namespace)
+    services = root / 'platform' / 'services'
+    require((services / 'pom.xml').is_file(), '找不到 platform/services/pom.xml，请在仓库根目录运行或传入 --root')
+    output = services / name
+    require(not output.exists(), '服务目录已存在，禁止覆盖')
+    version, assets = load_assets(with_example, values)
+    created = []
     try:
-        for relative, data, executable in assets:
+        for relative, text in assets:
             path = output / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open('xb') as stream:
-                stream.write(data)
-            if executable:
-                path.chmod(0o755)
-        metadata = {'template_version': manifest['version'], 'generator_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'template_sha256': hashlib.sha256((source / 'template.json').read_bytes()).hexdigest(), 'group_id': group, 'artifact_id': artifact, 'package': package}
-        (output / 'template-origin.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
+            with path.open('x', encoding='utf-8') as stream:
+                stream.write(text)
+            created.append(path)
+        add_module(services / 'pom.xml', name)
     except Exception:
-        shutil.rmtree(output)
+        for path in reversed(created):
+            path.unlink()
+        for directory in sorted({p for c in created for p in c.parents if output in (p, *p.parents)}, reverse=True):
+            if directory.exists() and not any(directory.iterdir()):
+                directory.rmdir()
         raise
-    return metadata
+    return {'template_version': version, 'service': name, 'package': package, 'namespace': values['NAMESPACE'],
+            'example': with_example, 'files': len(created)}
 
 
 def main():
-    """暴露有限生成参数；失败返回非零，不吞掉缺失或不一致资产。"""
+    """暴露有限生成参数；失败返回非零。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('group-id', 'artifact-id', 'package', 'output'):
-        parser.add_argument('--' + name, required=True)
+    parser.add_argument('--name', required=True, help='服务名，即模块目录与 artifactId，例如 order-service')
+    parser.add_argument('--package', required=True, help='服务根包，例如 com.company.order')
+    parser.add_argument('--permission-namespace', help='IAM 权限命名空间，默认为去掉 -service 的服务名')
+    parser.add_argument('--with-example', action='store_true', help='附带便笺示例：命令、纯查询、编排查询与 IAM 数据范围')
+    parser.add_argument('--root', default=str(TEMPLATE.parents[2]), help='仓库根目录，默认为本模板所在仓库')
     args = parser.parse_args()
     try:
-        result = generate(Path(__file__).absolute().parent, Path(args.output), args.group_id, args.artifact_id, args.package)
+        result = generate(Path(args.root).resolve(), args.name, args.package, args.permission_namespace,
+                          args.with_example)
     except (ValueError, OSError, KeyError) as failure:
         parser.exit(2, str(failure) + '\n')
     print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

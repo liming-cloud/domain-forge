@@ -1,7 +1,11 @@
 package org.domainforge.iam.application.port.audit;
 
-/** 审计独立于已完成业务事务；失败必须独立告警，不伪报全量可恢复。 */
+/**
+ * 关键管理变更的审计记录；与业务变更同库同事务，审计写入失败使整个业务回滚。
+ */
 public interface AuditTrail {
-  /** 仅在业务提交确认后调用，最多两次有界重试，不因审计故障撤销业务结果。 */
-  void record(AuditEvent event);
+    /**
+     * 必须在业务事务内调用；失败直接抛出，不重试、不吞掉，也不另起事务。
+     */
+    void record(AuditEvent event);
 }

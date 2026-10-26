@@ -1,136 +1,74 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper">
-  <select id="waitingAccountLocks" resultType="int">
-    SELECT count(*) FROM pg_stat_activity
-    WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%iam_account%'
-  </select>
-  <update id="installGrantCommitFailure">
-    CREATE FUNCTION composite_grant_commit_failure() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN RAISE EXCEPTION 'controlled deferred grant failure'; END $$;
-    CREATE CONSTRAINT TRIGGER composite_grant_commit_failure
-    AFTER INSERT ON iam_session_grant DEFERRABLE INITIALLY DEFERRED
-    FOR EACH ROW EXECUTE FUNCTION composite_grant_commit_failure();
-  </update>
-  <update id="removeGrantCommitFailure">
-    DROP TRIGGER composite_grant_commit_failure ON iam_session_grant;
-    DROP FUNCTION composite_grant_commit_failure();
-  </update>
-  <update id="reset">
-    TRUNCATE iam_account, iam_invitation, iam_session_grant, iam_operation, iam_audit RESTART IDENTITY;
-    UPDATE iam_administration_guard SET initialized=false WHERE id=1;
-    UPDATE iam_login_protection SET generation=NULL,blocked_until='infinity' WHERE id=1;
-  </update>
-  <insert id="manualRetentionRecord">
-    INSERT INTO iam_audit(operation_id,actor,target_id,action,outcome,source,occurred_at,provenance,missing_fields)
-    VALUES(gen_random_uuid(),'test-manual',gen_random_uuid(),'test','original-result-unconfirmed','manual',NULL,'ticket:retention','originalActor')
-  </insert>
-  <select id="reissuedAccountCount" resultType="int">
-    SELECT count(*) FROM iam_account WHERE login_name='reissue.race'
-  </select>
-  <update id="deleteSession">
-    DELETE FROM iam_session_grant WHERE token_digest=#{value}
-  </update>
-  <update id="restoreSessionTable">
-    ALTER TABLE iam_session_grant_unavailable RENAME TO iam_session_grant
-  </update>
-  <update id="hideSessionTable">
-    ALTER TABLE iam_session_grant RENAME TO iam_session_grant_unavailable
-  </update>
-  <select id="operationCount" resultType="int">
-    SELECT count(*) FROM iam_operation WHERE operation_id=CAST(#{value} AS uuid)
-  </select>
-  <select id="tokenSessionCount" resultType="int">
-    SELECT count(*) FROM iam_session_grant WHERE token_digest=#{value}
-  </select>
-  <select id="sessionCount" resultType="int">
-    SELECT count(*) FROM iam_session_grant
-  </select>
-  <select id="manualAuditCount" resultType="int">
-    SELECT count(*) FROM iam_audit WHERE source='manual'
-  </select>
-  <select id="replayInvitationCount" resultType="int">
-    SELECT count(*) FROM iam_invitation WHERE login_name='cleanup.replay'
-  </select>
-  <select id="cleanupAuditCount" resultType="int">
-    SELECT count(*) FROM iam_audit WHERE actor='test'
-  </select>
-  <select id="cleanupReceiptCount" resultType="int">
-    SELECT count(*) FROM iam_operation WHERE actor_scope='cleanup'
-  </select>
-  <update id="expiredAudits">
-    INSERT INTO iam_audit(operation_id,actor,target_id,action,outcome,source,occurred_at,recorded_at) SELECT gen_random_uuid(),'test',gen_random_uuid(),'test','test','observed',clock_timestamp()-interval '91 days',clock_timestamp()-interval '91 days' FROM generate_series(1,1005)
-  </update>
-  <update id="expireReplayInvitation">
-    UPDATE iam_invitation SET expires_at=clock_timestamp()-interval '1 hour' WHERE login_name='cleanup.replay'
-  </update>
-  <update id="expiredReceipts">
-    INSERT INTO iam_operation(actor_scope,operation_id,fingerprint,target_id,result_version,action,expires_at) SELECT 'cleanup',gen_random_uuid(),repeat('a',64),gen_random_uuid(),1,'test',clock_timestamp()-interval '1 second' FROM generate_series(1,1005)
-  </update>
-  <select id="manualAudit" resultType="map">
-    SELECT * FROM iam_audit WHERE operation_id=CAST(#{value} AS uuid) AND source='manual'
-  </select>
-  <select id="targetAuditCount" resultType="int">
-    SELECT count(*) FROM iam_audit WHERE target_id=CAST(#{value} AS uuid)
-  </select>
-  <update id="dropAuditFailure">
-    DROP FUNCTION fail_audit()
-  </update>
-  <update id="removeAuditFailure">
-    DROP TRIGGER fail_audit ON iam_audit
-  </update>
-  <update id="attachAuditFailure">
-    CREATE TRIGGER fail_audit BEFORE INSERT ON iam_audit FOR EACH ROW EXECUTE FUNCTION fail_audit()
-  </update>
-  <update id="createAuditFailure">
-    CREATE FUNCTION fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'controlled audit failure'; END $$
-  </update>
-  <select id="expiredAccountCount" resultType="int">
-    SELECT count(*) FROM iam_account WHERE login_name='expiry.user'
-  </select>
-  <update id="expireInvitation">
-    UPDATE iam_invitation SET expires_at=clock_timestamp() WHERE login_name='expiry.user'
-  </update>
-  <update id="dropInvitationFailure">
-    DROP FUNCTION fail_invitation()
-  </update>
-  <update id="removeInvitationFailure">
-    DROP TRIGGER fail_invitation ON iam_invitation
-  </update>
-  <select id="unconsumedRollbackInvitationCount" resultType="int">
-    SELECT count(*) FROM iam_invitation WHERE login_name='rollback.user' AND consumed_by IS NULL
-  </select>
-  <select id="rollbackAccountCount" resultType="int">
-    SELECT count(*) FROM iam_account WHERE login_name='rollback.user'
-  </select>
-  <update id="attachInvitationFailure">
-    CREATE TRIGGER fail_invitation BEFORE UPDATE ON iam_invitation FOR EACH ROW EXECUTE FUNCTION fail_invitation()
-  </update>
-  <update id="createInvitationFailure">
-    CREATE FUNCTION fail_invitation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.login_name='rollback.user' THEN RAISE EXCEPTION 'controlled failure'; END IF; RETURN NEW; END $$
-  </update>
-  <select id="registrationReceiptCount" resultType="int">
-    SELECT count(*) FROM iam_operation WHERE action='invitation.accept'
-  </select>
-  <select id="parallelAccountCount" resultType="int">
-    SELECT count(*) FROM iam_account WHERE login_name='parallel.user'
-  </select>
-  <select id="initializationAuditCount" resultType="int">
-    SELECT count(*) FROM iam_audit WHERE action='administrator.initialize'
-  </select>
-  <select id="accountCount" resultType="int">
-    SELECT count(*) FROM iam_account
-  </select>
-  <select id="protectionRemainingSeconds" resultType="long">
-    SELECT floor(extract(epoch FROM blocked_until-clock_timestamp())) FROM iam_login_protection WHERE id=1
-  </select>
-  <select id="protectionDigest" resultType="string">
-    SELECT policy_digest FROM iam_login_protection WHERE id=1
-  </select>
-  <select id="protectionDeadline" resultType="java.time.Instant">
-    SELECT blocked_until FROM iam_login_protection WHERE id=1
-  </select>
-  <update id="extendProtectionWindow">
-    UPDATE iam_login_protection SET blocked_until=clock_timestamp()+#{seconds}*interval '1 second' WHERE id=1
-  </update>
+    <update id="reset">
+        TRUNCATE iam_account, iam_invitation, iam_session_grant, iam_audit, iam_account_role, iam_membership,
+            iam_menu_item, iam_role_grant_unit;
+        DELETE FROM iam_role_grant WHERE role_id &lt;&gt; 1;
+        DELETE FROM iam_role WHERE id &lt;&gt; 1;
+        DELETE FROM iam_permission WHERE namespace &lt;&gt; 'iam';
+        DELETE FROM iam_org_unit WHERE id &lt;&gt; 1;
+        UPDATE iam_org_unit SET name = '根组织', enabled = true, version = 1 WHERE id = 1;
+        UPDATE iam_administration_guard SET initialized = false WHERE id = 1;
+    </update>
+    <select id="waitingAccountLocks" resultType="int">
+        SELECT count(*)
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND wait_event_type = 'Lock'
+          AND query LIKE '%iam_account%'
+    </select>
+    <update id="installGrantCommitFailure">
+        CREATE FUNCTION fixture_grant_commit_failure() RETURNS trigger
+            LANGUAGE plpgsql AS
+        $$
+        BEGIN
+            RAISE EXCEPTION 'controlled deferred grant failure';
+        END
+        $$;
+        CREATE CONSTRAINT TRIGGER fixture_grant_commit_failure
+            AFTER INSERT
+            ON iam_session_grant DEFERRABLE INITIALLY DEFERRED
+            FOR EACH ROW
+        EXECUTE FUNCTION fixture_grant_commit_failure();
+    </update>
+    <update id="removeGrantCommitFailure">
+        DROP TRIGGER fixture_grant_commit_failure ON iam_session_grant;
+        DROP FUNCTION fixture_grant_commit_failure();
+    </update>
+    <update id="installAuditFailure">
+        CREATE FUNCTION fixture_audit_failure() RETURNS trigger
+            LANGUAGE plpgsql AS
+        $$
+        BEGIN
+            RAISE EXCEPTION 'controlled audit failure';
+        END
+        $$;
+        CREATE TRIGGER fixture_audit_failure
+            BEFORE INSERT
+            ON iam_audit
+            FOR EACH ROW
+        EXECUTE FUNCTION fixture_audit_failure();
+    </update>
+    <update id="removeAuditFailure">
+        DROP TRIGGER fixture_audit_failure ON iam_audit;
+        DROP FUNCTION fixture_audit_failure();
+    </update>
+    <select id="accountCount" resultType="int">
+        SELECT count(*) FROM iam_account WHERE login_name = #{name}
+    </select>
+    <select id="sessionCount" resultType="int">
+        SELECT count(*) FROM iam_session_grant WHERE token_digest = #{digest}
+    </select>
+    <select id="auditCount" resultType="int">
+        SELECT count(*) FROM iam_audit WHERE action = #{action}
+    </select>
+    <update id="expireInvitation">
+        UPDATE iam_invitation SET expires_at = clock_timestamp() - interval '1 second' WHERE login_name = #{name}
+    </update>
+    <insert id="insertExpiredAudits">
+        INSERT INTO iam_audit (id, actor, target_id, action, occurred_at)
+        SELECT g, 'fixture', g, 'retention.old', clock_timestamp() - interval '91 days'
+        FROM generate_series(1, #{count}) AS g
+    </insert>
 </mapper>

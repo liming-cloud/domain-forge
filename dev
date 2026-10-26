@@ -1,9 +1,0 @@
-#!/usr/bin/env python3
-"""使用当前 Python 转交研发入口；不改变工作目录、参数或退出状态。"""
-
-import os
-from pathlib import Path
-import sys
-
-
-os.execv(sys.executable, [sys.executable, "-B", str(Path(__file__).resolve().parent / "harness/cli.py"), *sys.argv[1:]])

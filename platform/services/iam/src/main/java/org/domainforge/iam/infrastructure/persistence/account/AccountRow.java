@@ -1,47 +1,40 @@
 package org.domainforge.iam.infrastructure.persistence.account;
 
-import java.util.Arrays;
+import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.model.account.Membership;
+
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-import org.domainforge.iam.domain.model.Account;
 
-/** 账号表投影；权限存储编码不传播到领域或HTTP。 */
+/**
+ * 账号表投影；角色分配与成员归属分表保存。
+ */
 public record AccountRow(
-    String id,
-    String loginName,
-    String credentialDigest,
-    long credentialVersion,
-    long version,
-    boolean enabled,
-    String permissions) {
-  /** 转换领域快照为确定排序的有限权限表示。 */
-  static AccountRow from(Account account) {
-    return new AccountRow(
-        account.id().toString(),
-        account.loginName(),
-        account.credentialDigest(),
-        account.credentialVersion(),
-        account.version(),
-        account.enabled(),
-        String.join(",", new TreeSet<>(account.permissions())));
-  }
+        long id, String loginName, String credentialDigest, long credentialVersion, long version, boolean enabled) {
+    /**
+     * 转换领域快照的主表部分。
+     */
+    static AccountRow from(Account account) {
+        return new AccountRow(
+                account.id(),
+                account.loginName(),
+                account.credentialDigest(),
+                account.credentialVersion(),
+                account.version(),
+                account.enabled());
+    }
 
-  /** 恢复领域模型再次校验权限目录，不默许数据库异常值。 */
-  Account toDomain() {
-    return new Account(
-        UUID.fromString(id),
-        loginName,
-        credentialDigest,
-        credentialVersion,
-        version,
-        enabled,
-        permissions.isEmpty() ? Set.of() : Set.copyOf(Arrays.asList(permissions.split(","))));
-  }
+    /**
+     * 与子表一起恢复领域模型，并再次校验不变量。
+     */
+    Account toDomain(Set<Long> roles, Set<Membership> memberships) {
+        return new Account(id, loginName, credentialDigest, credentialVersion, version, enabled, roles, memberships);
+    }
 
-  /** 禁止记录携带密码摘要的默认record表示。 */
-  @Override
-  public String toString() {
-    return "AccountRow[id=" + id + "]";
-  }
+    /**
+     * 禁止记录携带密码摘要的默认record表示。
+     */
+    @Override
+    public String toString() {
+        return "AccountRow[id=" + id + "]";
+    }
 }

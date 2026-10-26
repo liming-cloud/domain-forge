@@ -1,90 +1,216 @@
 {
-  "schema": 1,
-  "version": "0.3.0-iam.2",
+  "schema": 2,
+  "version": "0.4.0",
   "assets": [
-    {
-      "source": "assets/.mvn/wrapper/maven-wrapper.properties",
-      "target": ".mvn/wrapper/maven-wrapper.properties",
-      "sha256": "9e702bcd7e68ba1cace0a3382a7082e6e1e1b321688a7a3fbf4d5ae7eb0af533",
-      "render": false,
-      "executable": false
-    },
-    {
-      "source": "assets/AGENTS.md.tpl",
-      "target": "AGENTS.md",
-      "sha256": "640357608c63d9ff9628c14c2f1d7f071177b96ec008dbf24716d3d0fb85bab8",
-      "render": false,
-      "executable": false
-    },
     {
       "source": "assets/README.md.tpl",
       "target": "README.md",
-      "sha256": "8bac5c7fbd408c75c17e7234147ab2598aa6224c024f90066506f9d814c6a94d",
-      "render": true,
-      "executable": false
-    },
-    {
-      "source": "assets/mvnw",
-      "target": "mvnw",
-      "sha256": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02",
-      "render": false,
-      "executable": true
-    },
-    {
-      "source": "assets/mvnw.cmd",
-      "target": "mvnw.cmd",
-      "sha256": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c",
-      "render": false,
-      "executable": false
+      "example": false
     },
     {
       "source": "assets/pom.xml.tpl",
       "target": "pom.xml",
-      "sha256": "aaf8c8428e048ac6015dad897aad8ac817f98f268f71c82c795d11947be07086",
-      "render": true,
-      "executable": false
+      "example": false
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/Application.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/Application.java",
-      "sha256": "5dcf8edddafcca17077d57f5c98f5e818bc7c4ab8a6f4037125635888a8d3acd",
-      "render": true,
-      "executable": false
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/access/DataScopes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/access/DataScopes.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/operation/Identifiers.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/operation/Identifiers.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/@@APP_CLASS@@.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/@@APP_CLASS@@.java",
+      "example": false
     },
     {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/LoggingState.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/LoggingState.java",
-      "sha256": "b4e3ceabaae0f591f87e73428e472293fcde5d2cb87023bc61ef9cc6897bdc4d",
-      "render": true,
-      "executable": false
+      "example": false
     },
     {
-      "source": "assets/src/main/resources/application.properties",
-      "target": "src/main/resources/application.properties",
-      "sha256": "07f24433f32b5ad9fc96b00d5c84ef1b88aedc447a7ea05b096e7f4d05e68fcf",
-      "render": true,
-      "executable": false
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/PersistenceConfiguration.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/PersistenceConfiguration.java",
+      "example": false
     },
     {
-      "source": "assets/src/main/resources/logback-spring.xml",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamAccessClient.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamAccessClient.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamCurrentSubjectSource.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamCurrentSubjectSource.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamDataScopes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamDataScopes.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamFailures.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamFailures.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/operation/SnowflakeIdentifiers.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/operation/SnowflakeIdentifiers.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/resources/application.yml.tpl",
+      "target": "src/main/resources/application.yml",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/resources/logback-spring.xml.tpl",
       "target": "src/main/resources/logback-spring.xml",
-      "sha256": "7c22a15d4379b13f84b92a61f466dc8edb944b76b170be2e0ce2f1cc803c4901",
-      "render": false,
-      "executable": false
+      "example": false
     },
     {
       "source": "assets/src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java.tpl",
       "target": "src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java",
-      "sha256": "544789d9259dd93f9445c64f1e49b20560e8f77717ea0596896674756d55340c",
-      "render": true,
-      "executable": false
+      "example": false
     },
     {
-      "source": "01-使用说明.md",
-      "target": "docs/01-使用说明.md",
-      "sha256": "e94e33c53a9fb659ea08cb4c43e9ea61362845881a22bd0ec067a3eac017ffc1",
-      "render": false,
-      "executable": false
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteChange.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteChange.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NotePermissions.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NotePermissions.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteRejected.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteRejected.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/WriteNote.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/WriteNote.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ListVisibleNotes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ListVisibleNotes.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteFilter.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteFilter.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteQueries.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteView.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteView.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteRepository.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteRepository.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteMapper.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteRow.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteRow.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNotes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNotes.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/NoteQueryMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/NoteQueryMapper.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/SqlNoteQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/SqlNoteQueries.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/CreateNoteRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/CreateNoteRequest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/EditNoteRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/EditNoteRequest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteChangeResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteChangeResponse.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteRejectionMapping.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteRejectionMapping.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteResponse.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/db/migration/V1__note.sql.tpl",
+      "target": "src/main/resources/db/migration/V1__note.sql",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/iam/permissions.json.tpl",
+      "target": "src/main/resources/iam/permissions.json",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/mapper/note/NoteMapper.xml.tpl",
+      "target": "src/main/resources/mapper/note/NoteMapper.xml",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/mapper/query/note/NoteQueryMapper.xml.tpl",
+      "target": "src/main/resources/mapper/query/note/NoteQueryMapper.xml",
+      "example": true
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/domain/model/note/NoteTest.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/domain/model/note/NoteTest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java",
+      "example": true
     }
   ]
 }

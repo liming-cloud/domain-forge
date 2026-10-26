@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.query.access.AccessScopeMapper">
+    <!-- 一条语句：有效会话主体 → 启用角色在所请求权限上的授予 → 按范围展开有效组织。
+         有效组织 = 节点及全部祖先启用；成员部门全部失效时不升级为 ALL。 -->
+    <select id="scopes" resultType="org.domainforge.iam.infrastructure.query.access.ScopeProjection">
+        WITH RECURSIVE
+            subject AS (SELECT a.id
+                        FROM iam_session_grant g
+                                 JOIN iam_account a ON a.id = g.account_id
+                        WHERE g.token_digest = #{digest}
+                          AND NOT g.revoked
+                          AND g.expires_at &gt; clock_timestamp()
+                          AND a.enabled
+                          AND a.credential_version = g.credential_version),
+            requested AS (SELECT code
+                          FROM iam_permission
+                          WHERE scoped
+                            AND code IN
+                            <foreach collection="permissions" item="code" open="(" separator="," close=")">#{code}</foreach>),
+            effective (id, depth) AS (SELECT id, 0 FROM iam_org_unit WHERE parent_id IS NULL AND enabled
+                                      UNION ALL
+                                      SELECT u.id, e.depth + 1
+                                      FROM iam_org_unit u
+                                               JOIN effective e ON u.parent_id = e.id
+                                      WHERE u.enabled AND e.depth &lt; 1000),
+            grants AS (SELECT rg.role_id, rg.permission_code, rg.scope
+                       FROM subject s
+                                JOIN iam_account_role ar ON ar.account_id = s.id
+                                JOIN iam_role r ON r.id = ar.role_id AND r.enabled
+                                JOIN iam_role_grant rg ON rg.role_id = r.id
+                                JOIN requested q ON q.code = rg.permission_code),
+            member_units AS (SELECT m.unit_id AS id
+                             FROM subject s
+                                      JOIN iam_membership m ON m.account_id = s.id
+                                      JOIN effective e ON e.id = m.unit_id),
+            subtree (id, depth) AS (SELECT id, 0 FROM member_units
+                                    UNION
+                                    SELECT e.id, t.depth + 1
+                                    FROM iam_org_unit u
+                                             JOIN subtree t ON u.parent_id = t.id
+                                             JOIN effective e ON e.id = u.id
+                                    WHERE t.depth &lt; 1000)
+        SELECT 'SUBJECT' AS kind, NULL::varchar AS permission, NULL::bigint AS unit_id FROM subject
+        UNION ALL
+        SELECT 'PERMISSION', code, NULL::bigint FROM requested
+        UNION ALL
+        SELECT DISTINCT scope, permission_code, NULL::bigint FROM grants WHERE scope IN ('ALL', 'SELF')
+        UNION ALL
+        SELECT DISTINCT 'UNIT', g.permission_code, m.id
+        FROM grants g
+                 CROSS JOIN member_units m
+        WHERE g.scope = 'DEPARTMENT'
+        UNION ALL
+        SELECT DISTINCT 'UNIT', g.permission_code, t.id
+        FROM grants g
+                 CROSS JOIN subtree t
+        WHERE g.scope = 'DEPARTMENT_AND_DESCENDANTS'
+        UNION ALL
+        SELECT DISTINCT 'UNIT', g.permission_code, gu.unit_id
+        FROM grants g
+                 JOIN iam_role_grant_unit gu ON gu.role_id = g.role_id AND gu.permission_code = g.permission_code
+                 JOIN effective e ON e.id = gu.unit_id
+        WHERE g.scope = 'CUSTOM_DEPARTMENTS'
+    </select>
+</mapper>

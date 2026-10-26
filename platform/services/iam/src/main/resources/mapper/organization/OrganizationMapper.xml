@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.iam.infrastructure.persistence.organization.OrganizationMapper">
+    <select id="lock" resultType="org.domainforge.iam.infrastructure.persistence.organization.OrganizationUnitRow">
+        SELECT id, parent_id, name, enabled, version FROM iam_org_unit WHERE id = #{id} FOR UPDATE
+    </select>
+    <!-- 深度上限防止异常数据导致无限递归；正常树由协调锁与成环检查保证无环。 -->
+    <select id="ancestors" resultType="long">
+        WITH RECURSIVE chain (id, parent_id, depth) AS (
+            SELECT id, parent_id, 0 FROM iam_org_unit WHERE id = #{id}
+            UNION ALL
+            SELECT u.id, u.parent_id, c.depth + 1
+            FROM iam_org_unit u
+                     JOIN chain c ON u.id = c.parent_id
+            WHERE c.depth &lt; 1000)
+        SELECT id FROM chain ORDER BY depth
+    </select>
+    <select id="existing" resultType="long">
+        SELECT count(*) FROM iam_org_unit WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <select id="sameName" resultType="long">
+        SELECT count(*) FROM iam_org_unit WHERE parent_id = #{parent} AND name = #{name} AND id &lt;&gt; #{except}
+    </select>
+    <insert id="insert">
+        INSERT INTO iam_org_unit (id, parent_id, name, enabled, version)
+        VALUES (#{id}, #{parentId}, #{name}, #{enabled}, #{version})
+    </insert>
+    <update id="update">
+        UPDATE iam_org_unit
+        SET parent_id = #{row.parentId}, name = #{row.name}, enabled = #{row.enabled}, version = #{row.version}
+        WHERE id = #{row.id} AND version = #{expected}
+    </update>
+    <delete id="delete">
+        DELETE FROM iam_org_unit WHERE id = #{id}
+    </delete>
+    <select id="references" resultType="long">
+        SELECT (SELECT count(*) FROM iam_org_unit WHERE parent_id = #{id})
+                   + (SELECT count(*) FROM iam_membership WHERE unit_id = #{id})
+                   + (SELECT count(*) FROM iam_role_grant_unit WHERE unit_id = #{id})
+    </select>
+</mapper>
