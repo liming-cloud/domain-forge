@@ -1,0 +1,18 @@
+# access-control 组件默认值：只维护 Sa-Token 会话策略；Redis 连接归 cache 组件。
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  is-read-cookie: false
+  is-read-body: false
+  is-read-header: true
+  is-log: false
+  is-print: false
+  timeout: 28800
+  active-timeout: -1
+  auto-renew: false
+  is-share: false
+  is-concurrent: true
+domainforge:
+  access:
+    # redis：官方 Redisson DAO；memory：原生内存实现，仅用于不连接 Redis 的测试。
+    session-store: redis

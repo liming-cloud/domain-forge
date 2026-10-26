@@ -6,6 +6,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PlaceOrder {
-  Order order;
-  Facade facade;
+    Order order;
+    Facade facade;
 }

@@ -1,3 +1,4 @@
 package fixture.bad.appinfra.infrastructure;
 
-public class Store {}
+public class Store {
+}

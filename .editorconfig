@@ -1,0 +1,28 @@
+# 仓库统一的编辑器与 IntelliJ 代码风格。IntelliJ 会读取 ij_ 开头的设置，
+# 保证不同机器上"Reformat Code"的结果一致；Checkstyle 的格式规则与此对应。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[*.java]
+ij_continuation_indent_size = 8
+ij_java_class_count_to_use_import_on_demand = 5
+ij_java_names_count_to_use_import_on_demand = 3
+ij_java_imports_layout = *,|,javax.**,java.**,|,$*
+ij_java_align_multiline_resources = false
+ij_java_keep_simple_blocks_in_one_line = false
+ij_java_doc_do_not_wrap_if_one_line = false
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off

@@ -1,3 +1,4 @@
 package fixture.bad.orphan.misc;
 
-public class Orphan {}
+public class Orphan {
+}

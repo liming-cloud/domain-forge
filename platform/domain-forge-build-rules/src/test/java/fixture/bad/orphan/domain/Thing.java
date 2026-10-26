@@ -1,3 +1,4 @@
 package fixture.bad.orphan.domain;
 
-public class Thing {}
+public class Thing {
+}
