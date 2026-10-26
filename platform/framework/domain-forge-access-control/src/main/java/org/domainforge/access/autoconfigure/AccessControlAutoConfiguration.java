@@ -90,9 +90,13 @@ public class AccessControlAutoConfiguration {
 
         /**
          * 先拒绝遗漏声明并验证完整主体，再交原生执行登录、权限、角色及 AND／OR。
+         *
+         * <p>当前主体延迟取得：事实源常依赖 HTTP 客户端（如 Feign），而客户端装配又会读取 MVC 配置，立即注入会成环。
          */
         @Bean
-        WebMvcConfigurer accessInterceptors(AccessDeclarations declarations, CurrentAccess current, StpLogic logic) {
+        WebMvcConfigurer accessInterceptors(
+                AccessDeclarations declarations, ObjectProvider<CurrentAccess> currentAccess, StpLogic logic) {
+            CurrentAccess current = () -> currentAccess.getObject().current();
             return new WebMvcConfigurer() {
                 @Override
                 public void addInterceptors(InterceptorRegistry registry) {
