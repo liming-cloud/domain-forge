@@ -30,7 +30,7 @@
         <spotless.version>3.10.4</spotless.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <checkstyle.version>14.3.0</checkstyle.version>
-        <dependency-plugin.version>3.8.1</dependency-plugin.version>
+        <dependency-plugin.version>3.11.0</dependency-plugin.version>
         <!-- 集成测试：failsafe 运行 *IT，docker-maven-plugin 在 pre-integration-test 启动隔离依赖。 -->
         <failsafe.version>3.5.6</failsafe.version>
         <docker-maven-plugin.version>0.49.0</docker-maven-plugin.version>
