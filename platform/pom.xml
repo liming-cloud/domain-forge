@@ -32,7 +32,7 @@
         <checkstyle.version>14.3.0</checkstyle.version>
         <dependency-plugin.version>3.8.1</dependency-plugin.version>
         <!-- 集成测试：failsafe 运行 *IT，docker-maven-plugin 在 pre-integration-test 启动隔离依赖。 -->
-        <failsafe.version>3.5.6</failsafe.version>
+        <failsafe.version>3.6.1</failsafe.version>
         <docker-maven-plugin.version>0.49.0</docker-maven-plugin.version>
         <it.postgres.image>
             postgres:18.4-alpine3.24@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
