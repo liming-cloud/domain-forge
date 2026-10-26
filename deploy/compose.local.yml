@@ -1,5 +1,12 @@
+# 本地调试覆盖：只在回环地址发布依赖端口，供 IDE 中运行的服务直连。生产部署不要叠加本文件。
 services:
   postgres:
     ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
   redis:
     ports: ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
+  nacos:
+    # 客户端按 HTTP 端口 +1000 连接 gRPC，两个端口只能一起改。
+    ports:
+      - "127.0.0.1:${NACOS_PORT:-8848}:8848"
+      - "127.0.0.1:${NACOS_GRPC_PORT:-9848}:9848"
+      - "127.0.0.1:${NACOS_CONSOLE_PORT:-18080}:8080"
