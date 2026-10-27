@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合；同时在 deploy/ 写入其部署文件。
+"""在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合；同时在 deploy/ 写入其部署文件，
+带示例时向网关配置种子追加示例接口的路由。
 
 生成结果继承内部 parent，自动执行架构规则与质量门禁；生成后代码归该服务维护，模板升级不覆盖已有服务。
 """
@@ -16,7 +17,7 @@ KEYWORDS = set(
     'final finally float for goto if implements import instanceof int interface long native new package private '
     'protected public return short static strictfp super switch synchronized this throw throws transient try void '
     'volatile while true false null var yield record sealed permits'.split())
-RESERVED_NAMES = {'iam', 'services', 'framework', 'shared', 'platform'}
+RESERVED_NAMES = {'iam', 'gateway', 'services', 'framework', 'shared', 'platform'}
 
 
 def require(valid, message):
@@ -75,8 +76,11 @@ def load_assets(with_example, values):
         target = Path(render(entry['target'], values))
         require(not target.is_absolute() and '..' not in target.parts, '资产目标越界')
         require(entry.get('root', 'service') in ('service', 'repository'), '资产根目录无效')
+        require(entry.get('mode', 'create') in ('create', 'append'), '资产写入方式无效')
+        require(entry.get('mode', 'create') == 'create' or entry.get('root') == 'repository', '只能追加到仓库已有文件')
         assets.append((entry.get('root', 'service'), target,
-                       render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values)))
+                       render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values),
+                       entry.get('mode', 'create')))
     return manifest['version'], assets
 
 
@@ -99,20 +103,32 @@ def generate(root, name, package, namespace=None, with_example=False):
     values['POSTGRES_IMAGE'] = postgres_image(root)
     version, assets = load_assets(with_example, values)
     bases = {'service': output, 'repository': root}
-    for kind, relative, _ in assets:
-        if kind == 'repository':
+    for kind, relative, text, mode in assets:
+        if mode == 'append':
+            require((root / relative).is_file(), str(relative) + ' 不存在，无法追加')
+            require(text.splitlines()[0] not in (root / relative).read_text(encoding='utf-8').splitlines(),
+                    str(relative) + ' 中已有同名条目')
+        elif kind == 'repository':
             require(not (root / relative).exists(), str(relative) + ' 已存在，禁止覆盖')
             require((root / relative).parent.is_dir(), str(relative.parent) + ' 不存在')
     created = []
+    appended = {}
     try:
-        for kind, relative, text in assets:
+        for kind, relative, text, mode in assets:
             path = bases[kind] / relative
+            if mode == 'append':
+                original = path.read_text(encoding='utf-8')
+                appended[path] = original
+                path.write_text(original + ('' if original.endswith('\n') else '\n') + text, encoding='utf-8')
+                continue
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open('x', encoding='utf-8') as stream:
                 stream.write(text)
             created.append(path)
         add_module(services / 'pom.xml', name)
     except Exception:
+        for path, original in appended.items():
+            path.write_text(original, encoding='utf-8')
         for path in reversed(created):
             path.unlink()
         for directory in sorted({p for c in created for p in c.parents if output in (p, *p.parents)}, reverse=True):

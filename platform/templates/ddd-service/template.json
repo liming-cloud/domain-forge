@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -219,16 +219,17 @@
       "root": "repository"
     },
     {
-      "source": "assets/deploy/nginx/services/@@ARTIFACT@@.conf.tpl",
-      "target": "deploy/nginx/services/@@ARTIFACT@@.conf",
-      "example": true,
-      "root": "repository"
-    },
-    {
       "source": "assets/deploy/nacos/config/@@ARTIFACT@@.yaml.tpl",
       "target": "deploy/nacos/config/@@ARTIFACT@@.yaml",
       "example": false,
       "root": "repository"
+    },
+    {
+      "source": "assets/deploy/nacos/config/gateway-route.yaml.tpl",
+      "target": "deploy/nacos/config/gateway.yaml",
+      "example": true,
+      "root": "repository",
+      "mode": "append"
     }
   ]
 }

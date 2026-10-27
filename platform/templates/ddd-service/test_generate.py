@@ -20,8 +20,9 @@ class GenerateTest(unittest.TestCase):
                                           '</project>\n', encoding='utf-8')
         deploy = self.root / 'deploy'
         (deploy / 'services').mkdir(parents=True)
-        (deploy / 'nginx' / 'services').mkdir(parents=True)
         (deploy / 'nacos' / 'config').mkdir(parents=True)
+        (deploy / 'nacos' / 'config' / 'gateway.yaml').write_text(
+            'gateway:\n  routing:\n    routes:\n      - id: iam\n        service: iam\n        paths: [/api/**]\n', encoding='utf-8')
         (deploy / 'compose.yml').write_text('services:\n  postgres:\n    image: postgres:18@sha256:abc\n',
                                             encoding='utf-8')
 
@@ -38,7 +39,7 @@ class GenerateTest(unittest.TestCase):
         compose = (self.root / 'deploy/services/order-service.compose.yml').read_text(encoding='utf-8')
         self.assertIn('image: postgres:18@sha256:abc', compose)
         self.assertIn('ORDER_SERVICE_DB_USER: order_service', compose)
-        self.assertFalse((self.root / 'deploy/nginx/services/order-service.conf').exists())
+        self.assertNotIn('order-service', (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8'))
         seed = (self.root / 'deploy/nacos/config/order-service.yaml').read_text(encoding='utf-8')
         self.assertIn('source: nacos', seed)
         self.assertIn('SPRING_PROFILES_ACTIVE: config-center', compose)
@@ -55,11 +56,18 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('${RETAIL_ORDER_DB_URL}', config)
         it = next(output.rglob('NoteServiceIT.java')).read_text(encoding='utf-8')
         self.assertIn('currentSchema=retail_order', it)
-        routes = (self.root / 'deploy/nginx/services/retail-order.conf').read_text(encoding='utf-8')
-        self.assertIn('http://retail-order:8090', routes)
-        locations = [line for line in routes.splitlines() if line.startswith('location')]
-        self.assertEqual(3, len(locations))
-        self.assertFalse(any('/internal/' in line for line in locations))
+        routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
+        self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
+        self.assertIn('      - id: iam\n', routes)
+        self.assertNotIn('/internal/', routes)
+
+    def test_failed_generation_restores_gateway_seed(self):
+        seed = self.root / 'deploy/nacos/config/gateway.yaml'
+        before = seed.read_text(encoding='utf-8')
+        (self.root / 'platform/services/pom.xml').write_text('<project/>\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            generate.generate(self.root, 'retail-order', 'com.company.retail', with_example=True)
+        self.assertEqual(before, seed.read_text(encoding='utf-8'))
 
     def test_existing_deploy_file_is_not_overwritten(self):
         existing = self.root / 'deploy/services/order.compose.yml'
@@ -72,7 +80,7 @@ class GenerateTest(unittest.TestCase):
                          (self.root / 'platform/services/pom.xml').read_text(encoding='utf-8'))
 
     def test_rejects_invalid_or_existing_targets_without_changes(self):
-        for name, package in [('Order', 'com.company.order'), ('iam', 'com.company.iam'),
+        for name, package in [('Order', 'com.company.order'), ('iam', 'com.company.iam'), ('gateway', 'com.c.gw'),
                               ('order', 'com.company.class'), ('order', 'order')]:
             with self.assertRaises(ValueError):
                 generate.generate(self.root, name, package)

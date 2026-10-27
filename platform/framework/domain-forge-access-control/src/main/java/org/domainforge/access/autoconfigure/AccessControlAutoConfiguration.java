@@ -16,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -78,12 +79,21 @@ public class AccessControlAutoConfiguration {
         }
 
         /**
-         * 拒绝不经网关或系统内服务的直连；只在网关接入前的部署中临时关闭。
+         * 拒绝不经网关或系统内服务的直连。
          */
         @Bean
         @ConditionalOnProperty(name = "domainforge.access.same-token.enabled", havingValue = "true")
         SameTokenFilter sameTokenFilter() {
             return new SameTokenFilter();
+        }
+
+        /**
+         * 只允许本地开发与测试关闭 Same-Token 校验；部署环境（启用 config-center）关闭即启动失败。
+         */
+        @Bean
+        @ConditionalOnProperty(name = "domainforge.access.same-token.enabled", havingValue = "false")
+        SameTokenDisabled sameTokenDisabled(Environment environment) {
+            return SameTokenDisabled.check(environment);
         }
 
         @Bean

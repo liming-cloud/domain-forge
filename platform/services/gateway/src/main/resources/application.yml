@@ -1,0 +1,101 @@
+# API 网关配置。连接目标与凭据只来自环境变量；路由与限流是动态配置组 gateway，部署时以 Nacos 中的 gateway.yaml 为准。
+spring:
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${GATEWAY_DISCOVERY_ENABLED:false}
+        server-addr: ${GATEWAY_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${GATEWAY_NACOS_NAMESPACE:public}
+        group: ${GATEWAY_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${GATEWAY_NACOS_USERNAME:}
+        password: ${GATEWAY_NACOS_PASSWORD:}
+        ip: ${GATEWAY_DISCOVERY_IP:}
+    gateway:
+      server:
+        webflux:
+          # 客户端地址由网关自己确定并覆盖 X-Forwarded-For，不追加转发头。
+          x-forwarded:
+            enabled: false
+          forwarded:
+            enabled: false
+          httpclient:
+            connect-timeout: 2000
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:15s}
+  data:
+    redis:
+      host: ${GATEWAY_REDIS_HOST}
+      port: ${GATEWAY_REDIS_PORT}
+      password: ${GATEWAY_REDIS_PASSWORD}
+      timeout: 300ms
+      connect-timeout: 300ms
+
+server:
+  port: ${GATEWAY_PORT:8000}
+  max-http-request-header-size: 16KB
+
+management:
+  server:
+    address: 127.0.0.1
+    port: ${GATEWAY_MANAGEMENT_PORT:9093}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+    gateway:
+      access: none
+
+# 须与 access-control 组件的 Sa-Token 配置一致：会话与 Same-Token 的 Redis 键名由 token-name 决定。
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  is-read-cookie: false
+  is-read-body: false
+  is-read-header: true
+  is-log: false
+  is-print: false
+  same-token-timeout: 86400
+
+domainforge:
+  gateway:
+    # 可信代理（Nginx 固定地址），只采用它给出的 X-Forwarded-For；逗号分隔，为空时不信任任何转发头。
+    trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:}
+
+# 路由与限流（动态配置组）。启用配置中心时以 Nacos 发布的值为准，这里只供本地开发。
+gateway:
+  routing:
+    rate-limit:
+      replenish-per-second: 20
+      burst: 40
+    routes:
+      - id: iam
+        service: iam
+        paths: [/api/**]
+        anonymous: [POST /api/auth/login, POST /api/auth/invitations/accept]
+
+---
+# 配置中心：部署时以 SPRING_PROFILES_ACTIVE=config-center 启用。Nacos 不可达或 dataId 未发布时启动失败。
+spring:
+  config:
+    activate:
+      on-profile: config-center
+    import: "nacos:gateway.yaml?refreshEnabled=true"
+  cloud:
+    nacos:
+      config:
+        server-addr: ${GATEWAY_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${GATEWAY_NACOS_NAMESPACE:public}
+        group: ${GATEWAY_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${GATEWAY_NACOS_USERNAME:}
+        password: ${GATEWAY_NACOS_PASSWORD:}
+domainforge:
+  config:
+    expected-source: nacos
