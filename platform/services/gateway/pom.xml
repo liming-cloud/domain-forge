@@ -52,6 +52,11 @@
         </dependency>
         <dependency>
             <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot-reactor-v3v4-common</artifactId>
+            <version>1.46.0</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
             <artifactId>sa-token-redisson</artifactId>
             <exclusions>
                 <exclusion>

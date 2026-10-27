@@ -1,0 +1,14 @@
+# 跨服务调用组件默认值：所有 Feign 客户端的超时与重定向；服务可按客户端覆盖（spring.cloud.openfeign.client.config.<contextId>）。
+spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 1000
+            read-timeout: 2000
+            follow-redirects: false
+    loadbalancer:
+      # 负载均衡层也不重试：结果未知的请求不自动重放。
+      retry:
+        enabled: false

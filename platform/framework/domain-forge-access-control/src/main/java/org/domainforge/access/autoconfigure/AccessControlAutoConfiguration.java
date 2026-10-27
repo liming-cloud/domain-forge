@@ -2,6 +2,8 @@ package org.domainforge.access.autoconfigure;
 
 import cn.dev33.satoken.dao.SaTokenDao;
 import cn.dev33.satoken.dao.SaTokenDaoForRedisson;
+import cn.dev33.satoken.filter.SaServletFilter;
+import cn.dev33.satoken.same.SaSameUtil;
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpLogic;
 import org.domainforge.access.api.CurrentAccess;
@@ -13,6 +15,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -55,6 +58,11 @@ public class AccessControlAutoConfiguration {
     @Import(AccessFailureAdvice.class)
     static class WebAccess {
         /**
+         * Same-Token 过滤器的顺序，与 Sa-Token 文档中的全局过滤器一致。
+         */
+        static final int SAME_TOKEN_ORDER = -100;
+
+        /**
          * 每个应用必须提供唯一事实源，缺失时启动失败。
          */
         @Bean
@@ -79,12 +87,20 @@ public class AccessControlAutoConfiguration {
         }
 
         /**
-         * 拒绝不经网关或系统内服务的直连。
+         * 按 Sa-Token 官方用法注册全局过滤器校验 Same-Token，拒绝不经网关或系统内服务的直连。
+         *
+         * <p>排在 Sa-Token 上下文过滤器（-104）之后、业务过滤器之前；管理端点在独立端口，不经过它。
          */
         @Bean
         @ConditionalOnProperty(name = "domainforge.access.same-token.enabled", havingValue = "true")
-        SameTokenFilter sameTokenFilter() {
-            return new SameTokenFilter();
+        FilterRegistrationBean<SaServletFilter> sameTokenFilter() {
+            var filter = new SaServletFilter()
+                    .addInclude("/**")
+                    .setAuth(ignored -> SaSameUtil.checkCurrentRequestToken())
+                    .setError(SameTokenRejections::respond);
+            var registration = new FilterRegistrationBean<>(filter);
+            registration.setOrder(SAME_TOKEN_ORDER);
+            return registration;
         }
 
         /**

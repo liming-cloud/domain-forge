@@ -181,4 +181,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service` 调用它的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

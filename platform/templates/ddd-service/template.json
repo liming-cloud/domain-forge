@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -228,6 +228,53 @@
       "source": "assets/deploy/nacos/config/gateway-route.yaml.tpl",
       "target": "deploy/nacos/config/gateway.yaml",
       "example": true,
+      "root": "repository",
+      "mode": "append"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNote.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNote.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNotes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNotes.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigest.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigestQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigestQueries.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerNoteClient.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerNoteClient.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerNotes.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerNotes.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/NoteDigestController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/NoteDigestController.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteDigestIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteDigestIT.java",
+      "example": "call"
+    },
+    {
+      "source": "assets/deploy/nacos/config/gateway-call-route.yaml.tpl",
+      "target": "deploy/nacos/config/gateway.yaml",
+      "example": "call",
       "root": "repository",
       "mode": "append"
     }
