@@ -33,6 +33,11 @@
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-persistence</artifactId>
         </dependency>
+        <!-- 配置中心：部署时以 config-center profile 读取 Nacos 中的 @@ARTIFACT@@.yaml。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-config</artifactId>
+        </dependency>
         <!-- 持久化组件的事务管理器需要 spring-jdbc；组件把它声明为可选，由服务显式引入。 -->
         <dependency>
             <groupId>org.springframework</groupId>

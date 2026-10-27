@@ -2,6 +2,7 @@
 # PostgreSQL 在线逻辑备份：pg_dump 自定义格式，取自单一快照，备份期间服务不停。
 # 覆盖 domainforge 库中 IAM 与各业务服务的 schema，并保留对象属主。
 # 生成 domainforge-<UTC 时间>.dump 与同名 .sha256；写完并通过可读性校验后才改为正式文件名。
+# 同时导出 Nacos 中的全部配置为 domainforge-<UTC 时间>.nacos.json（含控制台修改），供 restore.sh 一并恢复。
 # 备份含密码摘要与敏感输入指纹，目录只允许当前用户访问；异地保存与加密由运维负责。
 #
 # 用法：deploy/backup.sh <环境文件> <备份目录>
@@ -23,12 +24,16 @@ umask 077
 mkdir -p "$out"
 name="domainforge-$(date -u +%Y%m%dT%H%M%SZ).dump"
 partial="$out/.$name.partial"
-trap 'rm -f "$partial"' EXIT
+configs="${name%.dump}.nacos.json"
+trap 'rm -f "$partial" "$out/.$configs.partial"' EXIT
 
 started=$(date +%s)
 compose exec -T postgres pg_dump -U domainforge -d domainforge --format=custom > "$partial"
 compose exec -T postgres pg_restore --list < "$partial" > /dev/null
 mv "$partial" "$out/$name"
 (cd "$out" && checksum "$name" > "$name.sha256")
+python3 -I "$deploy/nacos/configs.py" export "$env_file" "$out/.$configs.partial" > /dev/null
+mv "$out/.$configs.partial" "$out/$configs"
+(cd "$out" && checksum "$configs" > "$configs.sha256")
 
 echo "backup=$out/$name bytes=$(wc -c < "$out/$name" | tr -d ' ') seconds=$(($(date +%s) - started))"

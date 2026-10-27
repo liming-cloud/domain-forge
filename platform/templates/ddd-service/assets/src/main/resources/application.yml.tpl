@@ -98,3 +98,23 @@ management:
   metrics:
     tags:
       application: @@ARTIFACT@@
+
+---
+# 配置中心：部署时以 SPRING_PROFILES_ACTIVE=config-center 启用。Nacos 不可达或 dataId 未发布时启动失败。
+# 需要不重启生效的配置组用 domain-forge-config 的 DynamicSettingsBinder 声明，见 docs/architecture/05-配置中心.md。
+spring:
+  config:
+    activate:
+      on-profile: config-center
+    import: "nacos:@@ARTIFACT@@.yaml?refreshEnabled=true"
+  cloud:
+    nacos:
+      config:
+        server-addr: ${@@ENV@@_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${@@ENV@@_NACOS_NAMESPACE:public}
+        group: ${@@ENV@@_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${@@ENV@@_NACOS_USERNAME:}
+        password: ${@@ENV@@_NACOS_PASSWORD:}
+domainforge:
+  config:
+    expected-source: nacos

@@ -2,6 +2,7 @@
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
 #   首次部署与管理员初始化 → 普通重启保留数据 → 备份 → 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
+#   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
 #   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退。
 # 新版本镜像在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 # 结果以接口行为判定，不以容器启动或备份文件存在代替；结束时删除本次创建的容器、卷和临时文件。
@@ -103,6 +104,63 @@ step "核对恢复结果"
 [ "$(get_status /api/me "$stale_token")" = "401" ] || fail "恢复前的会话应失效"
 admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
+
+step "配置中心：种子已发布并被 IAM 读取"
+configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
+configs export "$env_file" "$work/configs.json" > /dev/null
+grep -q 'source: nacos' "$work/configs.json" || fail "iam.yaml 种子未发布"
+
+# publish_attempts <次数>：以管理员身份发布 iam.yaml，只改账号失败次数阈值
+publish_attempts() {
+    python3 -I -c 'import json, sys; print(json.dumps([{"dataId": "iam.yaml", "group": "DEFAULT_GROUP", "type": "yaml",
+        "content": "domainforge:\n  config:\n    source: nacos\niam:\n  login-protection:\n"
+                   "    account-attempts: " + sys.argv[1] + "\n    account-window-seconds: 600\n"
+                   "    address-attempts: 30\n    address-window-seconds: 60\n"}]))' "$1" > "$work/publish.json"
+    configs import "$env_file" "$work/publish.json" > /dev/null
+}
+# limited_at：同一新账号名连续以错误密码登录，返回第几次得到 429
+limited_at() {
+    local name="cfg$RANDOM$RANDOM" attempt
+    for attempt in 1 2 3 4 5 6; do
+        [ "$(login "$name" "Wrong-$(secret)")" = "429" ] && { echo "$attempt"; return; }
+    done
+    echo 0
+}
+# await_limited <次数>：等待阈值在 IAM 中实际生效（以入口的登录结果为准）
+await_limited() {
+    local attempt
+    for attempt in $(seq 1 40); do
+        [ "$(limited_at)" = "$1" ] && return
+        sleep 0.5
+    done
+    fail "配置未在 IAM 中生效：期望第 $1 次登录被限流"
+}
+
+step "配置中心：运行中发布生效"
+publish_attempts 2
+await_limited 3
+
+step "配置中心：重新部署不覆盖控制台修改"
+compose down > /dev/null 2>&1
+compose up -d --wait > /dev/null 2>&1 || fail "重新部署未全部健康"
+grep -q 'nacos config kept: iam.yaml' <<< "$(compose logs nacos-init)" || fail "重新部署时应保留已有配置"
+await_limited 3
+
+step "配置中心：删除 PostgreSQL 与 Nacos 卷后连同配置恢复"
+config_backup=$("$repo/deploy/backup.sh" "$env_file" "$work/config-backups" 2> "$work/config-backup.log") \
+    || { cat "$work/config-backup.log"; fail "备份脚本"; }
+config_dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' <<< "$config_backup")
+[ -s "${config_dump%.dump}.nacos.json" ] || fail "备份应包含 Nacos 配置"
+publish_attempts 4
+await_limited 5
+compose down > /dev/null 2>&1
+docker volume rm "${COMPOSE_PROJECT_NAME}_postgres-data" "${COMPOSE_PROJECT_NAME}_nacos-data" > /dev/null
+compose up -d --wait > /dev/null 2>&1 || fail "空卷启动未全部健康"
+grep -q 'nacos config seeded: iam.yaml' <<< "$(compose logs nacos-init)" || fail "空 Nacos 应重新发布种子"
+"$repo/deploy/restore.sh" "$env_file" "$config_dump" --yes > /dev/null 2> "$work/config-restore.log" \
+    || { cat "$work/config-restore.log"; fail "恢复脚本"; }
+await_limited 3
+[ "$(login alice "$alice_pw")" = "200" ] || fail "连同配置恢复后 alice 登录"
 
 step "构建模拟新版本镜像"
 mkdir -p "$work/v2" "$work/v3"

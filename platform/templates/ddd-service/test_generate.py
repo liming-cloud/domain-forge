@@ -21,6 +21,7 @@ class GenerateTest(unittest.TestCase):
         deploy = self.root / 'deploy'
         (deploy / 'services').mkdir(parents=True)
         (deploy / 'nginx' / 'services').mkdir(parents=True)
+        (deploy / 'nacos' / 'config').mkdir(parents=True)
         (deploy / 'compose.yml').write_text('services:\n  postgres:\n    image: postgres:18@sha256:abc\n',
                                             encoding='utf-8')
 
@@ -38,6 +39,9 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('image: postgres:18@sha256:abc', compose)
         self.assertIn('ORDER_SERVICE_DB_USER: order_service', compose)
         self.assertFalse((self.root / 'deploy/nginx/services/order-service.conf').exists())
+        seed = (self.root / 'deploy/nacos/config/order-service.yaml').read_text(encoding='utf-8')
+        self.assertIn('source: nacos', seed)
+        self.assertIn('SPRING_PROFILES_ACTIVE: config-center', compose)
         for path in output.rglob('*'):
             if path.is_file():
                 self.assertNotIn('@@', path.read_text(encoding='utf-8'), path)
