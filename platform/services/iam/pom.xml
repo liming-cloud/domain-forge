@@ -47,6 +47,10 @@
             <artifactId>domain-forge-persistence</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-config</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
@@ -202,7 +206,7 @@
                 <groupId>io.fabric8</groupId>
                 <artifactId>docker-maven-plugin</artifactId>
                 <configuration>
-                    <filter>postgres,redis</filter>
+                    <filter>postgres,redis,nacos</filter>
                 </configuration>
             </plugin>
             <plugin>

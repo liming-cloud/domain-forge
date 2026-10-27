@@ -1,0 +1,3 @@
+org.springframework.boot.EnvironmentPostProcessor=\
+org.domainforge.config.autoconfigure.SnapshotIsolation,\
+org.domainforge.config.autoconfigure.ConfigDefaults

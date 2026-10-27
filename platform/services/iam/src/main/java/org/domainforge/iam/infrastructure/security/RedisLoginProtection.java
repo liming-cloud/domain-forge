@@ -2,9 +2,10 @@ package org.domainforge.iam.infrastructure.security;
 
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
-import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.application.port.authentication.LoginReservation;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
+import org.domainforge.config.api.DynamicSettings;
+import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisCallback;
@@ -26,7 +27,7 @@ import java.util.UUID;
 public final class RedisLoginProtection implements LoginProtection {
     private final StringRedisTemplate redis;
     private final SecretOperations secrets;
-    private final LoginProtectionSettings settings;
+    private final DynamicSettings<LoginProtectionSettings> settings;
     private final DefaultRedisScript<Long> reserveScript;
     private final DefaultRedisScript<Long> successScript;
 
@@ -34,7 +35,7 @@ public final class RedisLoginProtection implements LoginProtection {
      * 脚本由制品加载，不接收任意外部脚本或计数键。
      */
     public RedisLoginProtection(
-            StringRedisTemplate redis, SecretOperations secrets, LoginProtectionSettings settings) {
+            StringRedisTemplate redis, SecretOperations secrets, DynamicSettings<LoginProtectionSettings> settings) {
         this.redis = redis;
         this.secrets = secrets;
         this.settings = settings;
@@ -63,6 +64,8 @@ public final class RedisLoginProtection implements LoginProtection {
         String accountKey = "iam:login:account:" + secrets.fingerprint("account", name);
         String addressKey = "iam:login:address:" + secrets.fingerprint("address", address);
         String attempt = UUID.randomUUID().toString();
+        // 每次预占读取一次当前阈值，同一次判断内的次数与窗口来自同一份配置。
+        LoginProtectionSettings limits = settings.current();
         Long result;
         try {
             requireNoEviction();
@@ -70,10 +73,10 @@ public final class RedisLoginProtection implements LoginProtection {
                     reserveScript,
                     List.of(accountKey, addressKey),
                     attempt,
-                    Integer.toString(settings.accountAttempts()),
-                    Integer.toString(settings.accountWindowSeconds()),
-                    Integer.toString(settings.addressAttempts()),
-                    Integer.toString(settings.addressWindowSeconds()));
+                    Integer.toString(limits.accountAttempts()),
+                    Integer.toString(limits.accountWindowSeconds()),
+                    Integer.toString(limits.addressAttempts()),
+                    Integer.toString(limits.addressWindowSeconds()));
         } catch (IamException e) {
             throw e;
         } catch (RuntimeException e) {
