@@ -3,6 +3,8 @@ spring:
   cloud:
     nacos:
       config:
+        # 未启用 config-center profile 时不创建 Nacos 配置客户端；启用时由 NacosClientDefaults 开启。
+        enabled: false
         # 本地开发不导入 Nacos 配置时允许启动；启用配置中心时由服务的 spring.config.import 导入，
         # 并以 domainforge.config.expected-source 确认配置确实来自 Nacos。
         import-check:
