@@ -124,6 +124,8 @@
                     <configuration>
                         <!-- Boot repackage 后的 JAR 不能直接作类路径，使用编译输出目录。 -->
                         <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                        <!-- 固定顺序：默认按文件系统顺序，macOS 与 CI 的 Linux 不同，曾掩盖进程级单例导致的顺序依赖。 -->
+                        <runOrder>alphabetical</runOrder>
                         <environmentVariables>
                             <POSTGRES_PORT>${it.postgres.port}</POSTGRES_PORT>
                             <POSTGRES_PASSWORD>${it.password}</POSTGRES_PASSWORD>
