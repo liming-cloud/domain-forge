@@ -81,10 +81,13 @@ public final class Login {
     }
 
     /**
-     * 锁定账号后重新核对启用状态和凭据版本，再登记许可；密码校验期间发生的改密或禁用使本次登录失败。
+     * 重新读取并核对启用状态和凭据版本，再登记许可；密码校验期间已提交的改密或禁用使本次登录失败。
+     *
+     * <p>不加行锁：与改密／禁用并发提交时许可可能带着旧凭据版本写入，但每次请求校验许可都要求账号启用且
+     * 凭据版本一致（禁用与启用也递增凭据版本），这样的许可无法使用。
      */
     private void grant(Account verified, String token) {
-        Account current = accounts.lock(verified.id());
+        Account current = accounts.find(verified.id());
         if (current == null || !current.enabled() || current.credentialVersion() != verified.credentialVersion())
             throw rejected();
         sessions.insert(new SessionGrant(

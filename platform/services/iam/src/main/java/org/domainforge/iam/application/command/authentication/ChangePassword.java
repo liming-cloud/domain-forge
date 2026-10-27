@@ -49,12 +49,12 @@ public final class ChangePassword {
         String digest = passwords.encode(newPassword);
         return transactions.execute(status -> {
             var actor = authorization.require(identity.tokenDigest(), null);
-            var current = accounts.lock(actor.accountId());
-            if (current.credentialVersion() != verified.credentialVersion())
-                throw new IamException(IamFailure.CONFLICT, "凭据已变化，请重新登录");
-            var changed = current.changePassword(digest);
-            accounts.update(changed, current.version());
-            audit.record(new AuditEvent(Long.toString(actor.accountId()), current.id(), "account.password"));
+            if (actor.accountId() != verified.id())
+                throw new IamException(IamFailure.UNAUTHENTICATED, "当前凭据无效");
+            // 按校验时读到的版本条件更新：其间账号有任何修改（含改密、禁用）都以 409 拒绝，无需行锁。
+            var changed = verified.changePassword(digest);
+            accounts.update(changed, verified.version());
+            audit.record(new AuditEvent(Long.toString(actor.accountId()), verified.id(), "account.password"));
             return new CommandResult(changed.id(), changed.version());
         });
     }

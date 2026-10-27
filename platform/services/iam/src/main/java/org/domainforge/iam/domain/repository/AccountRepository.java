@@ -12,14 +12,9 @@ public interface AccountRepository {
     Account find(long id);
 
     /**
-     * 读取用于密码校验的账号快照，密码计算后仍须再次锁定核对版本。
+     * 读取用于密码校验的账号快照；保存时按其版本条件更新。
      */
     Account findByLoginName(String normalizedName);
-
-    /**
-     * 在调用方事务中取得账号排他锁；可能移除系统管理员的操作须先持有管理守卫。
-     */
-    Account lock(long id);
 
     /**
      * 创建新账号及其角色分配；唯一登录名由数据库兜底。

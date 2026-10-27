@@ -62,7 +62,7 @@ public class ManageAccount {
         DomainRules.requireVersion(target, version);
         guard.lock();
         var actor = authorization.require(tokenDigest, "iam:account:state");
-        Account current = lockAccount(target, version);
+        Account current = currentAccount(target, version);
         if (current.roleIds().contains(Role.SYSTEM_ADMIN_ID) && !actor.systemAdministrator())
             throw new IamException(IamFailure.FORBIDDEN, "只有系统管理员可以修改系统管理员账号");
         return save(current, current.changeEnabled(enabled), actor, "account.state");
@@ -78,7 +78,7 @@ public class ManageAccount {
             throw new IamException(IamFailure.INVALID_REQUEST, "角色分配无效");
         guard.lock();
         var actor = authorization.requireSystem(tokenDigest, "iam:account:role");
-        Account current = lockAccount(target, version);
+        Account current = currentAccount(target, version);
         for (long roleId : new TreeSet<>(roleIds)) {
             Role role = roles.lock(roleId);
             if (role == null || !role.enabled()) throw new IamException(IamFailure.CONFLICT, "角色不存在或已停用");
@@ -95,7 +95,7 @@ public class ManageAccount {
         if (memberships == null) throw new IamException(IamFailure.INVALID_REQUEST, "成员归属无效");
         organizations.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, "iam:member:manage");
-        Account current = lockAccount(target, version);
+        Account current = currentAccount(target, version);
         Account changed = DomainRules.apply(() -> current.changeMemberships(memberships));
         var units = changed.memberships().stream().map(Membership::unitId).toList();
         if (organizations.existing(units) != units.size())
@@ -103,8 +103,11 @@ public class ManageAccount {
         return save(current, changed, actor, "account.memberships");
     }
 
-    private Account lockAccount(long target, long version) {
-        Account account = accounts.lock(target);
+    /**
+     * 不加行锁读取并核对客户端版本；保存时再按同一版本条件更新，并发修改只有一个成功。
+     */
+    private Account currentAccount(long target, long version) {
+        Account account = accounts.find(target);
         return DomainRules.requireCurrent(account, account == null ? 0 : account.version(), version);
     }
 

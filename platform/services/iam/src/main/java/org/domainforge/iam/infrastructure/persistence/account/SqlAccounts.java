@@ -46,11 +46,6 @@ public class SqlAccounts implements AccountRepository {
     }
 
     @Override
-    public Account lock(long id) {
-        return domain(mapper.lock(id));
-    }
-
-    @Override
     public void insert(Account account) {
         mapper.insert(AccountRow.from(account));
         writeChildren(account);
