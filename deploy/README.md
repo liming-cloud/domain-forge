@@ -56,6 +56,8 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 ## 安全要点
 
 - **客户端地址**：Nginx 用 `$remote_addr` 覆盖 `X-Forwarded-For`；IAM 只信任 Nginx 固定地址给出的该头，登录防护按真实客户端地址计数，客户端伪造的头无效。前面再加一层负载均衡时，需要把它的地址加入 Nginx 的 `set_real_ip_from`，否则所有请求都会被算成同一个地址。
+- **直连后端**：后端只在内部网络可达。Same-Token 校验（见[API 网关](../docs/architecture/06-API网关.md#same-token)）要等网关接入后才能开启：在此之前 Nginx 直连后端、不带 Same-Token，因此 Compose 中 IAM 与业务服务暂时设置 `DOMAINFORGE_ACCESS_SAME_TOKEN_ENABLED=false`。
+- **请求标识**：Nginx 为每个请求生成 `X-Request-Id`，覆盖客户端传入的值；后端日志带上该标识，并在响应头返回，排查时按它关联日志。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
 - **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。

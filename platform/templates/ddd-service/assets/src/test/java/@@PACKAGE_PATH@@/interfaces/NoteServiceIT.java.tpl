@@ -6,6 +6,7 @@ import @@PACKAGE@@.application.command.note.NotePermissions;
 import @@PACKAGE@@.bootstrap.@@APP_CLASS@@;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.domainforge.access.api.SameTokens;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,13 +90,14 @@ class NoteServiceIT {
     }
 
     /**
-     * IAM 替身：按 Bearer 令牌返回预置主体与范围；未知令牌 401，故障开关 503。
+     * IAM 替身：按 Bearer 令牌返回预置主体与范围；未知令牌或缺少有效 Same-Token 时 401，故障开关 503。
      */
     private static void answer(HttpExchange exchange) throws IOException {
         String token = String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")).replace("Bearer ", "");
+        boolean internal = SameTokens.current().equals(exchange.getRequestHeaders().getFirst(SameTokens.HEADER));
         String path = exchange.getRequestURI().getPath();
         String body = path.endsWith("/current") ? SUBJECTS.get(token) : SCOPES.get(token);
-        int status = IAM_DOWN.get() ? 503 : body == null ? 401 : 200;
+        int status = IAM_DOWN.get() ? 503 : body == null || !internal ? 401 : 200;
         byte[] bytes = (status == 200 ? "{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":" + body + "}"
                 : "{\"code\":\"X\",\"message\":\"x\",\"data\":null}").getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -125,13 +127,22 @@ class NoteServiceIT {
         return "{\"all\":" + all + ",\"self\":" + self + ",\"unitIds\":[" + units + "]}";
     }
 
+    /**
+     * 按网关转发的形态调用：携带当前 Same-Token。
+     */
     private static HttpResponse<String> call(String method, String path, String token, String body)
+            throws Exception {
+        return send(method, path, token, body, SameTokens.current());
+    }
+
+    private static HttpResponse<String> send(String method, String path, String token, String body, String sameToken)
             throws Exception {
         var request = HttpRequest.newBuilder(URI.create(base + path))
                 .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofString(body))
                 .header("Content-Type", "application/json");
         if (token != null) request.header("Authorization", "Bearer " + token);
+        if (sameToken != null) request.header(SameTokens.HEADER, sameToken);
         return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
@@ -150,6 +161,17 @@ class NoteServiceIT {
     @Test
     void missingTokenIsUnauthenticated() throws Exception {
         assertEquals(401, call("GET", "/api/me/notes", null, null).statusCode());
+    }
+
+    // 绕过网关的直连（缺少或伪造 Same-Token）即使带着有效登录令牌也被拒绝，不进入业务处理。
+    @Test
+    void directCallWithoutSameTokenIsRejected() throws Exception {
+        String token = user(401, BOTH, scope(true, false, ""), scope(true, false, ""));
+        assertEquals(401, send("GET", "/api/notes", token, null, null).statusCode());
+        assertEquals(401, send("GET", "/api/notes", token, null, "forged").statusCode());
+        var accepted = call("GET", "/api/notes", token, null);
+        assertEquals(200, accepted.statusCode());
+        assertNotNull(accepted.headers().firstValue("X-Request-Id").orElse(null));
     }
 
     // 写范围决定能在哪些组织下创建；读范围决定列表可见；本人便笺是只需登录的纯查询。

@@ -101,6 +101,8 @@ services:
       # 只信任 Nginx 固定地址给出的 X-Forwarded-For，登录防护按真实客户端地址计数。
       SERVER_FORWARDHEADERSSTRATEGY: NATIVE
       SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES: '172\.31\.250\.10'
+      # 网关接入前（P6-3 步骤 3）Nginx 直连后端，不带 Same-Token，暂时关闭校验；接入网关后删除此项。
+      DOMAINFORGE_ACCESS_SAME_TOKEN_ENABLED: "false"
     networks: [backend]
     depends_on:
       postgres:

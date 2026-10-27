@@ -77,6 +77,15 @@ public class AccessControlAutoConfiguration {
             return new CurrentSubjectPermissions(current, logic);
         }
 
+        /**
+         * 拒绝不经网关或系统内服务的直连；只在网关接入前的部署中临时关闭。
+         */
+        @Bean
+        @ConditionalOnProperty(name = "domainforge.access.same-token.enabled", havingValue = "true")
+        SameTokenFilter sameTokenFilter() {
+            return new SameTokenFilter();
+        }
+
         @Bean
         AccessDeclarations accessDeclarations() {
             return new AccessDeclarations();

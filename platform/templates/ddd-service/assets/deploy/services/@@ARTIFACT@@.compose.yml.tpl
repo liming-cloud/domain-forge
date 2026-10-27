@@ -53,6 +53,8 @@ services:
       @@ENV@@_NACOS_SERVER_ADDR: nacos:8848
       @@ENV@@_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+      # 网关接入前（P6-3 步骤 3）Nginx 直连后端，不带 Same-Token，暂时关闭校验；接入网关后删除此项。
+      DOMAINFORGE_ACCESS_SAME_TOKEN_ENABLED: "false"
     networks: [backend]
     depends_on:
       @@ARTIFACT@@-db-init:
