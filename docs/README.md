@@ -19,6 +19,7 @@
 | | [故障与可观测性](standards/09-故障与可观测性.md) | 异常、日志、指标、健康检查 |
 | | [测试与验证](standards/10-测试与验证.md) | 测试分层与证据 |
 | 流程 | [开发流程](workflow/01-开发流程.md) | 分支、PR、评审清单、人工决定、文档维护 |
+| 部署 | [部署参考](../deploy/README.md) | Compose 单机部署、初始化与验证 |
 | 模板 | [服务模板使用说明](../platform/templates/ddd-service/01-使用说明.md) | 生成业务服务 |
 
 AI 编码工具从 [AGENTS.md](../AGENTS.md) 开始。

@@ -20,7 +20,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.build.outputTimestamp>2026-10-15T00:00:00Z</project.build.outputTimestamp>
-        <spring-boot.version>4.0.8</spring-boot.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
         <redisson.version>4.8.0</redisson.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
@@ -30,9 +30,9 @@
         <spotless.version>3.10.4</spotless.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <checkstyle.version>14.3.0</checkstyle.version>
-        <dependency-plugin.version>3.8.1</dependency-plugin.version>
+        <dependency-plugin.version>3.11.0</dependency-plugin.version>
         <!-- 集成测试：failsafe 运行 *IT，docker-maven-plugin 在 pre-integration-test 启动隔离依赖。 -->
-        <failsafe.version>3.5.6</failsafe.version>
+        <failsafe.version>3.6.1</failsafe.version>
         <docker-maven-plugin.version>0.49.0</docker-maven-plugin.version>
         <it.postgres.image>
             postgres:18.4-alpine3.24@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
