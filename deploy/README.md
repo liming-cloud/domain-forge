@@ -1,6 +1,6 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：IAM、PostgreSQL、Redis、Nacos（只用作服务注册与发现）、Nginx，以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
+单机基线：IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心）、Nginx，以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
@@ -8,8 +8,8 @@
 | iam | 身份权限服务，启动后注册到 Nacos | 无 | 无（数据在 PostgreSQL） |
 | postgres | 库 `domainforge`：IAM 在 `public`，每个业务服务一个同名 schema | 无 | 卷 `postgres-data` |
 | redis | 会话、登录防护计数、缓存 | 无 | 不持久化，重启后所有用户需重新登录 |
-| nacos | 服务注册与发现，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限；实例信息可重建） |
-| nacos-init | 一次性任务：设置管理员密码、创建服务专用账号 | 无 | 无 |
+| nacos | 服务注册与发现、配置中心，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限、配置；实例信息可重建） |
+| nacos-init | 一次性任务：设置管理员密码、创建服务专用账号、发布配置种子 | 无 | 无 |
 | `<服务名>`、`<服务名>-db-init` | 业务服务及其数据库账号初始化（覆盖文件 `services/<服务名>.compose.yml`） | 无 | 无（数据在 PostgreSQL） |
 
 ## 前提
@@ -74,7 +74,8 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 |---|---|---|
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
-| Nacos（管理员与服务账号、权限；实例信息） | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的其他修改需手工重做 |
+| Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
+| Nacos 账号、权限与实例 | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的账号修改需手工重做 |
 | 环境文件 | 由运维与备份分开保管 | 恢复必须使用备份时的同一份（`IAM_FINGERPRINT_KEY` 不同则依赖指纹的数据无法匹配） |
 
 ```bash
@@ -89,6 +90,16 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 备份含密码摘要与敏感输入指纹，按机密数据保存；异地副本、加密与保留周期由运维负责，本参考不提供定时任务。
 
+
+## 配置中心
+
+服务的非敏感运行参数由 Nacos 管理（设计、动态项与取值范围见[配置中心](../docs/architecture/05-配置中心.md)）。每个服务一个 dataId `<服务名>.yaml`，种子在 `nacos/config/`：
+
+- `nacos-init` 只在 dataId 不存在时发布种子，之后以 Nacos 中的内容为准，重新部署不覆盖；修改种子不会影响已部署的环境。
+- 修改配置：在 Nacos 控制台（本地调试时 `compose.local.yml` 在回环地址发布）以管理员发布。动态项立即生效，其余项重启服务后生效；无法应用的值（越界、类型错误）不生效，服务继续使用当前值并记录 `config_rejected` 日志与 `domainforge.config.refresh{result=rejected}` 指标。
+- 服务账号对配置只读；Nacos 中不放凭据与密钥，它们只来自环境文件。
+- 服务启动时连不上 Nacos 或 dataId 未发布即启动失败，由 Compose 重启策略重试。
+- IAM 的登录防护阈值由 Nacos 管理，环境变量 `IAM_LOGIN_*_ATTEMPTS`／`_WINDOW_SECONDS` 只在未启用配置中心的本地开发中生效。
 
 ## 升级与回退
 
@@ -125,6 +136,7 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 | 应用回退 | 旧版本在新结构上正常运行，新增的表保留 |
 | 迁移失败的升级 | 脚本非零退出；失败迁移没有历史记录、没有残留表；回到上一版本后正常 |
 | 数据回退 | 用升级前备份恢复到旧版本后，新版本的迁移与表都不存在，账号可登录 |
+| 配置中心 | 种子首次发布且 IAM 读取；运行中发布的阈值经入口登录实际生效；重新部署不覆盖；删除 PostgreSQL 与 Nacos 卷后种子重新发布，恢复后配置回到备份时的值 |
 
 新版本由验证脚本在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 

@@ -48,6 +48,8 @@ services:
       @@ENV@@_REDIS_PASSWORD: ${REDIS_PASSWORD:?provide REDIS_PASSWORD}
       # IAM 地址留空：经 Nacos 发现名为 iam 的服务。
       @@ENV@@_DISCOVERY_ENABLED: "true"
+      # 配置中心：读取 Nacos 中的 @@ARTIFACT@@.yaml（种子见 deploy/nacos/config/）。
+      SPRING_PROFILES_ACTIVE: config-center
       @@ENV@@_NACOS_SERVER_ADDR: nacos:8848
       @@ENV@@_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}

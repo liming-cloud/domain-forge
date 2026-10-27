@@ -2,7 +2,8 @@
 # 从 backup.sh 生成的备份恢复 PostgreSQL。会删除当前库的全部数据，需显式传入 --yes。
 # 过程：校验摘要 → 停止全部应用服务与入口 → 由各业务服务的 db-init 建好数据库账号 →
 #       重建 domainforge 库并在单一事务内导入（保留对象属主）→
-#       重启 Redis（不持久化，清空全部会话与登录防护计数）→ 启动全部服务并等待健康。
+#       重启 Redis（不持久化，清空全部会话与登录防护计数）→ 有同名 .nacos.json 时恢复 Nacos 配置 →
+#       启动全部服务并等待健康。Nacos 中存在而备份中没有的配置保持不变。
 # 恢复后备份时刻之后的变更全部丢失，所有用户需重新登录。必须使用备份时的同一份环境文件
 # （尤其是 IAM_FINGERPRINT_KEY），否则依赖指纹的数据无法再匹配。
 #
@@ -26,6 +27,10 @@ if [ ! -f "$dump.sha256" ]; then
     exit 1
 fi
 (cd "$(dirname "$dump")" && checksum -c "$(basename "$dump").sha256" > /dev/null)
+configs="${dump%.dump}.nacos.json"
+if [ -f "$configs" ]; then
+    (cd "$(dirname "$configs")" && checksum -c "$(basename "$configs").sha256" > /dev/null)
+fi
 
 started=$(date +%s)
 services=$(compose config --services)
@@ -41,6 +46,10 @@ compose exec -T postgres dropdb -U domainforge --force --if-exists domainforge
 compose exec -T postgres createdb -U domainforge domainforge
 compose exec -T postgres pg_restore -U domainforge -d domainforge --exit-on-error --single-transaction < "$dump"
 compose restart redis
+if [ -f "$configs" ]; then
+    compose up -d --wait nacos
+    python3 -I "$deploy/nacos/configs.py" import "$env_file" "$configs" > /dev/null
+fi
 compose up -d --wait
 
 echo "restored=$dump seconds=$(($(date +%s) - started))"

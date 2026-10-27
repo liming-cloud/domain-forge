@@ -12,11 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Nacos 配置客户端只在 config-center profile 启用时开启，其余情况保持组件默认的关闭。
  */
-class SnapshotIsolationTest {
+class NacosClientDefaultsTest {
     private static String enabledWith(Map<String, Object> properties) {
         var environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(new MapPropertySource("test", properties));
-        new SnapshotIsolation().postProcessEnvironment(environment, new SpringApplication());
+        new NacosClientDefaults().postProcessEnvironment(environment, new SpringApplication());
         new ConfigDefaults().postProcessEnvironment(environment, new SpringApplication());
         return environment.getProperty("spring.cloud.nacos.config.enabled");
     }

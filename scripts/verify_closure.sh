@@ -3,7 +3,7 @@
 # 经 Nginx 走完 IAM 授权的完整链路：
 #   注册账号 → 未授权被拒 → 安装权限目录、建角色授予、分配角色 → 业务命令与范围查询成功 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主）→ 撤销角色后立即被拒。
-# 同时核对业务服务经 Nacos 发现 IAM、数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
+# 同时核对业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
 #
 # 用法：scripts/verify_closure.sh
 set -euo pipefail
@@ -46,6 +46,8 @@ write_env "$port" "IAM_IMAGE_TAG=$tag" "NOTE_SERVICE_IMAGE_TAG=$tag" "NOTE_SERVI
 compose up -d --build --wait --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
+# 服务以 config-center 启动：能通过健康检查即说明已从 Nacos 读到带来源标记的 note-service.yaml。
+grep -q 'nacos config seeded: note-service.yaml' <<< "$(compose logs nacos-init)" || fail "生成服务的配置种子未发布"
 
 step "初始化管理员并注册账号"
 admin_pw="Admin-$(secret)"

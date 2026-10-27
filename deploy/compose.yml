@@ -71,6 +71,7 @@ services:
       NACOS_SERVICE_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
     volumes:
       - ./nacos/init.sh:/init/init.sh:ro
+      - ./nacos/config:/init/config:ro
     networks: [backend]
     depends_on:
       nacos:
@@ -92,6 +93,8 @@ services:
       IAM_REDIS_PASSWORD: ${REDIS_PASSWORD:?provide REDIS_PASSWORD}
       IAM_FINGERPRINT_KEY: ${IAM_FINGERPRINT_KEY:?provide IAM_FINGERPRINT_KEY}
       IAM_DISCOVERY_ENABLED: "true"
+      # 配置中心：读取 Nacos 中的 iam.yaml（种子见 nacos/config/），不可达或未发布时启动失败。
+      SPRING_PROFILES_ACTIVE: config-center
       IAM_NACOS_SERVER_ADDR: nacos:8848
       IAM_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       IAM_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
