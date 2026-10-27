@@ -33,6 +33,16 @@
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-persistence</artifactId>
         </dependency>
+        <!-- 持久化组件的事务管理器需要 spring-jdbc；组件把它声明为可选，由服务显式引入。 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
+        <!-- Spring MVC 与 Feign 的 JSON 编解码在运行时需要 Jackson 3 databind。 -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-access-control</artifactId>
@@ -150,16 +160,6 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-jdbc</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

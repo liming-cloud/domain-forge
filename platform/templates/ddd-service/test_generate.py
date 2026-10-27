@@ -18,6 +18,11 @@ class GenerateTest(unittest.TestCase):
         services.mkdir(parents=True)
         (services / 'pom.xml').write_text('<project>\n    <modules>\n        <module>iam</module>\n    </modules>\n'
                                           '</project>\n', encoding='utf-8')
+        deploy = self.root / 'deploy'
+        (deploy / 'services').mkdir(parents=True)
+        (deploy / 'nginx' / 'services').mkdir(parents=True)
+        (deploy / 'compose.yml').write_text('services:\n  postgres:\n    image: postgres:18@sha256:abc\n',
+                                            encoding='utf-8')
 
     def tearDown(self):
         shutil.rmtree(self.root)
@@ -29,6 +34,10 @@ class GenerateTest(unittest.TestCase):
         self.assertTrue((output / 'src/main/java/com/company/order/bootstrap/OrderServiceApplication.java').is_file())
         self.assertFalse(any(output.rglob('Note*.java')))
         self.assertIn('<module>order-service</module>', (output.parent / 'pom.xml').read_text(encoding='utf-8'))
+        compose = (self.root / 'deploy/services/order-service.compose.yml').read_text(encoding='utf-8')
+        self.assertIn('image: postgres:18@sha256:abc', compose)
+        self.assertIn('ORDER_SERVICE_DB_USER: order_service', compose)
+        self.assertFalse((self.root / 'deploy/nginx/services/order-service.conf').exists())
         for path in output.rglob('*'):
             if path.is_file():
                 self.assertNotIn('@@', path.read_text(encoding='utf-8'), path)
@@ -42,6 +51,21 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('${RETAIL_ORDER_DB_URL}', config)
         it = next(output.rglob('NoteServiceIT.java')).read_text(encoding='utf-8')
         self.assertIn('currentSchema=retail_order', it)
+        routes = (self.root / 'deploy/nginx/services/retail-order.conf').read_text(encoding='utf-8')
+        self.assertIn('http://retail-order:8090', routes)
+        locations = [line for line in routes.splitlines() if line.startswith('location')]
+        self.assertEqual(3, len(locations))
+        self.assertFalse(any('/internal/' in line for line in locations))
+
+    def test_existing_deploy_file_is_not_overwritten(self):
+        existing = self.root / 'deploy/services/order.compose.yml'
+        existing.write_text('keep\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            generate.generate(self.root, 'order', 'com.company.order')
+        self.assertEqual('keep\n', existing.read_text(encoding='utf-8'))
+        self.assertFalse((self.root / 'platform/services/order').exists())
+        self.assertNotIn('<module>order</module>',
+                         (self.root / 'platform/services/pom.xml').read_text(encoding='utf-8'))
 
     def test_rejects_invalid_or_existing_targets_without_changes(self):
         for name, package in [('Order', 'com.company.order'), ('iam', 'com.company.iam'),

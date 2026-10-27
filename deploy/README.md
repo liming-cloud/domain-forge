@@ -1,15 +1,16 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：IAM、PostgreSQL、Redis、Nacos（只用作服务注册与发现）、Nginx。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
+单机基线：IAM、PostgreSQL、Redis、Nacos（只用作服务注册与发现）、Nginx，以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
-| nginx | 唯一公开入口，只转发 `/api/` 到 IAM | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
+| nginx | 唯一公开入口：业务服务登记的公开前缀转发到对应服务，其余 `/api/` 转发到 IAM | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
 | iam | 身份权限服务，启动后注册到 Nacos | 无 | 无（数据在 PostgreSQL） |
-| postgres | IAM 业务数据 | 无 | 卷 `postgres-data` |
+| postgres | 库 `domainforge`：IAM 在 `public`，每个业务服务一个同名 schema | 无 | 卷 `postgres-data` |
 | redis | 会话、登录防护计数、缓存 | 无 | 不持久化，重启后所有用户需重新登录 |
 | nacos | 服务注册与发现，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限；实例信息可重建） |
 | nacos-init | 一次性任务：设置管理员密码、创建服务专用账号 | 无 | 无 |
+| `<服务名>`、`<服务名>-db-init` | 业务服务及其数据库账号初始化（覆盖文件 `services/<服务名>.compose.yml`） | 无 | 无（数据在 PostgreSQL） |
 
 ## 前提
 
@@ -71,7 +72,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 
 | 数据 | 处理 | 恢复后 |
 |---|---|---|
-| PostgreSQL（IAM 全部业务数据与审计） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失 |
+| PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos（管理员与服务账号、权限；实例信息） | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的其他修改需手工重做 |
 | 环境文件 | 由运维与备份分开保管 | 恢复必须使用备份时的同一份（`IAM_FINGERPRINT_KEY` 不同则依赖指纹的数据无法匹配） |
@@ -141,4 +142,26 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 
 ## 接入业务服务
 
-模板生成的服务部署时：在 `compose.yml` 增加服务（构建方式同 IAM，启用 `<ENV>_DISCOVERY_ENABLED` 并使用 Nacos 服务账号），在 `nginx/default.conf` 为其公开前缀增加 `location`，不要转发 `/internal/`。
+`platform/templates/ddd-service/generate.py` 生成服务时同时写入：
+
+| 文件 | 内容 |
+|---|---|
+| `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM |
+| `deploy/nginx/services/<服务名>.conf` | 仅 `--with-example` 时生成：示例接口的公开前缀。新增公开接口时在此补充 `location`，不要转发 `/internal/` |
+
+部署步骤：
+
+```bash
+# 1. 环境文件增加本服务数据库账号密码（变量名为服务名大写、- 换成 _），例如
+#    NOTE_SERVICE_DB_PASSWORD=<openssl rand -hex 24>
+# 2. 构建 IAM 与服务的 jar
+platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam,services/note-service -am
+# 3. 之后所有 docker compose 命令与 backup.sh／restore.sh／upgrade.sh 都通过 COMPOSE_FILE 列入覆盖文件
+export COMPOSE_FILE=deploy/compose.yml:deploy/services/note-service.compose.yml
+docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
+# 4. 由系统管理员把服务的 src/main/resources/iam/permissions.json 安装到 IAM，再建角色授予并分配给账号
+```
+
+`restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
+
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service`，与 IAM 一起按本节启动，经 Nginx 核对：无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
