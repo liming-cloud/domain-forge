@@ -14,11 +14,6 @@ public interface IdentityFixtureMapper {
     void reset();
 
     /**
-     * 当前数据库中等待 iam_account 行锁的会话数，用于确认并发测试真的发生了锁等待。
-     */
-    int waitingAccountLocks();
-
-    /**
      * 让 iam_session_grant 的插入在 COMMIT 时失败（延迟约束触发器）。
      */
     void installGrantCommitFailure();

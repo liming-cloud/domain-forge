@@ -63,7 +63,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * 使用真实服务装配、Argon2、临时 PostgreSQL 与 Redis；不是替代数据库的模拟事务。
@@ -188,12 +187,11 @@ class IdentityPersistenceIT {
         if (loserFailure != null) assertEquals(loserFailure, ((IamException) loser).failure());
     }
 
-    private static void awaitAccountWait() throws InterruptedException {
-        for (int attempt = 0; attempt < 200; attempt++) {
-            if (sql.waitingAccountLocks() > 0) return;
-            Thread.sleep(25);
-        }
-        fail("没有观察到真实账号行锁等待");
+    private static void assertOneRejected(List<Object> results) {
+        assertOneSucceeded(results, null);
+        var loser = (IamException) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
+        assertTrue(Set.of(IamFailure.CONFLICT, IamFailure.UNAUTHENTICATED).contains(loser.failure()),
+                () -> "落败原因: " + loser.failure());
     }
 
     /**
@@ -212,7 +210,7 @@ class IdentityPersistenceIT {
     }
 
     /**
-     * 登记许可后在仍持有账号行锁的事务内暂停，直到测试放行。
+     * 登记许可后在未提交的事务内暂停，直到测试放行。
      */
     private static SessionStore pausedGrants(CountDownLatch inserted, CountDownLatch release) {
         SessionStore delegate = bean(SessionStore.class);
@@ -458,25 +456,25 @@ class IdentityPersistenceIT {
         assertEquals(0, sql.sessionCount(bean(SecretOperations.class).digest(issued.get())));
     }
 
-    // 登录在密码校验后、许可提交前持有账号锁；等待中的改密在其后提交，新许可随即失效。
+    // 登录不持有账号行锁：许可已写入但未提交时，改密不必等待即可提交；登录随后提交的许可带旧凭据版本，无法使用。
     @Test
-    void passwordChangeWaitingForLoginInvalidatesCommittedGrant() throws Exception {
+    void passwordChangeDuringLoginInvalidatesCommittedGrant() throws Exception {
         CurrentIdentity actor = identity(login(ADMIN, PASSWORD));
-        changeWaitingForLogin(ADMIN, () -> bean(ChangePassword.class).execute(actor, PASSWORD, NEW_PASSWORD));
+        changeDuringLogin(ADMIN, () -> bean(ChangePassword.class).execute(actor, PASSWORD, NEW_PASSWORD));
     }
 
-    // 同上，等待中的禁用在登录提交后生效。
+    // 同上，禁用在登录提交前完成，登录得到的许可同样无法使用。
     @Test
-    void disableWaitingForLoginInvalidatesCommittedGrant() throws Exception {
+    void disableDuringLoginInvalidatesCommittedGrant() throws Exception {
         String admin = login(ADMIN, PASSWORD);
         register(admin, "locked.member");
-        changeWaitingForLogin("locked.member", () -> {
+        changeDuringLogin("locked.member", () -> {
             setEnabled(admin, "locked.member", false);
             return null;
         });
     }
 
-    private void changeWaitingForLogin(String name, Callable<?> change) throws Exception {
+    private void changeDuringLogin(String name, Callable<?> change) throws Exception {
         var inserted = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var issued = new AtomicReference<String>();
@@ -484,14 +482,44 @@ class IdentityPersistenceIT {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             Future<?> login = pool.submit(() -> paused.execute(name, PASSWORD, ADDRESS));
             assertTrue(inserted.await(10, TimeUnit.SECONDS));
-            Future<?> changed = pool.submit(change);
-            awaitAccountWait();
+            pool.submit(change).get(20, TimeUnit.SECONDS);
             release.countDown();
             login.get(20, TimeUnit.SECONDS);
-            changed.get(20, TimeUnit.SECONDS);
         }
         assertEquals(1, sql.sessionCount(bean(SecretOperations.class).digest(issued.get())));
         assertUnauthenticated(issued.get());
+    }
+
+    // 同一账号并发改密：只有一个成功。落败方若已越过授权，由版本条件更新拒绝（409）；若胜出方先提交，
+    // 落败方的会话已随改密失效（401）。只有胜出的新密码可以登录。
+    @Test
+    void concurrentPasswordChangesOnlyOneWins() throws Exception {
+        CurrentIdentity actor = identity(login(ADMIN, PASSWORD));
+        String other = NEW_PASSWORD + "-other";
+        var results = race(
+                () -> bean(ChangePassword.class).execute(actor, PASSWORD, NEW_PASSWORD),
+                () -> bean(ChangePassword.class).execute(actor, PASSWORD, other));
+        assertOneRejected(results);
+        String winner = results.get(0) instanceof Exception ? other : NEW_PASSWORD;
+        String loser = winner.equals(other) ? NEW_PASSWORD : other;
+        assertNotNull(login(ADMIN, winner));
+        assertFailure(IamFailure.UNAUTHENTICATED, () -> login(ADMIN, loser));
+        assertEquals(2, account(ADMIN).version());
+    }
+
+    // 改密与管理员禁用并发：两者基于同一账号版本，只有一个成功（落败原因同上，409 或会话失效 401）。
+    @Test
+    void passwordChangeAndDisableOnlyOneWins() throws Exception {
+        String admin = login(ADMIN, PASSWORD);
+        register(admin, "race.member");
+        CurrentIdentity member = identity(login("race.member", PASSWORD));
+        Account target = account("race.member");
+        String digest = identity(admin).tokenDigest();
+        var results = race(
+                () -> bean(ChangePassword.class).execute(member, PASSWORD, NEW_PASSWORD),
+                () -> bean(ManageAccount.class).state(digest, target.id(), target.version(), false));
+        assertOneRejected(results);
+        assertEquals(target.version() + 1, account("race.member").version());
     }
 
     // 重发与接受竞争同一原邀请，只有一个能处理原邀请。

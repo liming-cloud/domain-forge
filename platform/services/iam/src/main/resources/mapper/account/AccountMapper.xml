@@ -12,10 +12,6 @@
         SELECT <include refid="columns"/>
         FROM iam_account WHERE login_name = #{name}
     </select>
-    <select id="lock" resultType="org.domainforge.iam.infrastructure.persistence.account.AccountRow">
-        SELECT <include refid="columns"/>
-        FROM iam_account WHERE id = #{id} FOR UPDATE
-    </select>
     <insert id="insert">
         INSERT INTO iam_account (id, login_name, credential_digest, credential_version, version, enabled)
         VALUES (#{id}, #{loginName}, #{credentialDigest}, #{credentialVersion}, #{version}, #{enabled})

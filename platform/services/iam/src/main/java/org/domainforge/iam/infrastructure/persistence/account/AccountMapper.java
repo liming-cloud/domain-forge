@@ -20,11 +20,6 @@ public interface AccountMapper {
     AccountRow byName(String name);
 
     /**
-     * 锁定账号直到当前事务结束。
-     */
-    AccountRow lock(long id);
-
-    /**
      * 唯一键拒绝同名账号，包括并发注册。
      */
     int insert(AccountRow row);
