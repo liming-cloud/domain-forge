@@ -4,7 +4,7 @@
 # 失败时脚本以非零退出并保留现场，按 README 的回退条件选择应用回退或数据恢复。
 #
 # 用法：deploy/upgrade.sh <环境文件> <备份目录>
-# 指定 Compose 项目名时设置 COMPOSE_PROJECT_NAME。
+# 指定 Compose 项目名时设置 COMPOSE_PROJECT_NAME；部署了业务服务时设置 COMPOSE_FILE。
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -14,7 +14,8 @@ fi
 deploy="$(cd "$(dirname "$0")" && pwd)"
 env_file=$1
 backups=$2
-compose() { docker compose -f "$deploy/compose.yml" --env-file "$env_file" "$@"; }
+# 未设置 COMPOSE_FILE 时只用 deploy/compose.yml；部署了业务服务时把其覆盖文件一并列入（以 : 分隔）。
+compose() { COMPOSE_FILE="${COMPOSE_FILE:-$deploy/compose.yml}" docker compose --env-file "$env_file" "$@"; }
 
 image=$(compose config --format json | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["services"]["iam"]["image"])')
 if ! docker image inspect "$image" > /dev/null 2>&1; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合。
+"""在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合；同时在 deploy/ 写入其部署文件。
 
 生成结果继承内部 parent，自动执行架构规则与质量门禁；生成后代码归该服务维护，模板升级不覆盖已有服务。
 """
@@ -31,6 +31,15 @@ def render(text, values):
         text = text.replace('@@' + key + '@@', replacement)
     require('@@' not in text, '模板含未解析参数')
     return text
+
+
+def postgres_image(root):
+    """部署文件中的数据库初始化任务使用与 deploy/compose.yml 相同的 postgres 镜像。"""
+    compose = root / 'deploy' / 'compose.yml'
+    require(compose.is_file(), '找不到 deploy/compose.yml')
+    match = re.search(r'^  postgres:\n    image: (\S+)$', compose.read_text(encoding='utf-8'), re.MULTILINE)
+    require(match is not None, 'deploy/compose.yml 中没有 postgres 镜像')
+    return match.group(1)
 
 
 def values_for(name, package, namespace):
@@ -65,7 +74,9 @@ def load_assets(with_example, values):
             continue
         target = Path(render(entry['target'], values))
         require(not target.is_absolute() and '..' not in target.parts, '资产目标越界')
-        assets.append((target, render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values)))
+        require(entry.get('root', 'service') in ('service', 'repository'), '资产根目录无效')
+        assets.append((entry.get('root', 'service'), target,
+                       render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values)))
     return manifest['version'], assets
 
 
@@ -79,17 +90,23 @@ def add_module(services_pom, name):
 
 
 def generate(root, name, package, namespace=None, with_example=False):
-    """生成服务目录并登记聚合；目标已存在时拒绝，失败时删除本次创建的文件。"""
+    """生成服务目录与部署文件并登记聚合；目标已存在时拒绝，失败时删除本次创建的文件。"""
     values = values_for(name, package, namespace)
     services = root / 'platform' / 'services'
     require((services / 'pom.xml').is_file(), '找不到 platform/services/pom.xml，请在仓库根目录运行或传入 --root')
     output = services / name
     require(not output.exists(), '服务目录已存在，禁止覆盖')
+    values['POSTGRES_IMAGE'] = postgres_image(root)
     version, assets = load_assets(with_example, values)
+    bases = {'service': output, 'repository': root}
+    for kind, relative, _ in assets:
+        if kind == 'repository':
+            require(not (root / relative).exists(), str(relative) + ' 已存在，禁止覆盖')
+            require((root / relative).parent.is_dir(), str(relative.parent) + ' 不存在')
     created = []
     try:
-        for relative, text in assets:
-            path = output / relative
+        for kind, relative, text in assets:
+            path = bases[kind] / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open('x', encoding='utf-8') as stream:
                 stream.write(text)

@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -211,6 +211,18 @@
       "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java.tpl",
       "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java",
       "example": true
+    },
+    {
+      "source": "assets/deploy/services/@@ARTIFACT@@.compose.yml.tpl",
+      "target": "deploy/services/@@ARTIFACT@@.compose.yml",
+      "example": false,
+      "root": "repository"
+    },
+    {
+      "source": "assets/deploy/nginx/services/@@ARTIFACT@@.conf.tpl",
+      "target": "deploy/nginx/services/@@ARTIFACT@@.conf",
+      "example": true,
+      "root": "repository"
     }
   ]
 }

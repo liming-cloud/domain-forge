@@ -13,7 +13,9 @@ set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 export COMPOSE_PROJECT_NAME="dfverify$$"
-port=$(python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+# shellcheck source=scripts/deploy_lib.sh
+. "$repo/scripts/deploy_lib.sh"
+port=$(free_port)
 base="http://127.0.0.1:$port"
 env_file="$work/df.env"
 tag_v1="verify$$-v1"
@@ -28,54 +30,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-step() { echo "== $*"; }
-fail() { echo "deploy_check=failed: $*" >&2; exit 1; }
-secret() { python3 -I -c 'import secrets; print(secrets.token_hex(24))'; }
-key() { python3 -I -c 'import base64, secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())'; }
-sql() { compose exec -T postgres psql -U domainforge -d domainforge -tAc "$1"; }
 set_tag() {
     sed "s/^IAM_IMAGE_TAG=.*/IAM_IMAGE_TAG=$1/" "$env_file" > "$env_file.next"
     chmod 600 "$env_file.next"
     mv "$env_file.next" "$env_file"
 }
-field() { python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"][sys.argv[1]])' "$1"; }
 
-# post <路径> <JSON> [令牌]：输出响应体，HTTP 状态写入 $work/status
-post() {
-    local auth=()
-    [ $# -ge 3 ] && auth=(-H "Authorization: Bearer $3")
-    curl -sS -o "$work/body" -w '%{http_code}' -X POST "$base$1" -H 'Content-Type: application/json' \
-        ${auth[@]+"${auth[@]}"} -d "$2" > "$work/status"
-    cat "$work/body"
-}
-get_status() { curl -sS -o /dev/null -w '%{http_code}' "$base$1" -H "Authorization: Bearer $2"; }
-expect() { [ "$(cat "$work/status")" = "$1" ] || fail "$2：期望 $1，实际 $(cat "$work/status")"; }
-login() { post /api/auth/login "{\"loginName\":\"$1\",\"password\":\"$2\"}" > /dev/null; cat "$work/status"; }
-token() { post /api/auth/login "{\"loginName\":\"$1\",\"password\":\"$2\"}" | field token; }
-register() {
-    local invitation
-    invitation=$(post /api/invitations "{\"loginName\":\"$1\"}" "$3" | field secret)
-    expect 200 "邀请 $1"
-    post /api/auth/invitations/accept \
-        "{\"invitationSecret\":\"$invitation\",\"loginName\":\"$1\",\"password\":\"$2\"}" > /dev/null
-    expect 200 "注册 $1"
-}
-
-cat > "$env_file" <<EOF
-POSTGRES_PASSWORD=$(secret)
-REDIS_PASSWORD=$(secret)
-NACOS_AUTH_TOKEN=$(key)
-NACOS_AUTH_IDENTITY_KEY=$(secret)
-NACOS_AUTH_IDENTITY_VALUE=$(secret)
-NACOS_ADMIN_PASSWORD=$(secret)
-NACOS_SERVICE_USERNAME=domainforge
-NACOS_SERVICE_PASSWORD=$(secret)
-IAM_FINGERPRINT_KEY=$(key)
-IAM_IMAGE_TAG=$tag_v1
-NGINX_HTTP_BIND=127.0.0.1
-NGINX_HTTP_PORT=$port
-EOF
-chmod 600 "$env_file"
+write_env "$port" "IAM_IMAGE_TAG=$tag_v1"
 admin_pw="Admin-$(secret)"
 alice_pw="Alice-$(secret)"
 alice_new_pw="Alice-new-$(secret)"
@@ -95,15 +56,11 @@ published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
 
 step "初始化管理员"
-# 密码经标准输入写入容器内仅属服务用户的临时文件，不出现在命令参数中。
-init_out=$(printf '%s' "$admin_pw" | compose run --rm -T --entrypoint sh iam -c \
-    'umask 077; cat > /tmp/admin-password; exec java -jar /app/iam.jar initialize-admin --login-name=admin --password-file=/tmp/admin-password' \
-    2> "$work/init.log") || { cat "$work/init.log"; fail "管理员初始化"; }
-grep -q administrator_initialized <<< "$init_out" || fail "管理员初始化未确认"
+initialize_admin "$admin_pw"
 admin_token=$(token admin "$admin_pw")
 
 step "写入数据并验证入口边界"
-register alice "$alice_pw" "$admin_token"
+register alice "$alice_pw" "$admin_token" > /dev/null
 [ "$(login alice "$alice_pw")" = "200" ] || fail "alice 登录"
 [ "$(get_status /internal/access/current "$admin_token")" = "404" ] || fail "/internal/ 不应对外"
 [ "$(get_status /actuator/health "$admin_token")" = "404" ] || fail "管理端点不应对外"
@@ -121,7 +78,7 @@ dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' <<< "$backup_line")
 [ -s "$dump" ] || fail "备份文件"
 
 step "备份后继续变更"
-register bob "$bob_pw" "$admin_token"
+register bob "$bob_pw" "$admin_token" > /dev/null
 alice_token=$(token alice "$alice_pw")
 post /api/auth/password "{\"oldPassword\":\"$alice_pw\",\"newPassword\":\"$alice_new_pw\"}" "$alice_token" > /dev/null
 expect 200 "alice 改密"
