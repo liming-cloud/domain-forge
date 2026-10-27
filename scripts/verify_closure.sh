@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # MVP 闭环验证：在仓库的干净副本中用模板生成带示例的业务服务，与真实 IAM 一起按部署参考启动整套服务，
-# 经 Nginx 走完 IAM 授权的完整链路：
+# 经 Nginx 与网关走完 IAM 授权的完整链路：
 #   注册账号 → 未授权被拒 → 安装权限目录、建角色授予、分配角色 → 业务命令与范围查询成功 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主）→ 撤销角色后立即被拒。
-# 同时核对业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
+# 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
+# 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
 #
 # 用法：scripts/verify_closure.sh
 set -euo pipefail
@@ -22,7 +23,8 @@ tag="closure$$"
 compose() { docker compose --env-file "$env_file" "$@"; }
 cleanup() {
     compose down -v --remove-orphans > /dev/null 2>&1 || true
-    docker image rm -f "domain-forge/iam:$tag" "domain-forge/note-service:$tag" > /dev/null 2>&1 || true
+    docker image rm -f "domain-forge/iam:$tag" "domain-forge/note-service:$tag" "domain-forge/gateway:$tag" \
+        > /dev/null 2>&1 || true
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -36,18 +38,20 @@ mkdir -p "$copy"
 python3 -I "$copy/platform/templates/ddd-service/generate.py" --root "$copy" \
     --name note-service --package org.example.note --with-example > /dev/null
 
-step "构建 IAM 与 note-service"
+step "构建 IAM、网关与 note-service"
 "$copy/platform/mvnw" -f "$copy/platform/pom.xml" -B -ntp -q clean package \
-    -DskipTests -Ddocker.skip=true -pl services/iam,services/note-service -am
+    -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway,services/note-service -am
 
 step "启动整套服务"
 service_db_pw=$(secret)
-write_env "$port" "IAM_IMAGE_TAG=$tag" "NOTE_SERVICE_IMAGE_TAG=$tag" "NOTE_SERVICE_DB_PASSWORD=$service_db_pw"
+write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "NOTE_SERVICE_IMAGE_TAG=$tag" \
+    "NOTE_SERVICE_DB_PASSWORD=$service_db_pw"
 compose up -d --build --wait --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
 # 服务以 config-center 启动：能通过健康检查即说明已从 Nacos 读到带来源标记的 note-service.yaml。
 grep -q 'nacos config seeded: note-service.yaml' <<< "$(compose logs nacos-init)" || fail "生成服务的配置种子未发布"
+grep -q -- '- id: note-service' "$copy/deploy/nacos/config/gateway.yaml" || fail "生成服务的网关路由未写入种子"
 
 step "初始化管理员并注册账号"
 admin_pw="Admin-$(secret)"
@@ -70,6 +74,9 @@ expect 200 "仅需登录的纯查询（共用会话 Redis）"
 post /api/notes '{"title":"未授权","content":""}' "$alice_token" > /dev/null
 expect 403 "无权限的业务命令（经 Nacos 发现的 IAM 判定）"
 [ "$(get_status /internal/access/current "$alice_token")" = "404" ] || fail "/internal/ 不应对外"
+direct=$(compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $alice_token" \
+    http://note-service:8090/api/me/notes)
+[ "$direct" = "401" ] || fail "绕过网关直连业务服务应被拒：$direct"
 
 step "安装权限目录、建角色授予并分配"
 catalog=$(python3 -I -c 'import json, sys; print(json.dumps({"permissions": json.load(open(sys.argv[1]))["permissions"]}))' \

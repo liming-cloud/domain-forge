@@ -17,6 +17,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,15 +26,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * 真实 Boot 装配下的 Same-Token 校验：直连拒绝、轮换窗口、存储故障，以及校验方不写入新值。
  */
 class SameTokenFilterTest {
-    private static ConfigurableApplicationContext start(String enabled) {
-        return new SpringApplicationBuilder(NativeAccessIntegrationTest.Application.class).run(
+    private static ConfigurableApplicationContext start(String enabled, String... extra) {
+        var arguments = new ArrayList<>(List.of(
                 "--server.port=0",
                 "--spring.main.banner-mode=off",
                 "--logging.level.root=ERROR",
                 "--domainforge.access.session-store=memory",
                 "--domainforge.access.same-token.enabled=" + enabled,
                 "--spring.autoconfigure.exclude=org.redisson.spring.starter.RedissonAutoConfigurationV2,"
-                        + "org.redisson.spring.starter.RedissonAutoConfigurationV4");
+                        + "org.redisson.spring.starter.RedissonAutoConfigurationV4"));
+        arguments.addAll(List.of(extra));
+        return new SpringApplicationBuilder(NativeAccessIntegrationTest.Application.class)
+                .run(arguments.toArray(String[]::new));
     }
 
     private static MockMvc mvc(ConfigurableApplicationContext context) {
@@ -112,11 +117,20 @@ class SameTokenFilterTest {
         }
     }
 
-    // 显式关闭时不注册过滤器（仅用于网关接入前的部署）。
+    // 本地开发与测试可以显式关闭；部署环境（config-center）关闭即启动失败。
     @Test
-    void disabledRegistersNoFilter() {
+    void disablingIsLocalOnly() {
         try (var context = start("false")) {
             assertTrue(context.getBeansOfType(SameTokenFilter.class).isEmpty());
         }
+        var failure = assertThrows(RuntimeException.class,
+                () -> start("false", "--spring.profiles.active=config-center"));
+        assertTrue(rootCause(failure).getMessage().contains("不得关闭 Same-Token"));
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause;
     }
 }

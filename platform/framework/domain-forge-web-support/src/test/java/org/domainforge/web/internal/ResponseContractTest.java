@@ -22,7 +22,9 @@ class ResponseContractTest {
                         "UNAUTHENTICATED",
                         "FORBIDDEN",
                         "SERVICE_UNAVAILABLE",
-                        "INTERNAL_ERROR")) {
+                        "INTERNAL_ERROR",
+                        "RATE_LIMITED",
+                        "GATEWAY_TIMEOUT")) {
             assertThrows(IllegalArgumentException.class, () -> ApiResponse.rejected(code, "拒绝"));
         }
         assertNull(ApiResponse.success(null).data());

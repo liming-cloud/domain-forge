@@ -1,0 +1,20 @@
+# 网关的 Nacos 配置种子：dataId 不存在时由 nacos-init 发布一次，之后以 Nacos 中的内容为准，重新部署不覆盖。
+# 路由与限流是动态配置组，发布后立即生效；无法应用的发布整组不生效、保持当前路由。规则见 docs/architecture/06-API网关.md。
+# 已部署的环境新增服务时，在 Nacos 控制台给 gateway.yaml 补上该服务的路由（修改这里不会再次发布）。
+domainforge:
+  config:
+    # 来源标记：网关启动时确认配置确实读自 Nacos，缺失即启动失败。
+    source: nacos
+gateway:
+  routing:
+    # 按客户端地址的令牌桶。
+    rate-limit:
+      replenish-per-second: 20
+      burst: 40
+    # 每条路由：服务名（Nacos 中注册的名字）、公开路径、无需登录的接口。路径越具体越先匹配，IAM 的 /api/** 兜底。
+    # 模板生成服务时在下方追加该服务的路由。
+    routes:
+      - id: iam
+        service: iam
+        paths: [/api/**]
+        anonymous: [POST /api/auth/login, POST /api/auth/invitations/accept]

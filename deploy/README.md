@@ -1,10 +1,11 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心）、Nginx，以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
+单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
-| nginx | 唯一公开入口：业务服务登记的公开前缀转发到对应服务，其余 `/api/` 转发到 IAM | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
+| nginx | 唯一公开入口：`/api/` 全部转发到网关，生成请求标识 | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
+| gateway | API 网关：按 Nacos 中 `gateway.yaml` 的路由分发到各服务，登录前置校验、限流，写入 Same-Token（见[API 网关](../docs/architecture/06-API网关.md)） | 无 | 无（路由在 Nacos） |
 | iam | 身份权限服务，启动后注册到 Nacos | 无 | 无（数据在 PostgreSQL） |
 | postgres | 库 `domainforge`：IAM 在 `public`，每个业务服务一个同名 schema | 无 | 卷 `postgres-data` |
 | redis | 会话、登录防护计数、缓存 | 无 | 不持久化，重启后所有用户需重新登录 |
@@ -14,14 +15,14 @@
 
 ## 前提
 
-- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM jar）；`python3`（`upgrade.sh` 读取 Compose 配置）。
-- 网段 `172.31.250.0/24` 未被主机其他网络占用。冲突时同步修改 `compose.yml` 中的网段、Nginx 固定地址和 IAM 的 `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES`。
+- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM 与网关 jar）；`python3`（`upgrade.sh` 读取 Compose 配置）。
+- 网段 `172.31.250.0/24` 未被主机其他网络占用。冲突时同步修改 `compose.yml` 中的网段、Nginx 与网关的固定地址、网关的 `GATEWAY_TRUSTED_PROXIES`（Nginx 地址）和 IAM 的 `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES`（网关地址）。
 
 ## 首次部署
 
 ```bash
-# 1. 构建 IAM 可执行 jar（必须 clean，target 中残留的旧资源或旧 jar 会被打进镜像或使镜像构建失败）
-platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam -am
+# 1. 构建 IAM 与网关的可执行 jar（必须 clean，target 中残留的旧资源或旧 jar 会被打进镜像或使镜像构建失败）
+platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway -am
 
 # 2. 准备环境文件：复制到仓库外并限制权限，按下方方法填写
 cp deploy/env.example /etc/domain-forge/df.env && chmod 600 /etc/domain-forge/df.env
@@ -51,13 +52,14 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
      -d '{"loginName":"admin","password":"<初始化时输入的密码>"}'                # 返回 token
 ```
 
-`/internal/`、管理端点和其他路径经 Nginx 一律返回 404。
+`/internal/`、管理端点和其他路径经入口一律返回 404；可能被后端规范化成其他路径的写法（如 `%2e%2e`、`..;`）在网关返回 400。
 
 ## 安全要点
 
-- **客户端地址**：Nginx 用 `$remote_addr` 覆盖 `X-Forwarded-For`；IAM 只信任 Nginx 固定地址给出的该头，登录防护按真实客户端地址计数，客户端伪造的头无效。前面再加一层负载均衡时，需要把它的地址加入 Nginx 的 `set_real_ip_from`，否则所有请求都会被算成同一个地址。
-- **直连后端**：后端只在内部网络可达。Same-Token 校验（见[API 网关](../docs/architecture/06-API网关.md#same-token)）要等网关接入后才能开启：在此之前 Nginx 直连后端、不带 Same-Token，因此 Compose 中 IAM 与业务服务暂时设置 `DOMAINFORGE_ACCESS_SAME_TOKEN_ENABLED=false`。
-- **请求标识**：Nginx 为每个请求生成 `X-Request-Id`，覆盖客户端传入的值；后端日志带上该标识，并在响应头返回，排查时按它关联日志。
+- **客户端地址**：Nginx 用 `$remote_addr` 覆盖 `X-Forwarded-For`；网关只信任 Nginx 固定地址给出的该头，转发时再以确定的客户端地址覆盖；IAM 只信任网关固定地址给出的该头。登录防护与网关限流都按真实客户端地址计数，客户端伪造的头无效。前面再加一层负载均衡时，需要把它的地址加入 Nginx 的 `set_real_ip_from`，否则所有请求都会被算成同一个地址。
+- **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/architecture/06-API网关.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
+- **限流**：网关按客户端地址限流（默认每秒 20 个、突发 40 个，超出 429），阈值在 Nacos 的 `gateway.yaml` 中调整、立即生效。前面再加负载均衡或客户端经同一 NAT 出口时，需要相应调高。
+- **请求标识**：Nginx 为每个请求生成 `X-Request-Id`，覆盖客户端传入的值；网关访问日志（`gateway_access request_id=…`）与后端日志都带上该标识，并在响应头返回，排查时按它关联日志。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
 - **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。
@@ -88,7 +90,7 @@ deploy/backup.sh /etc/domain-forge/df.env /var/backups/domain-forge
 deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge-<时间>.dump --yes
 ```
 
-恢复过程：校验摘要 → 停止 nginx、iam → 重建库并在单一事务内导入（失败则库保持为空，可修正后重试）→ 重启 Redis → 启动 iam、nginx 并等待健康。IAM 启动时 Flyway 只会向前迁移，因此可以把旧版本的备份恢复到新版本应用，反之不行。
+恢复过程：校验摘要 → 停止全部应用服务（nginx、网关、iam、业务服务）→ 重建库并在单一事务内导入（失败则库保持为空，可修正后重试）→ 重启 Redis → 启动全部服务并等待健康。IAM 启动时 Flyway 只会向前迁移，因此可以把旧版本的备份恢复到新版本应用，反之不行。
 
 备份含密码摘要与敏感输入指纹，按机密数据保存；异地副本、加密与保留周期由运维负责，本参考不提供定时任务。
 
@@ -132,7 +134,8 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 
 | 场景 | 核对 |
 |---|---|
-| 首次部署、管理员初始化、普通重启 | 全部 healthy，仅 nginx 有主机端口；`/internal/`、管理端点经入口为 404；重启后账号仍可登录 |
+| 首次部署、管理员初始化、普通重启 | 全部 healthy，仅 nginx 有主机端口；`/internal/`、管理端点经入口为 404，歧义路径不转发；重启后账号仍可登录 |
+| 网关 | 响应带请求标识且见于网关访问日志；网段内直连 IAM（含伪造 Same-Token 访问 `/internal/`）401；同一地址的突发请求被限流，经配置中心调高阈值后实际生效 |
 | 备份、备份后继续变更、删除数据库卷、恢复 | 备份前的账号和密码可用，备份后注册的账号与改密不存在，恢复前的会话被拒绝，审计可查询 |
 | 升级到带新增迁移的版本 | 自动生成升级前备份，迁移已执行，账号可登录 |
 | 应用回退 | 旧版本在新结构上正常运行，新增的表保留 |
@@ -161,15 +164,15 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 | 文件 | 内容 |
 |---|---|
 | `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM |
-| `deploy/nginx/services/<服务名>.conf` | 仅 `--with-example` 时生成：示例接口的公开前缀。新增公开接口时在此补充 `location`，不要转发 `/internal/` |
+| `deploy/nacos/config/gateway.yaml`（追加） | 仅 `--with-example` 时：向网关路由种子追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
 
 部署步骤：
 
 ```bash
 # 1. 环境文件增加本服务数据库账号密码（变量名为服务名大写、- 换成 _），例如
 #    NOTE_SERVICE_DB_PASSWORD=<openssl rand -hex 24>
-# 2. 构建 IAM 与服务的 jar
-platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam,services/note-service -am
+# 2. 构建 IAM、网关与服务的 jar
+platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway,services/note-service -am
 # 3. 之后所有 docker compose 命令与 backup.sh／restore.sh／upgrade.sh 都通过 COMPOSE_FILE 列入覆盖文件
 export COMPOSE_FILE=deploy/compose.yml:deploy/services/note-service.compose.yml
 docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
@@ -178,4 +181,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service`，与 IAM 一起按本节启动，经 Nginx 核对：无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

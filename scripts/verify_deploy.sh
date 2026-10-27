@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
-#   首次部署与管理员初始化 → 普通重启保留数据 → 备份 → 备份后继续变更 →
+#   首次部署与管理员初始化 → 网关（请求标识、直连后端被拒、限流与动态调整）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
 #   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
 #   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退。
 # 新版本镜像在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 # 结果以接口行为判定，不以容器启动或备份文件存在代替；结束时删除本次创建的容器、卷和临时文件。
 #
-# 用法：scripts/verify_deploy.sh            # 先 clean package 构建 IAM jar
+# 用法：scripts/verify_deploy.sh            # 先 clean package 构建 IAM 与网关 jar
 #       SKIP_BUILD=1 scripts/verify_deploy.sh  # 复用已构建的 jar
 set -euo pipefail
 
@@ -22,11 +22,12 @@ env_file="$work/df.env"
 tag_v1="verify$$-v1"
 tag_v2="verify$$-v2"
 tag_v3="verify$$-v3"
+tag_gateway="verify$$-gateway"
 compose() { docker compose -f "$repo/deploy/compose.yml" --env-file "$env_file" "$@"; }
 cleanup() {
     compose down -v --remove-orphans > /dev/null 2>&1 || true
     docker image rm -f "domain-forge/iam:$tag_v3" "domain-forge/iam:$tag_v2" "domain-forge/iam:$tag_v1" \
-        > /dev/null 2>&1 || true
+        "domain-forge/gateway:$tag_gateway" > /dev/null 2>&1 || true
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -37,16 +38,16 @@ set_tag() {
     mv "$env_file.next" "$env_file"
 }
 
-write_env "$port" "IAM_IMAGE_TAG=$tag_v1"
+write_env "$port" "IAM_IMAGE_TAG=$tag_v1" "GATEWAY_IMAGE_TAG=$tag_gateway"
 admin_pw="Admin-$(secret)"
 alice_pw="Alice-$(secret)"
 alice_new_pw="Alice-new-$(secret)"
 bob_pw="Bob-$(secret)"
 
 if [ "${SKIP_BUILD:-}" != "1" ]; then
-    step "构建 IAM jar"
+    step "构建 IAM 与网关 jar"
     "$repo/platform/mvnw" -f "$repo/platform/pom.xml" -B -ntp -q clean package \
-        -DskipTests -Ddocker.skip=true -pl services/iam -am
+        -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway -am
 fi
 
 step "首次部署"
@@ -65,6 +66,39 @@ register alice "$alice_pw" "$admin_token" > /dev/null
 [ "$(login alice "$alice_pw")" = "200" ] || fail "alice 登录"
 [ "$(get_status /internal/access/current "$admin_token")" = "404" ] || fail "/internal/ 不应对外"
 [ "$(get_status /actuator/health "$admin_token")" = "404" ] || fail "管理端点不应对外"
+# Nginx 先解码再匹配 location，这类路径可能在 Nginx 即为 404；到达网关则为 400。两者都不能转到后端。
+case "$(get_status /api/%2e%2e/internal/access/current "$admin_token")" in
+    400 | 404) ;;
+    *) fail "可能被后端规范化成 /internal/ 的路径不应转发" ;;
+esac
+
+step "网关：请求标识与直连后端被拒"
+request_id=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $admin_token" "$base/api/me" \
+    | tr -d '\r' | sed -n 's/^[Xx]-[Rr]equest-[Ii]d: //p')
+[[ "$request_id" =~ ^[0-9a-f]{32}$ ]] || fail "响应应只带一个入口生成的请求标识：$(tr '\n' ' ' <<< "$request_id")"
+compose logs gateway | grep -q "request_id=$request_id" || fail "网关访问日志应带同一请求标识"
+direct() { compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $admin_token" "$@"; }
+[ "$(direct http://iam:8080/api/me)" = "401" ] || fail "网段内直连 IAM（无 Same-Token）应被拒"
+[ "$(direct -H 'SA-SAME-TOKEN: forged' http://iam:8080/internal/access/current)" = "401" ] \
+    || fail "伪造 Same-Token 直连 /internal/ 应被拒"
+
+step "网关：限流与动态调整"
+configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
+burst_codes=$(seq 80 | xargs -P 16 -I{} curl -s -o /dev/null -w '%{http_code}\n' "$base/api/me")
+grep -qx 429 <<< "$burst_codes" || fail "同一客户端地址的突发请求应被网关限流"
+# 之后的验证全部来自同一地址：经配置中心调高阈值（同时验证限流参数动态生效）。
+python3 -I -c 'import json, sys; text = open(sys.argv[1]).read()
+text = text.replace("replenish-per-second: 20", "replenish-per-second: 1000").replace("burst: 40", "burst: 2000")
+print(json.dumps([{"dataId": "gateway.yaml", "group": "DEFAULT_GROUP", "type": "yaml", "content": text}]))' \
+    "$repo/deploy/nacos/config/gateway.yaml" > "$work/gateway.json"
+configs import "$env_file" "$work/gateway.json" > /dev/null
+raised=0
+for attempt in $(seq 1 40); do
+    sleep 0.5
+    codes=$(seq 80 | xargs -P 16 -I{} curl -s -o /dev/null -w '%{http_code}\n' "$base/api/me")
+    grep -qx 429 <<< "$codes" || { raised=1; break; }
+done
+[ "$raised" = "1" ] || fail "调高限流阈值未生效"
 
 step "普通重启保留数据"
 compose down > /dev/null 2>&1
@@ -106,7 +140,6 @@ admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
 
 step "配置中心：种子已发布并被 IAM 读取"
-configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
 configs export "$env_file" "$work/configs.json" > /dev/null
 grep -q 'source: nacos' "$work/configs.json" || fail "iam.yaml 种子未发布"
 

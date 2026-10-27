@@ -26,7 +26,9 @@ public record ApiResponse<T>(
                     "UNAUTHENTICATED",
                     "FORBIDDEN",
                     "SERVICE_UNAVAILABLE",
-                    "INTERNAL_ERROR");
+                    "INTERNAL_ERROR",
+                    "RATE_LIMITED",
+                    "GATEWAY_TIMEOUT");
 
     /**
      * 拒绝缺失标识或提示；调用方负责提示中不包含秘密或内部异常。
