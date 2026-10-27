@@ -4,7 +4,7 @@ import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.Passwords;
 import org.domainforge.iam.domain.policy.PasswordPolicy;
-import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
+import org.domainforge.iam.infrastructure.configuration.PasswordHashingSettings;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 
 import java.io.BufferedReader;
@@ -26,15 +26,15 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
     /**
      * 按已校验的本实例资源边界建立工作池、假摘要及固定密码列表。
      */
-    public ArgonPasswords(LoginProtectionSettings settings) {
-        waitMillis = settings.hashWaitMillis();
+    public ArgonPasswords(PasswordHashingSettings settings) {
+        waitMillis = settings.waitMillis();
         workers =
                 new ThreadPoolExecutor(
-                        settings.hashWorkers(),
-                        settings.hashWorkers(),
+                        settings.workers(),
+                        settings.workers(),
                         0,
                         TimeUnit.SECONDS,
-                        new ArrayBlockingQueue<>(settings.hashQueueCapacity()),
+                        new ArrayBlockingQueue<>(settings.queueCapacity()),
                         task -> {
                             Thread thread = new Thread(task, "iam-password");
                             thread.setDaemon(true);

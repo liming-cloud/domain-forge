@@ -14,5 +14,6 @@
         <module>domain-forge-web-support</module>
         <module>domain-forge-persistence</module>
         <module>domain-forge-access-control</module>
+        <module>domain-forge-config</module>
     </modules>
 </project>

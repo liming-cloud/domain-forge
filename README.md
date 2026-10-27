@@ -15,7 +15,7 @@
 platform/                      Maven 工程（parent 与聚合入口：platform/pom.xml）
   domain-forge-build-rules/    统一架构规则与 Checkstyle 配置，所有模块自动执行
   shared/                      纯共享类型
-  framework/                   通用组件：web-support、persistence、cache、access-control
+  framework/                   通用组件：web-support、persistence、cache、access-control、config
   services/iam/                身份权限服务
   templates/ddd-service/       业务服务生成模板
   verification/                端到端与冒烟验证

@@ -93,12 +93,33 @@ springdoc:
 iam:
   # 敏感输入 HMAC 的部署密钥（Base64，32 字节）。
   fingerprint-key: ${IAM_FINGERPRINT_KEY}
-  # 登录防护默认值；只允许收紧，越界阻止启动。修改后重启生效。
+  # 登录防护阈值（动态配置组）。启用配置中心时以 Nacos 发布的值为准，这里的值只供本地开发。
   login-protection:
     account-attempts: ${IAM_LOGIN_ACCOUNT_ATTEMPTS:5}
     account-window-seconds: ${IAM_LOGIN_ACCOUNT_WINDOW_SECONDS:600}
     address-attempts: ${IAM_LOGIN_ADDRESS_ATTEMPTS:30}
     address-window-seconds: ${IAM_LOGIN_ADDRESS_WINDOW_SECONDS:60}
-    hash-workers: ${IAM_LOGIN_HASH_WORKERS:2}
-    hash-queue-capacity: ${IAM_LOGIN_HASH_QUEUE_CAPACITY:8}
-    hash-wait-millis: ${IAM_LOGIN_HASH_WAIT_MILLIS:1000}
+  # 密码计算工作池；只允许收紧，越界阻止启动，修改后重启生效。
+  password-hashing:
+    workers: ${IAM_LOGIN_HASH_WORKERS:2}
+    queue-capacity: ${IAM_LOGIN_HASH_QUEUE_CAPACITY:8}
+    wait-millis: ${IAM_LOGIN_HASH_WAIT_MILLIS:1000}
+
+---
+# 配置中心：部署时以 SPRING_PROFILES_ACTIVE=config-center 启用。Nacos 不可达或 dataId 未发布时启动失败。
+spring:
+  config:
+    activate:
+      on-profile: config-center
+    import: "nacos:iam.yaml?refreshEnabled=true"
+  cloud:
+    nacos:
+      config:
+        server-addr: ${IAM_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${IAM_NACOS_NAMESPACE:public}
+        group: ${IAM_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${IAM_NACOS_USERNAME:}
+        password: ${IAM_NACOS_PASSWORD:}
+domainforge:
+  config:
+    expected-source: nacos

@@ -1,6 +1,7 @@
 package org.domainforge.iam.infrastructure.security;
 
 import org.domainforge.iam.application.port.IamException;
+import org.domainforge.iam.infrastructure.configuration.PasswordHashingSettings;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,8 +15,7 @@ class ArgonPasswordsTest {
     void hashesOriginalUnicodeWithRandomSalt() {
         try (var passwords =
                      new ArgonPasswords(
-                             new org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings(
-                                     5, 600, 30, 60, 2, 8, 1000))) {
+                             new PasswordHashingSettings(2, 8, 1000))) {
             for (String value :
                     new String[]{" ".repeat(15), "😀".repeat(128), "identity password e\u0301"}) {
                 String digest = passwords.encode(value);
@@ -34,8 +34,7 @@ class ArgonPasswordsTest {
     void rejectsInvalidOrBlockedPasswords() {
         try (var passwords =
                      new ArgonPasswords(
-                             new org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings(
-                                     5, 600, 30, 60, 2, 8, 1000))) {
+                             new PasswordHashingSettings(2, 8, 1000))) {
             for (String value :
                     new String[]{
                             "x".repeat(14), "x".repeat(129), "x".repeat(15) + "\uD800", "passwordpassword"
