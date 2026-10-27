@@ -1,6 +1,6 @@
 # API 网关（P6-3 设计）
 
-新增服务 `gateway`，位于 Nginx 与各后端服务之间，负责路由、登录前置校验、限流与请求标识。后端仍各自认证和授权（[O-08](../standards/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)），网关不替代 IAM 的当前授权判断。选型与验收见[路线图](../product/02-路线图.md#p6-实施计划)。本页为设计，尚未实施。
+新增服务 `gateway`，位于 Nginx 与各后端服务之间，负责路由、登录前置校验、限流与请求标识。后端仍各自认证和授权（[O-08](../standards/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)），网关不替代 IAM 的当前授权判断。选型与验收见[路线图](../product/02-路线图.md#p6-实施计划)。实施步骤 1（后端 Same-Token 校验与请求标识）已实施，网关服务与部署接入（步骤 2、3）待实施。
 
 ## 已确认的决定（2026-10-27）
 
@@ -66,8 +66,9 @@ gateway:
 
 - 使用 Sa-Token 原生 Same-Token（请求头 `SA-SAME-TOKEN`，值保存在共用 Redis，由 Sa-Token 生成与轮换），不自造密钥或签名协议。能读到该 Redis 的进程本来就能读到全部会话，信任边界不扩大。
 - 网关对每个转发请求写入当前 Same-Token，并删除客户端传入的同名头。
-- 后端校验由 `domain-forge-access-control` 提供：所有请求先校验 Same-Token（接受当前值与轮换前的上一个值），不符返回 401；`/actuator/health/**` 例外，供容器健康检查使用。组件默认开启，关闭需显式配置，部署环境不得关闭（启动校验）。
-- 服务间调用（当前为业务服务调用 IAM 的 `/internal/access/*`）由调用方在 Feign 请求中加上 Same-Token；P6-4 跨服务调用组件接管这一步。
+- 后端校验由 `domain-forge-access-control` 的过滤器提供：主端口的所有请求先校验 Same-Token，只读比较当前值与轮换前的上一个值（不调用 Sa-Token 的 `isValid`，它在值缺失时会生成新值），常量时间比较；缺失或不符返回 401，会话 Redis 不可用返回 503。管理端点在独立端口，不经过该过滤器，容器健康检查不受影响。
+- 开关 `domainforge.access.same-token.enabled` 默认开启。网关接入前 Nginx 直连后端、不带 Same-Token，部署参考暂时关闭（`DOMAINFORGE_ACCESS_SAME_TOKEN_ENABLED=false`）；步骤 3 接入网关时删除该项，并增加启动校验，禁止部署环境关闭。
+- 服务间调用（当前为业务服务调用 IAM 的 `/internal/access/*`）由调用方用 `SameTokens.current()` 取当前值，放进 Feign 请求的 `SA-SAME-TOKEN` 头；取值失败按依赖不可用（503）处理，不省略请求头继续调用。P6-4 跨服务调用组件接管这一步。
 - 轮换：由网关定时调用刷新，轮换窗口内新旧值都有效；实施时用真实 Redis 验证轮换期间的请求不失败。
 
 ### 限流
@@ -79,7 +80,7 @@ gateway:
 ### 请求标识
 
 - Nginx 生成 `X-Request-Id`（`$request_id`），覆盖客户端传入的值；网关缺少该头时自行生成（本地开发不经 Nginx 时）。
-- 网关原样向后端透传，并写入网关访问日志；后端由 `domain-forge-web-support` 写入日志上下文（MDC）并在响应头返回；服务间调用由 P6-4 组件继续传递。
+- 网关原样向后端透传，并写入网关访问日志；后端由 `domain-forge-web-support` 写入日志上下文（MDC 键 `requestId`）并在响应头返回，默认日志格式输出 `[<requestId>]`（无请求上下文时为 `[-]`）；格式不符（超过 64 字符或含 `[A-Za-z0-9._-]` 以外的字符）的传入值不进入日志，改为生成新值。服务间调用由 P6-4 组件继续传递。
 - 只用于关联日志，不作为幂等键或安全依据。
 
 ### 客户端地址
@@ -122,7 +123,7 @@ gateway:
 
 ## 实施步骤
 
-1. 后端 Same-Token 校验与请求标识：access-control、web-support 组件，IAM 与模板的 Feign 调用携带 Same-Token；组件测试。
+1. 后端 Same-Token 校验与请求标识：access-control、web-support 组件，模板调用 IAM 时携带 Same-Token，Nginx 生成请求标识；组件测试与模板集成测试。（已实施）
 2. gateway 服务：路由配置组、登录前置、限流、错误响应、`GatewayIT`。
 3. 部署与模板：Compose、Nginx 收敛、种子、可信代理、场景验证与部署参考。
 

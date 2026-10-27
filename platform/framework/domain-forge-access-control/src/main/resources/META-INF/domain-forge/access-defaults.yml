@@ -16,3 +16,6 @@ domainforge:
   access:
     # redis：官方 Redisson DAO；memory：原生内存实现，仅用于不连接 Redis 的测试。
     session-store: redis
+    same-token:
+      # 请求必须携带有效的 SA-SAME-TOKEN（网关转发与服务间调用写入），否则 401。
+      enabled: true
