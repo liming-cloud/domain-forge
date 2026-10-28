@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 真实 PostgreSQL 与会话 Redis 上的服务接入：IAM 由本地 HTTP 替身按公开合同应答，验证本服务的 Feign 适配、
@@ -65,6 +66,7 @@ class NoteServiceIT {
                 "--spring.data.redis.port=" + env("REDIS_PORT"),
                 "--spring.data.redis.password=" + env("REDIS_PASSWORD"),
                 "--@@ARTIFACT@@.iam.url=http://127.0.0.1:" + iam.getAddress().getPort(),
+                "--domainforge.messaging.relay.enabled=false",
                 "--logging.level.root=WARN");
         base = "http://127.0.0.1:" + application.getBean(Environment.class).getProperty("local.server.port");
     }
@@ -77,7 +79,7 @@ class NoteServiceIT {
 
     @BeforeEach
     void reset() {
-        application.getBean(JdbcTemplate.class).update("TRUNCATE note");
+        application.getBean(JdbcTemplate.class).update("TRUNCATE note, domainforge_outbox");
         SUBJECTS.clear();
         SCOPES.clear();
         IAM_DOWN.set(false);
@@ -191,6 +193,22 @@ class NoteServiceIT {
         String none = user(104, "\"" + READ + "\"", scope(false, false, ""), scope(false, false, ""));
         assertEquals(0, json(call("GET", "/api/notes", none, null)).get("data").size());
         assertEquals(1, json(call("GET", "/api/me/notes", east, null)).get("data").size());
+    }
+
+    // 创建便笺与 NoteCreated 同事务写入 Outbox；被拒绝的创建（业务回滚）不留下事件。
+    @Test
+    void creationPublishesEventInSameTransaction() throws Exception {
+        String writer = user(601, BOTH, scope(false, true, ""), scope(false, true, ""));
+        String id = json(call("POST", "/api/notes", writer, "{\"title\":\"有事件\",\"content\":\"\"}"))
+                .get("data").get("id").asString();
+        call("POST", "/api/notes", writer, "{\"title\":\" \",\"content\":\"\"}");
+        var jdbc = application.getBean(JdbcTemplate.class);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
+        var event = jdbc.queryForMap("SELECT topic, event_type, event_key, payload FROM domainforge_outbox");
+        assertEquals("@@ARTIFACT@@-notes", event.get("topic"));
+        assertEquals("NoteCreated", event.get("event_type"));
+        assertEquals(id, event.get("event_key"));
+        assertTrue(event.get("payload").toString().contains("\"ownerId\":\"601\""));
     }
 
     // 权限码缺失 403；过期版本为业务冲突（HTTP 200 + 稳定代码）；范围外对象按不存在处理。

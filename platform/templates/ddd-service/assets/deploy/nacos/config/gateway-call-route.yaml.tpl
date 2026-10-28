@@ -1,3 +1,3 @@
       - id: @@ARTIFACT@@-calls
         service: @@ARTIFACT@@
-        paths: [/api/@@NAMESPACE@@/**]
+        paths: [/api/@@NAMESPACE@@/note-digest]

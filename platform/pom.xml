@@ -45,6 +45,14 @@
         <it.nacos.image>nacos/nacos-server:v3.1.1@sha256:13e74786507abbacebe080fae2fc9c05aa2591eb99c97a0a78ff0e72beb21b13
         </it.nacos.image>
         <it.nacos.container>domain-forge-it-${project.artifactId}-nacos</it.nacos.container>
+        <!--
+          与 deploy/compose.yml 相同的 RocketMQ 镜像，单容器运行 namesrv＋broker（内置 proxy）。
+          proxy 返回的路由地址是 brokerIP1 与它自己的 gRPC 端口，宿主机上的测试要能连上，端口只能做同号固定映射。
+        -->
+        <it.rocketmq.image>apache/rocketmq:5.5.0@sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132
+        </it.rocketmq.image>
+        <it.rocketmq.port>18181</it.rocketmq.port>
+        <it.rocketmq.container>domain-forge-it-${project.artifactId}-rocketmq</it.rocketmq.container>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -136,6 +144,8 @@
                             <NACOS_GRPC_PORT>${it.nacos.grpc.port}</NACOS_GRPC_PORT>
                             <NACOS_CONTAINER>${it.nacos.container}</NACOS_CONTAINER>
                             <NACOS_ADMIN_PASSWORD>${it.password}</NACOS_ADMIN_PASSWORD>
+                            <ROCKETMQ_ENDPOINTS>127.0.0.1:${it.rocketmq.port}</ROCKETMQ_ENDPOINTS>
+                            <ROCKETMQ_CONTAINER>${it.rocketmq.container}</ROCKETMQ_CONTAINER>
                             <IAM_DB_URL>jdbc:postgresql://127.0.0.1:${it.postgres.port}/domainforge</IAM_DB_URL>
                             <IAM_DB_USER>domainforge</IAM_DB_USER>
                             <IAM_DB_PASSWORD>${it.password}</IAM_DB_PASSWORD>
@@ -240,6 +250,31 @@
                                     </ports>
                                     <wait>
                                         <log>Nacos Server API started successfully</log>
+                                        <time>120000</time>
+                                    </wait>
+                                </run>
+                            </image>
+                            <image>
+                                <alias>rocketmq</alias>
+                                <name>${it.rocketmq.image}</name>
+                                <run>
+                                    <containerNamePattern>domain-forge-it-${project.artifactId}-%a
+                                    </containerNamePattern>
+                                    <env>
+                                        <JAVA_OPT_EXT>-Xms512m -Xmx512m -Xmn256m</JAVA_OPT_EXT>
+                                    </env>
+                                    <cmd>
+                                        <exec>
+                                            <arg>sh</arg>
+                                            <arg>-c</arg>
+                                            <arg>printf 'brokerClusterName=DefaultCluster\nbrokerName=broker-a\nbrokerId=0\nbrokerIP1=127.0.0.1\nautoCreateTopicEnable=false\nautoCreateSubscriptionGroup=false\n' &gt; /tmp/broker.conf &amp;&amp; printf '{"rocketMQClusterName":"DefaultCluster","grpcServerPort":${it.rocketmq.port}}' &gt; /tmp/proxy.json &amp;&amp; (./mqnamesrv &amp;) &amp;&amp; exec ./mqbroker -n 127.0.0.1:9876 --enable-proxy -pc /tmp/proxy.json -c /tmp/broker.conf</arg>
+                                        </exec>
+                                    </cmd>
+                                    <ports>
+                                        <port>127.0.0.1:${it.rocketmq.port}:${it.rocketmq.port}</port>
+                                    </ports>
+                                    <wait>
+                                        <log>rocketmq-proxy startup successfully</log>
                                         <time>120000</time>
                                     </wait>
                                 </run>

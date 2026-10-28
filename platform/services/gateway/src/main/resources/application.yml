@@ -14,6 +14,11 @@ spring:
         username: ${GATEWAY_NACOS_USERNAME:}
         password: ${GATEWAY_NACOS_PASSWORD:}
         ip: ${GATEWAY_DISCOVERY_IP:}
+    # 关闭负载均衡层的实例缓存（默认 35 秒）：Nacos 发现客户端已订阅变更推送，叠加缓存会让后端重建后
+    # 旧地址多活 35 秒，请求被转到已不存在的实例（升级场景中实测登录失败）。
+    loadbalancer:
+      cache:
+        enabled: false
     gateway:
       server:
         webflux:

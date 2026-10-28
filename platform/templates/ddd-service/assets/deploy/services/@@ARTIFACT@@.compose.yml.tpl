@@ -53,6 +53,8 @@ services:
       @@ENV@@_NACOS_SERVER_ADDR: nacos:8848
       @@ENV@@_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+      # 消息：只在发布或消费事件时连接；主题与消费组由 rocketmq-init 按 deploy/rocketmq/topics.conf 创建。
+      @@ENV@@_MESSAGING_ENDPOINTS: rocketmq-broker:8081
     networks: [backend]
     depends_on:
       @@ARTIFACT@@-db-init:
@@ -60,6 +62,8 @@ services:
       redis:
         condition: service_healthy
       nacos-init:
+        condition: service_completed_successfully
+      rocketmq-init:
         condition: service_completed_successfully
     healthcheck:
       # 管理端口只绑定容器内回环地址，不对网络开放。
