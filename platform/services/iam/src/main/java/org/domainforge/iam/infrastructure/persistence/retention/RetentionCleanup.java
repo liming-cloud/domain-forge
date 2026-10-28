@@ -35,7 +35,7 @@ public final class RetentionCleanup {
     }
 
     /**
-     * 返回本次真实提交删除行数；失败返回零并计数，等待下轮固定周期再试。
+     * 返回本次真实提交删除行数；失败计数后抛出异常（调度记录为失败），数据保留到下个周期再试。
      */
     public int run() {
         try {
@@ -50,7 +50,7 @@ public final class RetentionCleanup {
         } catch (RuntimeException error) {
             failures.increment();
             LOG.warn("IAM retention failed type={}", error.getClass().getSimpleName());
-            return 0;
+            throw new IllegalStateException("IAM 过期数据清理失败，数据保留到下个周期", error);
         }
     }
 }

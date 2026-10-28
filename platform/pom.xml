@@ -53,6 +53,14 @@
         </it.rocketmq.image>
         <it.rocketmq.port>18181</it.rocketmq.port>
         <it.rocketmq.container>domain-forge-it-${project.artifactId}-rocketmq</it.rocketmq.container>
+        <!--
+          与 deploy/compose.yml 相同的 PowerJob 服务端镜像，表建在 PostgreSQL 容器的 public schema。服务端通过同号固定映射的
+          通信端口与宿主机上的 worker 互通（对外声明 127.0.0.1），并经 host-gateway 连回 worker（worker 声明 host.docker.internal）。
+        -->
+        <it.powerjob.image>powerjob/powerjob-server:v5.1.7@sha256:2b1f7e86cc500668c39d870b1bfac40dbd795258736de2e4e7142766bf836d73
+        </it.powerjob.image>
+        <it.powerjob.transport.port>17710</it.powerjob.transport.port>
+        <it.network>domain-forge-it-${project.artifactId}</it.network>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -146,6 +154,8 @@
                             <NACOS_ADMIN_PASSWORD>${it.password}</NACOS_ADMIN_PASSWORD>
                             <ROCKETMQ_ENDPOINTS>127.0.0.1:${it.rocketmq.port}</ROCKETMQ_ENDPOINTS>
                             <ROCKETMQ_CONTAINER>${it.rocketmq.container}</ROCKETMQ_CONTAINER>
+                            <POWERJOB_PORT>${it.powerjob.port}</POWERJOB_PORT>
+                            <POWERJOB_ADMIN_PASSWORD>${it.password}</POWERJOB_ADMIN_PASSWORD>
                             <IAM_DB_URL>jdbc:postgresql://127.0.0.1:${it.postgres.port}/domainforge</IAM_DB_URL>
                             <IAM_DB_USER>domainforge</IAM_DB_USER>
                             <IAM_DB_PASSWORD>${it.password}</IAM_DB_PASSWORD>
@@ -169,11 +179,19 @@
                     <artifactId>docker-maven-plugin</artifactId>
                     <version>${docker-maven-plugin.version}</version>
                     <configuration>
+                        <!-- 自定义网络按模块隔离，停止容器时一并删除。 -->
+                        <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
                         <images>
                             <image>
                                 <alias>postgres</alias>
                                 <name>${it.postgres.image}</name>
                                 <run>
+                                    <!-- 自定义网络：PowerJob 服务端容器按别名 postgres 连接（只有声明 powerjob 的模块用到）。 -->
+                                    <network>
+                                        <mode>custom</mode>
+                                        <name>${it.network}</name>
+                                        <alias>postgres</alias>
+                                    </network>
                                     <containerNamePattern>domain-forge-it-${project.artifactId}-%a
                                     </containerNamePattern>
                                     <env>
@@ -276,6 +294,37 @@
                                     <wait>
                                         <log>rocketmq-proxy startup successfully</log>
                                         <time>120000</time>
+                                    </wait>
+                                </run>
+                            </image>
+                            <image>
+                                <alias>powerjob</alias>
+                                <name>${it.powerjob.image}</name>
+                                <run>
+                                    <containerNamePattern>domain-forge-it-${project.artifactId}-%a
+                                    </containerNamePattern>
+                                    <network>
+                                        <mode>custom</mode>
+                                        <name>${it.network}</name>
+                                        <alias>powerjob</alias>
+                                    </network>
+                                    <extraHosts>
+                                        <host>host.docker.internal:host-gateway</host>
+                                    </extraHosts>
+                                    <env>
+                                        <JVMOPTIONS>-Xmx512m -Dpowerjob.network.external.address=127.0.0.1</JVMOPTIONS>
+                                        <PARAMS>--spring.profiles.active=product --spring.datasource.core.driver-class-name=org.postgresql.Driver --spring.datasource.core.jdbc-url=jdbc:postgresql://postgres:5432/domainforge --spring.datasource.core.username=domainforge --spring.datasource.core.password=${it.password} --spring.datasource.remote.hibernate.properties.hibernate.dialect=tech.powerjob.server.persistence.config.dialect.AdpPostgreSQLDialect --oms.auth.initiliaze.admin.password=${it.password} --oms.auth.openapi.enable=true --oms.transporter.active.protocols=HTTP --oms.transporter.main.protocol=HTTP --oms.http.port=${it.powerjob.transport.port}</PARAMS>
+                                    </env>
+                                    <ports>
+                                        <port>127.0.0.1:it.powerjob.port:7700</port>
+                                        <port>127.0.0.1:${it.powerjob.transport.port}:${it.powerjob.transport.port}</port>
+                                    </ports>
+                                    <dependsOn>
+                                        <container>postgres</container>
+                                    </dependsOn>
+                                    <wait>
+                                        <log>Started PowerJobServerApplication</log>
+                                        <time>180000</time>
                                     </wait>
                                 </run>
                             </image>

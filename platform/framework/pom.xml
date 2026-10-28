@@ -17,5 +17,6 @@
         <module>domain-forge-config</module>
         <module>domain-forge-service-call</module>
         <module>domain-forge-messaging</module>
+        <module>domain-forge-scheduling</module>
     </modules>
 </project>

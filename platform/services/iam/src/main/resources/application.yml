@@ -86,6 +86,13 @@ management:
       status:
         order: down,out-of-service,unknown,up
 
+# 定时任务（PowerJob）：部署时启用并提供服务端地址与应用密码；本地与测试默认不启用，任务不运行。
+domainforge:
+  scheduling:
+    enabled: ${IAM_SCHEDULING_ENABLED:false}
+    server-address: ${IAM_SCHEDULING_SERVER_ADDRESS:}
+    app-password: ${IAM_SCHEDULING_APP_PASSWORD:}
+
 springdoc:
   api-docs:
     enabled: ${IAM_API_DOCS_ENABLED:false}

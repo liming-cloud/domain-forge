@@ -12,6 +12,7 @@
 | | [API 网关](architecture/06-API网关.md) | 网关路由、身份传递、防直连、限流与请求标识 |
 | | [跨服务调用](architecture/07-跨服务调用.md) | Feign 组件合同、Same-Token 官方用法、服务专用接口 |
 | | [消息与 Outbox](architecture/08-消息与Outbox.md) | 投递合同、顺序与去重、中继、RocketMQ 部署 |
+| | [定时任务](architecture/09-定时任务.md) | PowerJob 调度、执行语义、任务登记与部署 |
 | 规范 | [需求与领域建模](standards/01-需求与领域建模.md) | 从需求到场景、模型和上下文 |
 | | [系统设计](standards/02-系统设计.md) | 模块、依赖、端口与用例 |
 | | [技术与构建](standards/03-技术与构建.md) | 技术栈、依赖与漏洞 |

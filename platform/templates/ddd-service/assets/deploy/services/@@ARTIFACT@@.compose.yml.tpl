@@ -55,6 +55,10 @@ services:
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
       # 消息：只在发布或消费事件时连接；主题与消费组由 rocketmq-init 按 deploy/rocketmq/topics.conf 创建。
       @@ENV@@_MESSAGING_ENDPOINTS: rocketmq-broker:8081
+      # 定时任务：应用 @@ARTIFACT@@ 由 powerjob-init 按 deploy/powerjob/apps.conf 注册。
+      @@ENV@@_SCHEDULING_ENABLED: "true"
+      @@ENV@@_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
+      @@ENV@@_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
     networks: [backend]
     depends_on:
       @@ARTIFACT@@-db-init:
@@ -64,6 +68,8 @@ services:
       nacos-init:
         condition: service_completed_successfully
       rocketmq-init:
+        condition: service_completed_successfully
+      powerjob-init:
         condition: service_completed_successfully
     healthcheck:
       # 管理端口只绑定容器内回环地址，不对网络开放。
