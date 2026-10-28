@@ -226,7 +226,8 @@ pre_upgrade_dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' "$work/upgrade.out")
 [ -s "$pre_upgrade_dump" ] || fail "升级前应自动备份"
 [ "$(sql "select count(*) from flyway_schema_history where version = '9000' and success")" = "1" ] \
     || fail "新版本迁移应已执行"
-[ "$(login alice "$alice_pw")" = "200" ] || fail "升级后 alice 登录"
+post /api/auth/login "{\"loginName\":\"alice\",\"password\":\"$alice_pw\"}" > /dev/null
+expect 200 "升级后 alice 登录（网关应立即转到重建后的 IAM 实例）"
 
 step "应用回退（保留新增迁移）"
 set_tag "$tag_v1"

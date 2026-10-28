@@ -12,3 +12,6 @@ spring:
       # 负载均衡层也不重试：结果未知的请求不自动重放。
       retry:
         enabled: false
+      # 不缓存实例列表（默认 35 秒）：Nacos 发现客户端已订阅变更推送，叠加缓存会让被调服务重建后旧地址多活 35 秒。
+      cache:
+        enabled: false
