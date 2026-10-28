@@ -78,7 +78,7 @@ gateway:
 ### 登录前置校验
 
 - 按 Sa-Token 官方[网关统一鉴权](https://sa-token.cc/doc.html#/micro/gateway-auth)用法注册 `SaReactorFilter`：`setAuth` 中以 `SaRouter.match(不在任一路由的匿名清单中).check(StpUtil.checkLogin())` 校验，`setError` 返回平台外壳。缺少令牌或会话不存在返回 401（未路由的路径对未登录请求同样是 401）。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
-- 原生过滤器在事件循环线程上同步读取 Redis（Sa-Token 响应式集成的既定方式），等待由 Redis 客户端超时（300 毫秒）限定。
+- 原生过滤器在事件循环线程上同步读取 Redis（Sa-Token 响应式集成的既定方式），等待由 Redis 命令超时（300 毫秒）限定；建立连接的超时为 2 秒，只在启动与重连时生效（CI 上多个服务同时启动时，300 毫秒内曾建不起初始连接池，网关反复重启）。
 - 令牌只从 `Authorization` 头读取（[A-04](../standards/07-安全与访问控制.md#a-04-令牌只从-authorization-头读取)），原样转发，不改写、不记录。
 - Redis 不可用时返回 503，不放行（[A-03](../standards/07-安全与访问控制.md#a-03-依赖故障时拒绝不降级放行)）。
 

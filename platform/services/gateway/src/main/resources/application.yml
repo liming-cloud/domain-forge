@@ -30,8 +30,9 @@ spring:
       host: ${GATEWAY_REDIS_HOST}
       port: ${GATEWAY_REDIS_PORT}
       password: ${GATEWAY_REDIS_PASSWORD}
+      # 命令超时限定登录校验在事件循环线程上的最长等待；建立连接只在启动与重连时发生，放宽以免负载高时启动失败。
       timeout: 300ms
-      connect-timeout: 300ms
+      connect-timeout: 2s
 
 server:
   port: ${GATEWAY_PORT:8000}
