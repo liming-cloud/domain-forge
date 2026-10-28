@@ -3,7 +3,8 @@
 #   首次部署与管理员初始化 → 网关（请求标识、直连后端被拒、限流与动态调整）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
 #   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
-#   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退。
+#   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退 →
+#   HTTPS 覆盖文件（测试 CA 签发的证书、HTTP 跳转、只接受 TLS 1.2+、换证书平滑重载、错误证书不重载、可选 HSTS）。
 # 新版本镜像在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 # 结果以接口行为判定，不以容器启动或备份文件存在代替；结束时删除本次创建的容器、卷和临时文件。
 #
@@ -255,6 +256,73 @@ rollback_line=$("$repo/deploy/restore.sh" "$env_file" "$pre_upgrade_dump" --yes 
 [ "$(sql "select count(*) from flyway_schema_history where version = '9000'")" = "0" ] || fail "数据回退后不应有新版本迁移"
 [ "$(sql "select to_regclass('deploy_upgrade_probe') is null")" = "t" ] || fail "数据回退后不应有新版本的表"
 [ "$(login alice "$alice_pw")" = "200" ] || fail "数据回退后 alice 登录"
+
+step "HTTPS：覆盖文件启用 TLS 与跳转"
+tls="$work/tls"
+mkdir -p "$tls/live"
+# issue <序号>：用本次生成的测试 CA 为 localhost／127.0.0.1 签发服务端证书，写入 $tls/issued-<序号>
+issue() {
+    openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=localhost" -keyout "$tls/issued-$1.key" \
+        -out "$tls/issued-$1.crt" -CA "$tls/ca.crt" -CAkey "$tls/ca.key" -set_serial "$1" \
+        -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" > /dev/null 2>&1
+}
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=domain-forge verify CA" \
+    -keyout "$tls/ca.key" -out "$tls/ca.crt" > /dev/null 2>&1
+issue 1001
+cp "$tls/issued-1001.crt" "$tls/live/fullchain.pem"
+cp "$tls/issued-1001.key" "$tls/live/privkey.pem"
+https_port=$(free_port)
+printf 'NGINX_TLS_DIR=%s\nNGINX_HTTPS_BIND=127.0.0.1\nNGINX_HTTPS_PORT=%s\n' "$tls/live" "$https_port" >> "$env_file"
+https_files="$repo/deploy/compose.yml:$repo/deploy/compose.https.yml"
+https_compose() { COMPOSE_FILE="$https_files" docker compose --env-file "$env_file" "$@"; }
+https_compose up -d --no-build --wait nginx > /dev/null 2>&1 || { https_compose logs --tail 40 nginx; fail "HTTPS 入口未健康"; }
+secure="https://localhost:$https_port"
+status=$(curl -sS --cacert "$tls/ca.crt" -o /dev/null -w '%{http_code}' -X POST "$secure/api/auth/login" \
+    -H 'Content-Type: application/json' -d "{\"loginName\":\"alice\",\"password\":\"$alice_pw\"}")
+[ "$status" = "200" ] || fail "经 HTTPS 登录：$status"
+redirect=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$base/api/me")
+[ "$redirect" = "301 https://127.0.0.1:$https_port/api/me" ] || fail "HTTP 应 301 跳转到 HTTPS：$redirect"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$base/healthz")" = "200" ] || fail "HTTP 健康检查不应跳转"
+curl -sS --cacert "$tls/ca.crt" -I "$secure/healthz" | grep -qi '^strict-transport-security' && fail "HSTS 默认应关闭"
+served_serial() {
+    openssl s_client -connect "127.0.0.1:$https_port" -servername localhost < /dev/null 2> /dev/null \
+        | openssl x509 -noout -serial
+}
+# await_serial <序列号>：重载是异步的（新工作进程接替旧进程），在 10 秒内等到实际提供的证书变化
+await_serial() {
+    local attempt
+    for attempt in $(seq 1 20); do
+        [ "$(served_serial)" = "$1" ] && return
+        sleep 0.5
+    done
+    fail "实际提供的证书应为 $1：$(served_serial)"
+}
+openssl s_client -connect "127.0.0.1:$https_port" -tls1_2 < /dev/null > /dev/null 2>&1 || fail "应接受 TLS 1.2"
+if openssl s_client -connect "127.0.0.1:$https_port" -tls1_1 -cipher 'DEFAULT@SECLEVEL=0' < /dev/null > /dev/null 2>&1; then
+    fail "不应接受 TLS 1.1"
+fi
+[ "$(served_serial)" = "serial=03E9" ] || fail "应使用首张证书：$(served_serial)"
+
+step "HTTPS：换证书平滑重载，错误证书不重载"
+started_at=$(docker inspect -f '{{.State.StartedAt}}' "$(https_compose ps -q nginx)")
+issue 1002
+cp "$tls/issued-1002.crt" "$tls/live/fullchain.pem"
+cp "$tls/issued-1002.key" "$tls/live/privkey.pem"
+COMPOSE_FILE="$https_files" "$repo/deploy/tls-reload.sh" "$env_file" > /dev/null || fail "换证书重载"
+await_serial "serial=03EA"
+[ "$(docker inspect -f '{{.State.StartedAt}}' "$(https_compose ps -q nginx)")" = "$started_at" ] || fail "重载不应重启 Nginx"
+cp "$tls/issued-1001.key" "$tls/live/privkey.pem"
+if COMPOSE_FILE="$https_files" "$repo/deploy/tls-reload.sh" "$env_file" > /dev/null 2>&1; then
+    fail "私钥与证书不匹配时不应重载"
+fi
+[ "$(served_serial)" = "serial=03EA" ] || fail "拒绝重载后应继续使用当前证书：$(served_serial)"
+cp "$tls/issued-1002.key" "$tls/live/privkey.pem"
+
+step "HTTPS：可选 HSTS"
+printf 'NGINX_HSTS=max-age=300\n' >> "$env_file"
+https_compose up -d --no-build --wait nginx > /dev/null 2>&1 || fail "开启 HSTS 后入口未健康"
+curl -sS --cacert "$tls/ca.crt" -I "$secure/healthz" | grep -qi '^strict-transport-security: max-age=300' \
+    || fail "开启后应发送 HSTS"
 
 echo "first_start_seconds=$first_start"
 echo "$backup_line" | sed "s#$work/##"
