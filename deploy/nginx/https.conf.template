@@ -1,0 +1,41 @@
+# 唯一公开入口（HTTPS，compose.https.yml 启用）。容器启动时 Nginx 镜像用环境变量渲染本模板（只替换 NGINX_ 开头的变量）。
+# 证书与私钥由运维放在主机目录 NGINX_TLS_DIR（fullchain.pem、privkey.pem），换证书后执行 deploy/tls-reload.sh。
+server_tokens off;
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+# HTTP：除健康检查外一律 301 跳转到 HTTPS，不在明文连接上处理任何业务请求。
+server {
+    listen 80;
+    server_name _;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location / {
+        return 301 https://$host:${NGINX_HTTPS_PORT}$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name _;
+
+    ssl_certificate /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    # 只允许 TLS 1.2 与 1.3；套件取 Mozilla “Intermediate” 配置中的 ECDHE 部分（不需要 DH 参数文件）。
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # HSTS 默认关闭（NGINX_HSTS 为空时不发送该头）：确认证书与续期稳定后再设为例如 max-age=31536000。
+    add_header Strict-Transport-Security "${NGINX_HSTS}" always;
+
+    include /etc/nginx/domain-forge/locations.inc;
+}

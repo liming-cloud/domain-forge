@@ -225,6 +225,7 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/proxy.inc:/etc/nginx/domain-forge/proxy.inc:ro
+      - ./nginx/locations.inc:/etc/nginx/domain-forge/locations.inc:ro
     networks:
       backend:
         ipv4_address: 172.31.250.10

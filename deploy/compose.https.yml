@@ -1,0 +1,16 @@
+# HTTPS 覆盖文件：与 compose.yml 一起使用（COMPOSE_FILE=deploy/compose.yml:deploy/compose.https.yml）。
+# Nginx 在 443 终止 TLS，80 只做跳转与健康检查；后端仍是 HTTP，网关与后端的鉴权不变。用法见 deploy/README.md 的 HTTPS 一节。
+services:
+  nginx:
+    ports:
+      - "${NGINX_HTTPS_BIND:-127.0.0.1}:${NGINX_HTTPS_PORT:-8443}:443"
+    environment:
+      # 渲染模板时只替换 NGINX_ 开头的变量，Nginx 自己的 $host 等变量保持原样。
+      NGINX_ENVSUBST_FILTER: "^NGINX_"
+      # 跳转地址中的公开 HTTPS 端口。
+      NGINX_HTTPS_PORT: ${NGINX_HTTPS_PORT:-8443}
+      NGINX_HSTS: ${NGINX_HSTS:-}
+    volumes:
+      - ./nginx/disabled.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/https.conf.template:/etc/nginx/templates/https.conf.template:ro
+      - ${NGINX_TLS_DIR:?provide NGINX_TLS_DIR}:/etc/nginx/tls:ro

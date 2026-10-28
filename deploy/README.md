@@ -1,6 +1,6 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。HTTPS 覆盖文件尚未交付，进度见[路线图](../docs/product/02-路线图.md#当前状态)。
+单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。启用 HTTPS 见 [HTTPS](#https)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
@@ -17,7 +17,7 @@
 
 ## 前提
 
-- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM 与网关 jar）；`python3`（`upgrade.sh` 读取 Compose 配置）。
+- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM 与网关 jar）；`python3`（`upgrade.sh` 读取 Compose 配置）；启用 HTTPS 时需要 `openssl`（`tls-reload.sh` 检查证书）。
 - 网段 `172.31.250.0/24` 未被主机其他网络占用。冲突时同步修改 `compose.yml` 中的网段、Nginx 与网关的固定地址、网关的 `GATEWAY_TRUSTED_PROXIES`（Nginx 地址）和 IAM 的 `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES`（网关地址）。
 
 ## 首次部署
@@ -157,6 +157,31 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 新版本由验证脚本在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 
 2026-10-26 本机实测（Apple Silicon，Docker 29.2，初始数据量）：首次启动 21—73 秒（含构建镜像时较长）；备份 1 秒内、约 33 KB；恢复（含 IAM 重启）15—20 秒；升级 9 秒；迁移失败的升级 7 秒内报告失败；数据回退 15 秒。耗时随数据量增长，生产数据量下需在部署环境实测。
+
+## HTTPS
+
+`compose.https.yml` 覆盖文件让 Nginx 在 443 终止 TLS，80 端口只做 301 跳转（健康检查 `/healthz` 除外）；后端仍是 HTTP，网关与后端的鉴权不变（[O-08](../docs/standards/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)）。证书由运维提供，任何 CA 签发的都可以（包括在主机上自行运行的 ACME 工具），本参考不负责签发。
+
+```bash
+# 1. 证书目录：fullchain.pem（服务器证书在前、中间证书在后）与 privkey.pem；私钥只允许运维用户读取
+install -d -m 700 /etc/domain-forge/tls
+install -m 644 fullchain.pem /etc/domain-forge/tls/fullchain.pem
+install -m 600 privkey.pem /etc/domain-forge/tls/privkey.pem
+# 2. 环境文件增加 NGINX_TLS_DIR=/etc/domain-forge/tls、NGINX_HTTPS_BIND=0.0.0.0、NGINX_HTTPS_PORT=443（HTTP 端口通常为 80）
+# 3. 之后所有 docker compose 命令与运维脚本都通过 COMPOSE_FILE 列入覆盖文件（有业务服务时一并列入）
+export COMPOSE_FILE=deploy/compose.yml:deploy/compose.https.yml
+docker compose --env-file /etc/domain-forge/df.env up -d --wait
+```
+
+| 方面 | 设置 |
+|---|---|
+| 协议 | 只接受 TLS 1.2 与 1.3；套件为 Mozilla “Intermediate” 配置的 ECDHE 部分；关闭会话票据 |
+| 跳转 | HTTP 上除 `/healthz` 外一律 301 到 `https://<主机>:<NGINX_HTTPS_PORT>`，明文连接上不处理业务请求 |
+| HSTS | 默认关闭；确认证书与续期稳定后在环境文件设置 `NGINX_HSTS=max-age=31536000` 并重新 `up`。开启后浏览器在有效期内拒绝降级到 HTTP，证书出错时用户无法绕过 |
+
+**更换证书**：把新的 `fullchain.pem` 与 `privkey.pem` 放入证书目录后执行 `deploy/tls-reload.sh /etc/domain-forge/df.env`。脚本先检查（文件齐全、私钥与证书匹配、证书未过期，30 天内到期时警告），通过后让 Nginx 平滑重载，不断开现有连接；任何一项不通过都不重载，继续使用当前证书。`deploy/tls-reload.sh <环境文件> --check` 只做检查，可用于定时的到期巡检。
+
+**验证**：`scripts/verify_deploy.sh` 最后用测试 CA 签发证书启用覆盖文件，核对：经 HTTPS 登录；HTTP 301 跳转且健康检查不跳转；接受 TLS 1.2、拒绝 TLS 1.1；默认不发送 HSTS，开启后发送；换证书后实际提供新证书且 Nginx 未重启；私钥与证书不匹配时拒绝重载并继续使用当前证书。
 
 ## 本地调试
 
