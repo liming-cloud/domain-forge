@@ -16,5 +16,6 @@
         <module>domain-forge-access-control</module>
         <module>domain-forge-config</module>
         <module>domain-forge-service-call</module>
+        <module>domain-forge-messaging</module>
     </modules>
 </project>

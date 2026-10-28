@@ -56,6 +56,10 @@
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-service-call</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-messaging</artifactId>
+        </dependency>
         <!-- IAM 当前授权：本服务 infrastructure 中的 Feign 客户端，经 Nacos 或固定地址调用。 -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

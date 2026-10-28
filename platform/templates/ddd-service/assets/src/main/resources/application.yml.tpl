@@ -3,6 +3,9 @@
 spring:
   application:
     name: @@ARTIFACT@@
+  config:
+    # 带便笺示例时启用 Outbox（文件随示例生成，没有示例时不存在）。
+    import: optional:classpath:messaging-outbox.yml
   main:
     banner-mode: off
   lifecycle:
@@ -49,6 +52,11 @@ spring:
       fail-on-unknown-properties: true
 
 # 本地直连 IAM 时设置 @@ENV@@_IAM_URL（如 http://127.0.0.1:8080）；为空时经 Nacos 发现 iam。
+# 消息组件连接 RocketMQ Proxy 的地址；只有发布或消费事件时才连接，部署时为 rocketmq-broker:8081。
+domainforge:
+  messaging:
+    endpoints: ${@@ENV@@_MESSAGING_ENDPOINTS:}
+
 @@ARTIFACT@@:
   iam:
     url: ${@@ENV@@_IAM_URL:}

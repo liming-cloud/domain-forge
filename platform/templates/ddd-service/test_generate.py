@@ -21,6 +21,8 @@ class GenerateTest(unittest.TestCase):
         deploy = self.root / 'deploy'
         (deploy / 'services').mkdir(parents=True)
         (deploy / 'nacos' / 'config').mkdir(parents=True)
+        (deploy / 'rocketmq').mkdir(parents=True)
+        (deploy / 'rocketmq' / 'topics.conf').write_text('# topics\n', encoding='utf-8')
         (deploy / 'nacos' / 'config' / 'gateway.yaml').write_text(
             'gateway:\n  routing:\n    routes:\n      - id: iam\n        service: iam\n        paths: [/api/**]\n', encoding='utf-8')
         (deploy / 'compose.yml').write_text('services:\n  postgres:\n    image: postgres:18@sha256:abc\n',
@@ -71,7 +73,24 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('"/api/board/note-digest"', controller)
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: board-service\n', routes)
-        self.assertIn('      - id: board-service-calls\n        service: board-service\n        paths: [/api/board/**]', routes)
+        self.assertIn('      - id: board-service-calls\n        service: board-service\n        paths: [/api/board/note-digest]',
+                      routes)
+        topics = (self.root / 'deploy/rocketmq/topics.conf').read_text(encoding='utf-8')
+        self.assertIn('topic board-service-notes NORMAL\n', topics)
+
+    def test_consume_example_subscribes_to_source(self):
+        generate.generate(self.root, 'board-service', 'com.company.board', call_peer='note-service',
+                          source='note-service')
+        output = self.root / 'platform' / 'services' / 'board-service'
+        handler = next(output.rglob('SourceNoteCreatedHandler.java')).read_text(encoding='utf-8')
+        self.assertIn('return "note-service-notes";', handler)
+        self.assertIn('return "board-service-note-tally";', handler)
+        self.assertTrue(any(output.rglob('V10__note_tally.sql')))
+        self.assertFalse(any(output.rglob('V2__outbox.sql')))
+        topics = (self.root / 'deploy/rocketmq/topics.conf').read_text(encoding='utf-8')
+        self.assertIn('group board-service-note-tally CONCURRENT\n', topics)
+        routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
+        self.assertIn('paths: [/api/board/note-tally]', routes)
 
     def test_call_example_requires_valid_peer(self):
         for peer in ['Note', 'iam', 'gateway', 'board']:
@@ -81,6 +100,8 @@ class GenerateTest(unittest.TestCase):
         bare = self.root / 'platform' / 'services' / 'plain'
         generate.generate(self.root, 'plain', 'com.company.plain')
         self.assertFalse(any(bare.rglob('PeerNote*.java')))
+        self.assertFalse(any(bare.rglob('*Tally*.java')))
+        self.assertFalse(any(bare.rglob('NoteCreated.java')))
 
     def test_failed_generation_restores_gateway_seed(self):
         seed = self.root / 'deploy/nacos/config/gateway.yaml'

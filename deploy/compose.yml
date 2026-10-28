@@ -76,6 +76,72 @@ services:
     depends_on:
       nacos:
         condition: service_healthy
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.5.0@sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132
+    restart: unless-stopped
+    logging: *logging
+    command: [nameserver]
+    environment:
+      JAVA_OPT_EXT: -Xms256m -Xmx256m -Xmn128m
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "exec 3<>/dev/tcp/127.0.0.1/9876"']
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  rocketmq-store-init:
+    # 一次性任务：镜像以 uid 3000 运行且没有预建存储目录，命名卷挂载点默认属于 root，先改属主。
+    image: apache/rocketmq:5.5.0@sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132
+    restart: "no"
+    user: "0:0"
+    entrypoint: [chown, "3000:3000", /home/rocketmq/store]
+    volumes:
+      - rocketmq-store:/home/rocketmq/store
+    networks: [backend]
+  rocketmq-broker:
+    # 消息与 Outbox 的传输：broker 内置 proxy（local 模式），服务经 gRPC 端口 8081 连接；不对外开放端口。
+    image: apache/rocketmq:5.5.0@sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132
+    restart: unless-stopped
+    logging: *logging
+    command: [broker, --enable-proxy, -c, /etc/rocketmq/broker.conf, -pc, /etc/rocketmq/proxy.json]
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: -Xms512m -Xmx512m -Xmn256m
+    volumes:
+      - ./rocketmq/broker.conf:/etc/rocketmq/broker.conf:ro
+      - ./rocketmq/proxy.json:/etc/rocketmq/proxy.json:ro
+      - rocketmq-store:/home/rocketmq/store
+    networks:
+      backend:
+        # 与 rocketmq/broker.conf 的 brokerIP1 一致：proxy 把它作为路由地址返回给客户端。
+        ipv4_address: 172.31.250.20
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+      rocketmq-store-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "exec 3<>/dev/tcp/127.0.0.1/8081"']
+      interval: 3s
+      timeout: 3s
+      start_period: 20s
+      retries: 40
+  rocketmq-init:
+    # 一次性任务：按 rocketmq/topics.conf 创建主题与消费组，等路由可见后退出。
+    image: apache/rocketmq:5.5.0@sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132
+    restart: "no"
+    logging: *logging
+    entrypoint: [sh, /init/init.sh]
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: -Xms128m -Xmx128m -Xmn64m
+    volumes:
+      - ./rocketmq/init.sh:/init/init.sh:ro
+      - ./rocketmq/topics.conf:/init/topics.conf:ro
+    networks: [backend]
+    depends_on:
+      rocketmq-broker:
+        condition: service_healthy
   iam:
     image: domain-forge/iam:${IAM_IMAGE_TAG:-local}
     build:
@@ -165,6 +231,10 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+      # 入口在消息主题建好后才开放；也让 `up --wait` 把一次性任务 rocketmq-init 的正常退出当作完成
+      # （没有任何服务依赖的一次性任务退出时，--wait 会判失败）。
+      rocketmq-init:
+        condition: service_completed_successfully
     healthcheck:
       test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/healthz']
       interval: 3s
@@ -181,3 +251,5 @@ networks:
 volumes:
   postgres-data:
   nacos-data:
+  # 消息存储：不进入备份。Outbox 在 PostgreSQL 中，是待发送事件的权威来源；丢失该卷会丢失已发送、尚未消费的消息。
+  rocketmq-store:

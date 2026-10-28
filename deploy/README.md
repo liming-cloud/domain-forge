@@ -11,6 +11,8 @@
 | redis | 会话、登录防护计数、缓存 | 无 | 不持久化，重启后所有用户需重新登录 |
 | nacos | 服务注册与发现、配置中心，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限、配置；实例信息可重建） |
 | nacos-init | 一次性任务：设置管理员密码、创建服务专用账号、发布配置种子 | 无 | 无 |
+| rocketmq-namesrv、rocketmq-broker | 集成事件的传输：broker 内置 proxy，服务经 `rocketmq-broker:8081` 连接（见[消息与 Outbox](../docs/architecture/08-消息与Outbox.md#部署)） | 无 | 卷 `rocketmq-store`（不进入备份，Outbox 在 PostgreSQL 中） |
+| rocketmq-store-init、rocketmq-init | 一次性任务：修正存储卷属主；按 `rocketmq/topics.conf` 创建主题与消费组 | 无 | 无 |
 | `<服务名>`、`<服务名>-db-init` | 业务服务及其数据库账号初始化（覆盖文件 `services/<服务名>.compose.yml`） | 无 | 无（数据在 PostgreSQL） |
 
 ## 前提
@@ -94,6 +96,15 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 备份含密码摘要与敏感输入指纹，按机密数据保存；异地副本、加密与保留周期由运维负责，本参考不提供定时任务。
 
+
+## 消息
+
+服务间的集成事件经 RocketMQ 传输，发布方以同事务 Outbox 保证“业务提交即事件不丢”（设计见[消息与 Outbox](../docs/architecture/08-消息与Outbox.md)）：
+
+- 主题与消费组在 `rocketmq/topics.conf` 登记，`rocketmq-init` 每次部署按它创建（已存在的更新）；关闭了自动创建，拼错名字会报错而不是静默新建。主题类型创建后不改。
+- RocketMQ 停机时业务照常提交，事件留在各服务的 `domainforge_outbox` 表中，恢复后继续发送；积压看指标 `domainforge.messaging.outbox.pending`。
+- 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
+- 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
 
 ## 配置中心
 
@@ -181,4 +192,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service` 调用它的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

@@ -3,6 +3,8 @@
 # 经 Nginx 与网关走完 IAM 授权的完整链路：
 #   注册账号 → 未授权被拒 → 安装权限目录、建角色授予、分配角色 → 业务命令与范围查询成功 →
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
+#   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
+#   提交的事件在恢复后继续发送）→
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
@@ -39,7 +41,8 @@ mkdir -p "$copy"
 python3 -I "$copy/platform/templates/ddd-service/generate.py" --root "$copy" \
     --name note-service --package org.example.note --with-example > /dev/null
 python3 -I "$copy/platform/templates/ddd-service/generate.py" --root "$copy" \
-    --name board-service --package org.example.board --call-example note-service > /dev/null
+    --name board-service --package org.example.board --call-example note-service --consume-example note-service \
+    > /dev/null
 
 step "构建 IAM、网关、note-service 与 board-service"
 "$copy/platform/mvnw" -f "$copy/platform/pom.xml" -B -ntp -q clean package \
@@ -56,6 +59,7 @@ published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 grep -q 'nacos config seeded: note-service.yaml' <<< "$(compose logs nacos-init)" || fail "生成服务的配置种子未发布"
 grep -q -- '- id: note-service' "$copy/deploy/nacos/config/gateway.yaml" || fail "生成服务的网关路由未写入种子"
 grep -q -- '- id: board-service-calls' "$copy/deploy/nacos/config/gateway.yaml" || fail "调用方示例的网关路由未写入种子"
+grep -q 'rocketmq group ready: board-service-note-tally' <<< "$(compose logs rocketmq-init)" || fail "消费组未创建"
 
 step "初始化管理员并注册账号"
 admin_pw="Admin-$(secret)"
@@ -105,6 +109,20 @@ expect 200 "已授权的业务命令"
 get /api/notes "$bob_token" > /dev/null
 expect 403 "未分配角色的账号读取便笺"
 
+# tally_is <期望值>：等 board-service 的便笺统计（事件累加，最终一致）达到期望值
+tally_is() {
+    local attempt value
+    for attempt in $(seq 1 60); do
+        value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"])')
+        [ "$value" = "$1" ] && return
+        sleep 1
+    done
+    fail "便笺统计应为 $1，实际 $value"
+}
+
+step "集成事件：note-service 发布 NoteCreated，board-service 累加统计"
+tally_is 1
+
 step "跨服务调用：board-service 以同一用户身份读取 note-service"
 digest=$(get /api/board/note-digest "$alice_token")
 expect 200 "调用方读取被调方便笺"
@@ -144,6 +162,16 @@ alice_token=$(token alice "$alice_pw")
 [ "$(get /api/notes "$alice_token" | size)" = "1" ] || fail "恢复后应只有备份前的 1 条便笺"
 post /api/notes '{"title":"恢复后","content":""}' "$alice_token" > /dev/null
 expect 200 "恢复后业务服务仍可写入自己的 schema"
+tally_is 2
+
+step "集成事件：RocketMQ 停机期间提交的事件在恢复后继续发送"
+compose stop rocketmq-broker > /dev/null 2>&1
+post /api/notes '{"title":"消息中断期间","content":""}' "$alice_token" > /dev/null
+expect 200 "RocketMQ 停机时业务提交不受影响"
+[ "$(sql "select count(*) from note_service.domainforge_outbox where sent_at is null")" -ge 1 ] \
+    || fail "停机期间的事件应留在 Outbox 等待发送"
+compose up -d --wait rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
+tally_is 3
 
 step "撤销角色后立即生效"
 admin_token=$(token admin "$admin_pw")

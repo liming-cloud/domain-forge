@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -275,6 +275,102 @@
       "source": "assets/deploy/nacos/config/gateway-call-route.yaml.tpl",
       "target": "deploy/nacos/config/gateway.yaml",
       "example": "call",
+      "root": "repository",
+      "mode": "append"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/contract/event/NoteCreated.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/contract/event/NoteCreated.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/event/NoteEvents.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/event/NoteEvents.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxNoteEvents.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxNoteEvents.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/db/migration/V2__outbox.sql.tpl",
+      "target": "src/main/resources/db/migration/V2__outbox.sql",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/messaging-outbox.yml.tpl",
+      "target": "src/main/resources/messaging-outbox.yml",
+      "example": true
+    },
+    {
+      "source": "assets/deploy/rocketmq/topics-notes.conf.tpl",
+      "target": "deploy/rocketmq/topics.conf",
+      "example": true,
+      "root": "repository",
+      "mode": "append"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/tally/NoteTallies.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/tally/NoteTallies.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordNoteCreated.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordNoteCreated.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/tally/NoteTallyQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/tally/NoteTallyQueries.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceNoteCreatedHandler.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceNoteCreatedHandler.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/NoteTallyMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/NoteTallyMapper.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlNoteTallies.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlNoteTallies.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/NoteTallyController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/NoteTallyController.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/resources/mapper/tally/NoteTallyMapper.xml.tpl",
+      "target": "src/main/resources/mapper/tally/NoteTallyMapper.xml",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/main/resources/db/migration/V10__note_tally.sql.tpl",
+      "target": "src/main/resources/db/migration/V10__note_tally.sql",
+      "example": "consume"
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteTallyIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteTallyIT.java",
+      "example": "consume"
+    },
+    {
+      "source": "assets/deploy/rocketmq/topics-tally.conf.tpl",
+      "target": "deploy/rocketmq/topics.conf",
+      "example": "consume",
+      "root": "repository",
+      "mode": "append"
+    },
+    {
+      "source": "assets/deploy/nacos/config/gateway-tally-route.yaml.tpl",
+      "target": "deploy/nacos/config/gateway.yaml",
+      "example": "consume",
       "root": "repository",
       "mode": "append"
     }

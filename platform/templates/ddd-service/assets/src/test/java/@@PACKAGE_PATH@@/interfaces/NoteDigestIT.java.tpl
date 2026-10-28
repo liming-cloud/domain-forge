@@ -64,6 +64,8 @@ class NoteDigestIT {
                 "--@@ENV@@_PEER_URL=http://127.0.0.1:" + peer.getAddress().getPort(),
                 "--@@ARTIFACT@@.iam.url=http://127.0.0.1:" + peer.getAddress().getPort(),
                 "--spring.cloud.openfeign.client.config.peerNotes.read-timeout=500",
+                "--domainforge.messaging.consumer.enabled=false",
+                "--domainforge.messaging.relay.enabled=false",
                 "--logging.level.root=WARN");
         base = "http://127.0.0.1:" + application.getBean(Environment.class).getProperty("local.server.port");
     }

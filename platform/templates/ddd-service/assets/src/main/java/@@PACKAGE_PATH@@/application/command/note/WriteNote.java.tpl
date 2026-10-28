@@ -1,6 +1,8 @@
 package @@PACKAGE@@.application.command.note;
 
+import @@PACKAGE@@.application.contract.event.NoteCreated;
 import @@PACKAGE@@.application.port.access.DataScopes;
+import @@PACKAGE@@.application.port.event.NoteEvents;
 import @@PACKAGE@@.application.port.operation.Identifiers;
 import @@PACKAGE@@.domain.model.note.Note;
 import @@PACKAGE@@.domain.repository.NoteRepository;
@@ -24,19 +26,22 @@ public class WriteNote {
     private final DataScopes scopes;
     private final NoteRepository notes;
     private final Identifiers ids;
+    private final NoteEvents events;
 
     /**
      * 只依赖访问组件公开接口、本服务端口与仓储。
      */
-    public WriteNote(CurrentAccess access, DataScopes scopes, NoteRepository notes, Identifiers ids) {
+    public WriteNote(CurrentAccess access, DataScopes scopes, NoteRepository notes, Identifiers ids,
+                     NoteEvents events) {
         this.access = access;
         this.scopes = scopes;
         this.notes = notes;
         this.ids = ids;
+        this.events = events;
     }
 
     /**
-     * 新建便笺：不归属组织时需要本人范围，归属组织时该组织须在写范围内。
+     * 新建便笺：不归属组织时需要本人范围，归属组织时该组织须在写范围内。同一事务内发布 {@link NoteCreated}。
      */
     @Transactional
     public NoteChange create(Long unitId, String title, String content) {
@@ -46,6 +51,7 @@ public class WriteNote {
         if (!Note.creatable(unitId, scope.all(), scope.self(), scope.unitIds()))
             throw new AccessException(AccessFailure.FORBIDDEN);
         notes.insert(note);
+        events.created(new NoteCreated(note.id(), account));
         return new NoteChange(note.id(), note.version());
     }
 

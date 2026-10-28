@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 在仓库的干净副本中生成两个服务并执行完整门禁（含真实 PostgreSQL／Redis 集成测试）：带便笺示例的 template-check，
-# 以及以 --call-example 调用它的 template-caller。证明模板产出能在本仓库内构建、通过架构规则、接入 IAM 合同，
+# 以及以 --call-example 调用它、以 --consume-example 消费其事件的 template-caller。证明模板产出能在本仓库内构建、通过架构规则、接入 IAM 合同，
 # 并按跨服务调用组件的合同调用另一服务。不修改当前工作区。
 #
 # 用法：scripts/verify_template.sh [额外 Maven 参数]，例如本机无 Docker 时：
@@ -19,7 +19,8 @@ trap 'rm -rf "$work"' EXIT
 python3 -I "$work/platform/templates/ddd-service/generate.py" --root "$work" \
   --name template-check --package org.example.templatecheck --with-example
 python3 -I "$work/platform/templates/ddd-service/generate.py" --root "$work" \
-  --name template-caller --package org.example.templatecaller --call-example template-check
+  --name template-caller --package org.example.templatecaller --call-example template-check \
+  --consume-example template-check
 "$work/platform/mvnw" -f "$work/platform/pom.xml" -B -ntp verify -pl services/template-check,services/template-caller \
   -am "$@"
 echo "template_check=passed"
