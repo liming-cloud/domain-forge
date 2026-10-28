@@ -1,6 +1,5 @@
 package @@PACKAGE@@.infrastructure.acl.iam;
 
-import org.domainforge.access.api.SameTokens;
 import org.domainforge.shared.ApiResponse;
 import org.domainforge.shared.CurrentScope;
 import org.domainforge.shared.CurrentSubject;
@@ -15,8 +14,8 @@ import java.util.Map;
 /**
  * IAM 当前授权的公开 HTTP 合同；url 为空时经 Nacos 发现名为 iam 的服务。
  *
- * <p>只转发调用者自己的 Bearer 令牌，不接收或传递任意账号 ID；同时携带 Same-Token，证明是系统内服务的调用。
- * 超时与不重试由配置固定。
+ * <p>显式传入当前请求经原生解析的 Bearer 令牌，不接收或传递任意账号 ID。Same-Token、请求标识、超时、不重试与失败分类
+ * 由跨服务调用组件统一提供。
  */
 @FeignClient(name = "iam", url = "${@@ARTIFACT@@.iam.url:}", contextId = "iamAccess")
 public interface IamAccessClient {
@@ -24,15 +23,12 @@ public interface IamAccessClient {
      * 当前主体：账号 ID、角色与精确权限。
      */
     @GetMapping("/internal/access/current")
-    ApiResponse<CurrentSubject> current(
-            @RequestHeader(SameTokens.HEADER) String sameToken, @RequestHeader("Authorization") String authorization);
+    ApiResponse<CurrentSubject> current(@RequestHeader("Authorization") String authorization);
 
     /**
      * 按精确权限读取数据范围。
      */
     @GetMapping("/internal/access/scopes")
     ApiResponse<Map<String, CurrentScope>> scopes(
-            @RequestHeader(SameTokens.HEADER) String sameToken,
-            @RequestHeader("Authorization") String authorization,
-            @RequestParam("permission") List<String> permissions);
+            @RequestHeader("Authorization") String authorization, @RequestParam("permission") List<String> permissions);
 }

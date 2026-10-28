@@ -27,7 +27,7 @@
 
 ## 网关服务
 
-- 位置 `platform/services/gateway`，遵守五个职责包和架构规则；网关没有领域模型，只有 `bootstrap`（启动与装配）与 `infrastructure`（`routing` 路由配置、`filter` 过滤器与错误响应、`security` Same-Token 轮换）。
+- 位置 `platform/services/gateway`，遵守五个职责包和架构规则；网关没有领域模型，只有 `bootstrap`（启动与装配）与 `infrastructure`（`routing` 路由配置、`filter` 过滤器与错误响应、`security` Same-Token 刷新）。
 - 技术：Spring Cloud Gateway Server WebFlux 5.0（随 Spring Cloud BOM），`sa-token-reactor-spring-boot4-starter` 与官方 Redisson DAO，Nacos 服务发现与配置（复用 `domain-forge-config`），Redis 客户端、Lua 脚本与分布式锁复用 `domain-forge-cache`。网关是 WebFlux 应用，不依赖 Servlet 版的 `domain-forge-web-support`、`domain-forge-access-control`；会话与 Same-Token 的 Redis 键名由 `sa-token.token-name` 决定，网关配置必须与 access-control 组件一致（`Authorization`）。
 - 不连接 PostgreSQL；只用 Redis（会话查询、限流、Same-Token）和 Nacos。Redis 读写都是阻塞调用，在 `boundedElastic` 线程上执行，不占用事件循环。
 - 端口：业务 8000，管理 9093（只绑定回环地址）。
@@ -38,9 +38,9 @@
 |---|---|---|
 | 1 | 路径检查（路由之前） | 400 `INVALID_REQUEST` |
 | 2 | 请求标识与客户端地址；删除客户端自带的 `Forwarded`、`X-Real-IP`、`SA-SAME-TOKEN` | — |
-| 3 | 路由匹配 | 404（框架默认） |
-| 4 | 限流 | 429 `RATE_LIMITED` |
-| 5 | 登录前置校验（匿名清单除外） | 401 `UNAUTHENTICATED`；Redis 不可用 503 |
+| 3 | 限流（全部请求） | 429 `RATE_LIMITED` |
+| 4 | 登录前置校验（Sa-Token `SaReactorFilter`，匿名清单除外） | 401 `UNAUTHENTICATED`；Redis 不可用 503 |
+| 5 | 路由匹配 | 404（框架默认） |
 | 6 | 写入 Same-Token | Redis 不可用 503 |
 | 7 | 转发；最后一步写入 `X-Forwarded-For` | 无实例或连接失败 503，超时 504 |
 
@@ -77,7 +77,8 @@ gateway:
 
 ### 登录前置校验
 
-- 不在匿名清单中的请求必须带 `Authorization: Bearer <token>`，网关用 Sa-Token 查询原生会话是否存在；缺少令牌或会话不存在返回 401。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
+- 按 Sa-Token 官方[网关统一鉴权](https://sa-token.cc/doc.html#/micro/gateway-auth)用法注册 `SaReactorFilter`：`setAuth` 中以 `SaRouter.match(不在任一路由的匿名清单中).check(StpUtil.checkLogin())` 校验，`setError` 返回平台外壳。缺少令牌或会话不存在返回 401（未路由的路径对未登录请求同样是 401）。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
+- 原生过滤器在事件循环线程上同步读取 Redis（Sa-Token 响应式集成的既定方式），等待由 Redis 命令超时（300 毫秒）限定；建立连接的超时为 2 秒，只在启动与重连时生效（CI 上多个服务同时启动时，300 毫秒内曾建不起初始连接池，网关反复重启）。
 - 令牌只从 `Authorization` 头读取（[A-04](../standards/07-安全与访问控制.md#a-04-令牌只从-authorization-头读取)），原样转发，不改写、不记录。
 - Redis 不可用时返回 503，不放行（[A-03](../standards/07-安全与访问控制.md#a-03-依赖故障时拒绝不降级放行)）。
 
@@ -85,15 +86,15 @@ gateway:
 
 - 使用 Sa-Token 原生 Same-Token（请求头 `SA-SAME-TOKEN`，值保存在共用 Redis 的 `Authorization:var:same-token`），不自造密钥或签名协议。能读到该 Redis 的进程本来就能读到全部会话，信任边界不扩大。
 - 网关对每个转发请求写入当前值（每次从 Redis 读取，不缓存），客户端传入的同名头在此之前已删除；读取失败返回 503，不省略请求头继续转发。
-- 后端校验由 `domain-forge-access-control` 的过滤器提供：主端口的所有请求先校验 Same-Token，只读比较当前值与轮换前的上一个值（不调用 Sa-Token 的 `isValid`，它在值缺失时会生成新值），常量时间比较；缺失或不符返回 401，会话 Redis 不可用返回 503。管理端点在独立端口，不经过该过滤器，容器健康检查不受影响。
+- 后端校验按 Sa-Token 官方用法由 `domain-forge-access-control` 注册的 `SaServletFilter` 完成（`setAuth` 中 `SaSameUtil.checkCurrentRequestToken()`，接受当前值与上一个值）：缺失或不符返回 401，会话 Redis 不可用返回 503。管理端点在独立端口，不经过该过滤器，容器健康检查不受影响。官方用法与平台实现的逐项对照见[跨服务调用](07-跨服务调用.md#same-token-的用法对照-sa-token-官方文档)。
 - 开关 `domainforge.access.same-token.enabled` 默认开启，只允许本地开发与测试关闭；启用 `config-center` profile（即部署环境）时关闭会使启动失败。
-- 服务间调用（当前为业务服务调用 IAM 的 `/internal/access/*`）由调用方用 `SameTokens.current()` 取当前值，放进 Feign 请求的 `SA-SAME-TOKEN` 头；取值失败按依赖不可用（503）处理。P6-4 跨服务调用组件接管这一步。
-- 轮换：网关启动时立即检查一次，此后每 10 分钟（`domainforge.gateway.same-token-check-interval`）检查；值不存在或剩余有效期不足一半（有效期 `sa-token.same-token-timeout`，24 小时）时生成新值，旧值作为“上一个值”在剩余有效期内仍被后端接受。多个网关实例在同一把分布式锁内检查剩余有效期，一次到期只轮换一次，不会连续轮换两次让持有旧值的在途请求被拒。
-- 首个值：网关启动时生成。若业务服务先于任何网关调用 `SameTokens.current()`，由它生成；两个进程同时首次生成时其中一个值会被覆盖，持有它的那次请求被拒——只在首次生成或过期重建时可能发生，网关按半衰期轮换使值不会过期。
+- 服务间调用由[跨服务调用组件](07-跨服务调用.md)的 Feign 拦截器写入 Same-Token。
+- 刷新：按官方建议由专门的定时任务按固定间隔调用 `SaSameUtil.refreshToken()`。网关启动时立即检查一次，此后每 30 分钟（`domainforge.gateway.same-token-refresh-interval`，低于 24 小时的有效期 `sa-token.same-token-timeout`）刷新；多个网关实例在同一把分布式锁内检查当前值的“年龄”，未满一个间隔说明其他实例刚刷新过，跳过——官方文档提醒集群中不要多处重复刷新。旧值作为“上一个值”保留到下次刷新。
+- 首个值：网关启动时生成。若某个后端先于网关调用 `SaSameUtil.getToken()`，由它生成；两个进程同时首次生成时其中一个值会被覆盖，持有它的那次请求被拒——只在首次生成时可能发生，网关定时刷新使值不会过期。
 
 ### 限流
 
-- Redis 令牌桶（Lua 脚本，键 `gateway:rate:<客户端地址>`），用 Redis 服务器时间计算补充量，避免多个网关实例的时钟差；超限返回 429 与 `Retry-After`。参数每次请求读取当前配置，动态调整立即生效。
+- 对全部请求生效、先于登录校验，未登录请求的洪泛也受限，不会全部压到会话查询。Redis 令牌桶（Lua 脚本，键 `gateway:rate:<客户端地址>`），用 Redis 服务器时间计算补充量，避免多个网关实例的时钟差；超限返回 429 与 `Retry-After`。参数每次请求读取当前配置，动态调整立即生效。
 - 这是过载保护，不是安全边界。Redis 不可用时限流放行，记录错误日志与计数器 `domainforge.gateway.rate-limit.unavailable`（供告警）；此时会话查询与 Same-Token 读取同样失败，请求仍以 503 结束，不会因此放开暴力尝试。
 - 按账号限流、按路由区分阈值不在本轮范围，出现真实需求时再加。
 
@@ -141,7 +142,7 @@ gateway:
 | 下游故障 | 无实例、响应超时 | 503、504，统一外壳 |
 | 限流 | 同一地址超过桶容量 | 429 与 `Retry-After`，其他地址不受影响 |
 | 路由动态更新 | 运行中发布新路由、非法路由 | 新路由实际转到新服务；非法发布保持原路由并计 `rejected` |
-| Same-Token 轮换 | 未到期检查、缩短剩余有效期后检查 | 未到期不轮换；到期后新值用于转发，上一个值保留 |
+| Same-Token 刷新 | 刚刷新后检查、把当前值的年龄调到一个间隔后检查 | 未满间隔不刷新；满间隔后新值用于转发，上一个值保留 |
 | Redis 中断 | 暂停 Redis 容器 | 受保护与匿名请求都 503，限流计数 `unavailable`；恢复后正常转发 |
 | 后端校验 | access-control `SameTokenFilterTest`；模板 `NoteServiceIT` | 缺失、伪造 401；当前与上一个值通过；校验方不生成值；部署环境不能关闭 |
 | 部署 | `verify_deploy.sh` | 响应带请求标识且见于网关日志；网段内直连 IAM（含伪造 Same-Token 访问 `/internal/`）401；突发请求被限流，经配置中心调高阈值后生效；原有部署、备份恢复、升级回退场景经网关全部通过 |

@@ -9,25 +9,25 @@ import org.domainforge.gateway.infrastructure.routing.GatewaySettings;
 import org.domainforge.gateway.infrastructure.routing.RateLimitSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
 /**
- * 按客户端地址的 Redis 令牌桶，超限返回 429。
+ * 按客户端地址的 Redis 令牌桶，超限返回 429；对全部请求生效，先于登录校验，避免未登录请求的洪泛压到会话查询。
  *
  * <p>这是过载保护，不是安全边界：Redis 不可用时放行，记录错误日志与计数器
  * {@code domainforge.gateway.rate-limit.unavailable} 供告警（设计见 docs/architecture/06-API网关.md#限流）。
  */
 @Component
-public class RateLimitFilter implements GlobalFilter, Ordered {
+public class RateLimitFilter implements WebFilter, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(RateLimitFilter.class);
     private static final RedisScript<Long> BUCKET =
             new RedisScript<>("scripts/gateway-rate-limit.lua", Long.class, "gateway:rate:");
@@ -47,7 +47,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String client = exchange.getAttributeOrDefault(RequestIdentityFilter.CLIENT_ADDRESS, "unknown");
         RateLimitSettings limit = settings.current().rateLimit();
         return Mono.fromCallable(() -> allowed(client, limit))
@@ -74,10 +74,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * 路由之后、登录校验之前：匿名的登录接口同样受限。
+     * 请求标识之后、登录校验（Sa-Token 全局过滤器）之前：未登录的请求与匿名的登录接口同样受限。
      */
     @Override
     public int getOrder() {
-        return -300;
+        return Ordered.HIGHEST_PRECEDENCE + 2;
     }
 }

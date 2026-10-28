@@ -2,6 +2,7 @@ package org.domainforge.access.internal;
 
 import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.dao.SaTokenDao;
+import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.filter.SaTokenContextFilterForJakartaServlet;
 import cn.dev33.satoken.same.SaSameUtil;
 import org.domainforge.access.api.AccessException;
@@ -9,6 +10,7 @@ import org.domainforge.access.api.AccessFailure;
 import org.domainforge.access.api.SameTokens;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -23,7 +25,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 真实 Boot 装配下的 Same-Token 校验：直连拒绝、轮换窗口、存储故障，以及校验方不写入新值。
+ * 真实 Boot 装配下按 Sa-Token 官方用法（SaServletFilter + checkCurrentRequestToken）的 Same-Token 校验：
+ * 直连拒绝、轮换窗口、存储故障、部署环境不能关闭。
  */
 class SameTokenFilterTest {
     private static ConfigurableApplicationContext start(String enabled, String... extra) {
@@ -42,12 +45,21 @@ class SameTokenFilterTest {
 
     private static MockMvc mvc(ConfigurableApplicationContext context) {
         return MockMvcBuilders.webAppContextSetup((WebApplicationContext) context)
-                .addFilters(context.getBean(SameTokenFilter.class), new SaTokenContextFilterForJakartaServlet())
+                .addFilters(new SaTokenContextFilterForJakartaServlet(), sameTokenFilter(context))
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
+    private static SaServletFilter sameTokenFilter(ConfigurableApplicationContext context) {
+        return ((FilterRegistrationBean<SaServletFilter>) context.getBean("sameTokenFilter")).getFilter();
+    }
+
     private static int call(MockMvc mvc, String sameToken) throws Exception {
-        var request = MockMvcRequestBuilders.get("/anonymous");
+        return call(mvc, "/anonymous", sameToken);
+    }
+
+    private static int call(MockMvc mvc, String path, String sameToken) throws Exception {
+        var request = MockMvcRequestBuilders.get(path);
         if (sameToken != null) request.header(SameTokens.HEADER, sameToken);
         return mvc.perform(request).andReturn().getResponse().getStatus();
     }
@@ -67,18 +79,17 @@ class SameTokenFilterTest {
                 });
     }
 
-    // 尚无 Same-Token 时直连被拒，且校验不会替攻击者生成一个值。
+    // 缺失或伪造的值被拒，响应为平台外壳且不回显收到的值。
     @Test
-    void verifierNeverCreatesToken() throws Exception {
+    void missingOrForgedTokenIsRejected() throws Exception {
         try (var context = start("true")) {
             var mvc = mvc(context);
-            // 原生内存存储在进程内共享，先清除其他用例留下的值。
-            var store = SaManager.getSaTokenDao();
-            store.delete(SaManager.getSaSameTemplate().splicingTokenSaveKey());
-            store.delete(SaManager.getSaSameTemplate().splicingPastTokenSaveKey());
             assertEquals(401, call(mvc, null));
-            assertEquals(401, call(mvc, "guess"));
-            assertNull(SaSameUtil.getTokenNh());
+            var forged = mvc.perform(MockMvcRequestBuilders.get("/anonymous").header(SameTokens.HEADER, "guess"))
+                    .andReturn().getResponse();
+            assertEquals(401, forged.getStatus());
+            assertTrue(forged.getContentAsString().contains("\"code\":\"UNAUTHENTICATED\""));
+            assertFalse(forged.getContentAsString().contains("guess"));
         }
     }
 
@@ -117,11 +128,21 @@ class SameTokenFilterTest {
         }
     }
 
+    // 服务专用接口（/internal/** 上的 @SaIgnore）：无用户会话，只凭 Same-Token 调用；没有 Same-Token 即使匿名也被拒。
+    @Test
+    void serviceOnlyEndpointNeedsSameTokenOnly() throws Exception {
+        try (var context = start("true")) {
+            var mvc = mvc(context);
+            assertEquals(200, call(mvc, "/internal/service-only", SameTokens.current()));
+            assertEquals(401, call(mvc, "/internal/service-only", null));
+        }
+    }
+
     // 本地开发与测试可以显式关闭；部署环境（config-center）关闭即启动失败。
     @Test
     void disablingIsLocalOnly() {
         try (var context = start("false")) {
-            assertTrue(context.getBeansOfType(SameTokenFilter.class).isEmpty());
+            assertFalse(context.containsBean("sameTokenFilter"));
         }
         var failure = assertThrows(RuntimeException.class,
                 () -> start("false", "--spring.profiles.active=config-center"));

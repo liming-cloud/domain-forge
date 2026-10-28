@@ -285,6 +285,13 @@ class GatewayIT {
         String client = "203.0.113.30";
         assertEquals(404, get("/internal/access/current", client).statusCode());
         assertEquals(404, get("/actuator/health", client).statusCode());
+        assertEquals(404, call("GET", "/actuator/health", client, Map.of()).statusCode());
+        // 管理端口复用主应用的 WebFilter：健康检查不能被登录校验拦下（容器健康检查依赖它）。
+        String management = gateway.getBean(Environment.class).getProperty("local.management.port");
+        var health = HTTP.send(HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + management + "/actuator/health/readiness")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, health.statusCode(), health.body());
         assertEquals(400, get("/api/%2e%2e/internal/access/current", client).statusCode());
         assertEquals(400, get("/api/..;/internal/access/current", client).statusCode());
         assertEquals(400, get("/api/notes/%2F..%2Finternal", client).statusCode());
@@ -334,17 +341,18 @@ class GatewayIT {
         assertEquals(404, get("/internal/access/current", client).statusCode());
     }
 
-    // 剩余有效期不足一半时轮换：新值用于转发，上一个值保留供在途请求使用；未到期不重复轮换。
+    // 按固定间隔刷新：刚刷新过（其他实例或启动时）不重复刷新；满一个间隔后新值用于转发，上一个值保留供在途请求使用。
     @Test
     @Order(7)
-    void sameTokenRotatesOncePerHalfLife() throws Exception {
+    void sameTokenRefreshesOncePerInterval() throws Exception {
         var rotation = gateway.getBean(SameTokenRotation.class);
         String before = SaSameUtil.getTokenNh();
         assertNotNull(before, "启动后应已生成 Same-Token");
-        rotation.rotateIfDue();
+        rotation.refreshIfDue();
         assertEquals(before, SaSameUtil.getTokenNh());
-        SaManager.getSaTokenDao().updateTimeout(SaManager.getSaSameTemplate().splicingTokenSaveKey(), 10);
-        rotation.rotateIfDue();
+        long timeout = SaManager.getConfig().getSameTokenTimeout();
+        SaManager.getSaTokenDao().updateTimeout(SaManager.getSaSameTemplate().splicingTokenSaveKey(), timeout - 1800);
+        rotation.refreshIfDue();
         String after = SaSameUtil.getTokenNh();
         assertNotEquals(before, after);
         assertEquals(before, SaSameUtil.getPastTokenNh());

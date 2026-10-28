@@ -17,13 +17,8 @@ spring:
         group: ${@@ENV@@_NACOS_GROUP:DEFAULT_GROUP}
         username: ${@@ENV@@_NACOS_USERNAME:}
         password: ${@@ENV@@_NACOS_PASSWORD:}
-    openfeign:
-      client:
-        config:
-          iamAccess:
-            connect-timeout: 1000
-            read-timeout: 2000
-            follow-redirects: false
+    # Feign 超时（连接 1 秒、读取 2 秒）、不重试、不跟随重定向由 domain-forge-service-call 统一提供，
+    # 个别客户端需要不同值时在 spring.cloud.openfeign.client.config.<contextId> 下覆盖。
   datasource:
     url: ${@@ENV@@_DB_URL}
     username: ${@@ENV@@_DB_USER}

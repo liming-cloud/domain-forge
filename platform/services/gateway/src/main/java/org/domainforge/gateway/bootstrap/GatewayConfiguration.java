@@ -2,9 +2,11 @@ package org.domainforge.gateway.bootstrap;
 
 import cn.dev33.satoken.dao.SaTokenDao;
 import cn.dev33.satoken.dao.SaTokenDaoForRedisson;
+import cn.dev33.satoken.reactor.filter.SaReactorFilter;
 import cn.dev33.satoken.stp.StpLogic;
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.config.api.DynamicSettingsBinder;
+import org.domainforge.gateway.infrastructure.filter.LoginCheck;
 import org.domainforge.gateway.infrastructure.routing.GatewaySettings;
 import org.redisson.api.RedissonClient;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +33,14 @@ public class GatewayConfiguration {
     @Bean
     SaTokenDao gatewaySessionStore(RedissonClient redisson) {
         return new SaTokenDaoForRedisson(redisson);
+    }
+
+    /**
+     * 登录前置校验：Sa-Token 官方的全局过滤器，排在路径检查、请求标识与限流之后。
+     */
+    @Bean
+    SaReactorFilter gatewayLoginCheck(DynamicSettings<GatewaySettings> settings) {
+        return LoginCheck.filter(settings);
     }
 
     /**

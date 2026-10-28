@@ -304,7 +304,8 @@ class NativeAccessIntegrationTest {
             Endpoints.class,
             ClassPermissionEndpoint.class,
             ClassDeniedPermissionEndpoint.class,
-            ClassAnonymousEndpoint.class
+            ClassAnonymousEndpoint.class,
+            ServiceOnlyEndpoint.class
     })
     static class Application {
         @Bean
@@ -482,6 +483,19 @@ class NativeAccessIntegrationTest {
             assertFalse(StpUtil.isLogin());
             assertFalse(StpUtil.hasPermission("account:read"));
             return "class-anonymous";
+        }
+    }
+
+    /**
+     * 服务专用接口：位于 /internal/** 的匿名声明，网关不路由，只能凭 Same-Token 从系统内调用。
+     */
+    @RestController
+    static class ServiceOnlyEndpoint {
+        @SaIgnore
+        @GetMapping("/internal/service-only")
+        String serviceOnly() {
+            assertFalse(StpUtil.isLogin());
+            return "service-only";
         }
     }
 

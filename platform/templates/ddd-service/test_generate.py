@@ -61,12 +61,34 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('      - id: iam\n', routes)
         self.assertNotIn('/internal/', routes)
 
+    def test_call_example_targets_peer_and_appends_route(self):
+        generate.generate(self.root, 'board-service', 'com.company.board', with_example=True, call_peer='note-service')
+        output = self.root / 'platform' / 'services' / 'board-service'
+        client = next(output.rglob('PeerNoteClient.java')).read_text(encoding='utf-8')
+        self.assertIn('name = "note-service"', client)
+        self.assertIn('${BOARD_SERVICE_PEER_URL:}', client)
+        controller = next(output.rglob('NoteDigestController.java')).read_text(encoding='utf-8')
+        self.assertIn('"/api/board/note-digest"', controller)
+        routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
+        self.assertIn('      - id: board-service\n', routes)
+        self.assertIn('      - id: board-service-calls\n        service: board-service\n        paths: [/api/board/**]', routes)
+
+    def test_call_example_requires_valid_peer(self):
+        for peer in ['Note', 'iam', 'gateway', 'board']:
+            with self.assertRaises(ValueError):
+                generate.generate(self.root, 'board', 'com.company.board', call_peer=peer)
+        self.assertFalse((self.root / 'platform/services/board').exists())
+        bare = self.root / 'platform' / 'services' / 'plain'
+        generate.generate(self.root, 'plain', 'com.company.plain')
+        self.assertFalse(any(bare.rglob('PeerNote*.java')))
+
     def test_failed_generation_restores_gateway_seed(self):
         seed = self.root / 'deploy/nacos/config/gateway.yaml'
         before = seed.read_text(encoding='utf-8')
         (self.root / 'platform/services/pom.xml').write_text('<project/>\n', encoding='utf-8')
         with self.assertRaises(ValueError):
-            generate.generate(self.root, 'retail-order', 'com.company.retail', with_example=True)
+            generate.generate(self.root, 'retail-order', 'com.company.retail', with_example=True,
+                              call_peer='note-service')
         self.assertEqual(before, seed.read_text(encoding='utf-8'))
 
     def test_existing_deploy_file_is_not_overwritten(self):

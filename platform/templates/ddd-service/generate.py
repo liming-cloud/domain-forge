@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合；同时在 deploy/ 写入其部署文件，
-带示例时向网关配置种子追加示例接口的路由。
+带示例时向网关配置种子追加示例接口的路由。--call-example 生成以当前用户身份调用另一服务便笺查询的示例。
 
 生成结果继承内部 parent，自动执行架构规则与质量门禁；生成后代码归该服务维护，模板升级不覆盖已有服务。
 """
@@ -62,7 +62,14 @@ def values_for(name, package, namespace):
     }
 
 
-def load_assets(with_example, values):
+def included(entry, with_example, call_peer):
+    """example 为 true 的资产随 --with-example 生成，为 call 的随 --call-example 生成。"""
+    kind = entry['example']
+    require(kind in (True, False, 'call'), '资产示例类型无效')
+    return kind is False or (kind is True and with_example) or (kind == 'call' and call_peer is not None)
+
+
+def load_assets(with_example, values, call_peer=None):
     """先读取并渲染全部登记资产，避免写到一半才发现缺失；未登记或缺失的资产直接拒绝。"""
     manifest = json.loads((TEMPLATE / 'template.json').read_text(encoding='utf-8'))
     require(manifest['schema'] == 2, '模板清单版本不匹配')
@@ -71,7 +78,7 @@ def load_assets(with_example, values):
     require(listed == actual, '模板含未登记或缺失资产')
     assets = []
     for entry in manifest['assets']:
-        if entry['example'] and not with_example:
+        if not included(entry, with_example, call_peer):
             continue
         target = Path(render(entry['target'], values))
         require(not target.is_absolute() and '..' not in target.parts, '资产目标越界')
@@ -93,15 +100,20 @@ def add_module(services_pom, name):
     services_pom.write_text(text.replace(marker, '        <module>' + name + '</module>\n' + marker), encoding='utf-8')
 
 
-def generate(root, name, package, namespace=None, with_example=False):
-    """生成服务目录与部署文件并登记聚合；目标已存在时拒绝，失败时删除本次创建的文件。"""
+def generate(root, name, package, namespace=None, with_example=False, call_peer=None):
+    """生成服务目录与部署文件并登记聚合；目标已存在时拒绝，失败时删除本次创建的文件并还原追加过的文件。"""
     values = values_for(name, package, namespace)
+    if call_peer is not None:
+        require(re.fullmatch(r'[a-z][a-z0-9]*(?:-[a-z0-9]+)*', call_peer) is not None, '被调服务名无效')
+        require(call_peer != name and call_peer not in RESERVED_NAMES, '被调服务不能是自身或平台服务')
+    values['PEER'] = call_peer or ''
+
     services = root / 'platform' / 'services'
     require((services / 'pom.xml').is_file(), '找不到 platform/services/pom.xml，请在仓库根目录运行或传入 --root')
     output = services / name
     require(not output.exists(), '服务目录已存在，禁止覆盖')
     values['POSTGRES_IMAGE'] = postgres_image(root)
-    version, assets = load_assets(with_example, values)
+    version, assets = load_assets(with_example, values, call_peer)
     bases = {'service': output, 'repository': root}
     for kind, relative, text, mode in assets:
         if mode == 'append':
@@ -118,7 +130,7 @@ def generate(root, name, package, namespace=None, with_example=False):
             path = bases[kind] / relative
             if mode == 'append':
                 original = path.read_text(encoding='utf-8')
-                appended[path] = original
+                appended.setdefault(path, original)
                 path.write_text(original + ('' if original.endswith('\n') else '\n') + text, encoding='utf-8')
                 continue
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -136,7 +148,7 @@ def generate(root, name, package, namespace=None, with_example=False):
                 directory.rmdir()
         raise
     return {'template_version': version, 'service': name, 'package': package, 'namespace': values['NAMESPACE'],
-            'example': with_example, 'files': len(created)}
+            'example': with_example, 'call_example': call_peer, 'files': len(created)}
 
 
 def main():
@@ -146,11 +158,13 @@ def main():
     parser.add_argument('--package', required=True, help='服务根包，例如 com.company.order')
     parser.add_argument('--permission-namespace', help='IAM 权限命名空间，默认为去掉 -service 的服务名')
     parser.add_argument('--with-example', action='store_true', help='附带便笺示例：命令、纯查询、编排查询与 IAM 数据范围')
+    parser.add_argument('--call-example', metavar='SERVICE',
+                        help='附带跨服务调用示例：以当前用户身份读取该服务（以 --with-example 生成）的便笺')
     parser.add_argument('--root', default=str(TEMPLATE.parents[2]), help='仓库根目录，默认为本模板所在仓库')
     args = parser.parse_args()
     try:
         result = generate(Path(args.root).resolve(), args.name, args.package, args.permission_namespace,
-                          args.with_example)
+                          args.with_example, args.call_example)
     except (ValueError, OSError, KeyError) as failure:
         parser.exit(2, str(failure) + '\n')
     print(json.dumps(result, ensure_ascii=False))

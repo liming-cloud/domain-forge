@@ -1,7 +1,6 @@
 package @@PACKAGE@@.infrastructure.acl.iam;
 
 import org.domainforge.access.api.CurrentSubjectSource;
-import org.domainforge.access.api.SameTokens;
 import org.domainforge.shared.CurrentSubject;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +21,7 @@ public class IamCurrentSubjectSource implements CurrentSubjectSource {
     @Override
     public CurrentSubject resolve(String token) {
         try {
-            return IamFailures.data(client.current(SameTokens.current(), "Bearer " + token));
+            return IamFailures.data(client.current("Bearer " + token));
         } catch (RuntimeException failure) {
             throw IamFailures.translate(failure);
         }
