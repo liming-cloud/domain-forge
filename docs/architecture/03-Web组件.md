@@ -18,7 +18,7 @@
 | `org.domainforge.web.api.PlatformJsonApi` | 标记接入组件的 Controller |
 | `org.domainforge.web.api.HttpResponses` | 仅受理（HTTP 202 + `ACCEPTED`） |
 | `org.domainforge.web.api.BusinessRejectionMapping<E>` | 把一个**确切的**业务异常类型映射为业务拒绝 |
-| `org.domainforge.web.api.HttpFailureResponses` | 技术适配层显式构造 401、403、503 等失败响应 |
+| `org.domainforge.web.api.HttpFailureResponses` | 技术适配层显式构造 401、403、413、503 等失败响应 |
 
 `org.domainforge.web.internal` 和装配包不是公开接口，架构规则禁止其他模块引用。
 
@@ -30,12 +30,13 @@
 | 已受理、尚未完成 | 202 | `ACCEPTED` |
 | 已判定的业务拒绝 | 200 | 业务自定义的稳定代码，`data` 为 `null` |
 | 请求体或参数解析失败 | 400 | `INVALID_REQUEST` |
+| 请求体超过上限（上传超过 multipart 上限，由文件存储组件映射） | 413 | `PAYLOAD_TOO_LARGE` |
 | 未认证 / 无权限 | 401 / 403 | `UNAUTHENTICATED` / `FORBIDDEN` |
 | 依赖不可用 | 503 | `SERVICE_UNAVAILABLE` |
 | 未知异常、映射失败 | 500 | `INTERNAL_ERROR`，固定安全提示 |
 | 路由不存在、方法不允许 | 保持框架默认（404 / 405） | 不改写 |
 
-`SUCCESS`、`ACCEPTED`、上述平台失败代码，以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
+`SUCCESS`、`ACCEPTED`、上述平台失败代码（含 `PAYLOAD_TOO_LARGE`），以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
 
 ## 业务拒绝映射
 

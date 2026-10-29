@@ -60,6 +60,14 @@
         <it.powerjob.image>powerjob/powerjob-server:v5.1.7@sha256:2b1f7e86cc500668c39d870b1bfac40dbd795258736de2e4e7142766bf836d73
         </it.powerjob.image>
         <it.powerjob.transport.port>17710</it.powerjob.transport.port>
+        <!--
+          S3 兼容服务（SeaweedFS 单容器 mini 模式），用于验证文件存储的 S3 对接；启动时开启鉴权并创建桶。
+          MinIO 已不再公开发布镜像，因此选用 SeaweedFS。
+        -->
+        <it.seaweedfs.image>chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+        </it.seaweedfs.image>
+        <it.seaweedfs.access-key>domainforge-it</it.seaweedfs.access-key>
+        <it.seaweedfs.bucket>domainforge-it</it.seaweedfs.bucket>
         <it.network>domain-forge-it-${project.artifactId}</it.network>
     </properties>
     <dependencyManagement>
@@ -156,6 +164,11 @@
                             <ROCKETMQ_CONTAINER>${it.rocketmq.container}</ROCKETMQ_CONTAINER>
                             <POWERJOB_PORT>${it.powerjob.port}</POWERJOB_PORT>
                             <POWERJOB_ADMIN_PASSWORD>${it.password}</POWERJOB_ADMIN_PASSWORD>
+                            <S3_ENDPOINT>http://127.0.0.1:${it.seaweedfs.port}</S3_ENDPOINT>
+                            <S3_ACCESS_KEY>${it.seaweedfs.access-key}</S3_ACCESS_KEY>
+                            <S3_SECRET_KEY>${it.password}</S3_SECRET_KEY>
+                            <S3_BUCKET>${it.seaweedfs.bucket}</S3_BUCKET>
+                            <SEAWEEDFS_CONTAINER>domain-forge-it-${project.artifactId}-seaweedfs</SEAWEEDFS_CONTAINER>
                             <IAM_DB_URL>jdbc:postgresql://127.0.0.1:${it.postgres.port}/domainforge</IAM_DB_URL>
                             <IAM_DB_USER>domainforge</IAM_DB_USER>
                             <IAM_DB_PASSWORD>${it.password}</IAM_DB_PASSWORD>
@@ -293,6 +306,32 @@
                                     </ports>
                                     <wait>
                                         <log>rocketmq-proxy startup successfully</log>
+                                        <time>120000</time>
+                                    </wait>
+                                </run>
+                            </image>
+                            <image>
+                                <alias>seaweedfs</alias>
+                                <name>${it.seaweedfs.image}</name>
+                                <run>
+                                    <containerNamePattern>domain-forge-it-${project.artifactId}-%a
+                                    </containerNamePattern>
+                                    <env>
+                                        <AWS_ACCESS_KEY_ID>${it.seaweedfs.access-key}</AWS_ACCESS_KEY_ID>
+                                        <AWS_SECRET_ACCESS_KEY>${it.password}</AWS_SECRET_ACCESS_KEY>
+                                    </env>
+                                    <cmd>
+                                        <exec>
+                                            <arg>mini</arg>
+                                            <arg>-dir=/data</arg>
+                                            <arg>-bucket=${it.seaweedfs.bucket}</arg>
+                                        </exec>
+                                    </cmd>
+                                    <ports>
+                                        <port>127.0.0.1:it.seaweedfs.port:8333</port>
+                                    </ports>
+                                    <wait>
+                                        <log>Start Seaweed S3 API Server</log>
                                         <time>120000</time>
                                     </wait>
                                 </run>

@@ -68,6 +68,7 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
 - **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。
+- **请求体上限**：Nginx 对普通接口限制请求体为 64k；只有路径以 `/files` 结尾的上传接口放宽到 21m（`nginx/locations.inc`），与服务的 multipart 上限 20MB 一致。
 
 ## 停止与数据
 
@@ -75,13 +76,14 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   # 保留卷
 ```
 
-不要使用 `down -v`，它会删除 PostgreSQL 与 Nacos 的卷。数据库迁移不执行 clean／repair。
+不要使用 `down -v`，它会删除 PostgreSQL、Nacos 与业务服务文件存储的卷。数据库迁移不执行 clean／repair。
 
 ## 备份与恢复
 
 | 数据 | 处理 | 恢复后 |
 |---|---|---|
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
+| 业务服务的文件（命名卷 `<服务名>-files`） | `backup.sh` 在导出数据库之后打包为同名 `.files.<服务名>.tar` | `restore.sh` 用备份替换卷中的内容；备份时刻之后上传的文件消失，多出的对象由清理任务删除。备份中没有该文件（功能上线前的备份）时保留现有文件并提示 |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
 | Nacos 账号、权限与实例 | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的账号修改需手工重做 |
@@ -117,6 +119,15 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 - RocketMQ 停机时业务照常提交，事件留在各服务的 `domainforge_outbox` 表中，恢复后继续发送；积压看指标 `domainforge.messaging.outbox.pending`。
 - 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
 - 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
+
+## 文件存储
+
+业务服务的文件默认保存在服务自己的命名卷 `<服务名>-files`（容器内 `/var/lib/domain-forge/files`），设计与合同见[文件存储](../docs/architecture/11-文件存储.md)：
+
+- **授权**：上传与下载都经业务服务自己的接口，先按权限与数据范围判断；文件卷和存储不对外暴露。
+- **删除与清理**：删除只做标记，24 小时后由定时任务 `file-storage-cleanup`（PowerJob 控制台中各服务的应用下）删除对象；该任务同时删除没有记录的孤儿对象。恢复较早的备份后，可在控制台手动触发并填写参数 `days=N`（检查最近 N 天的目录）。
+- **备份**：`backup.sh` 须在 24 小时内完成，否则备份期间被删除的文件可能已不在卷中。
+- **改用 S3 兼容存储**：在服务的覆盖文件中设置 `<ENV>_FILES_STORAGE: s3` 与 `<ENV>_FILES_S3_ENDPOINT`、`<ENV>_FILES_S3_BUCKET`，访问密钥 `<ENV>_FILES_S3_ACCESS_KEY`／`<ENV>_FILES_S3_SECRET_KEY` 写在环境文件中。桶需事先创建。S3 中的数据不在 `backup.sh` 范围内，由对象存储自身的备份或版本机制负责；已有文件不会自动迁移。
 
 ## 配置中心
 
@@ -211,7 +222,7 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 
 | 文件 | 内容 |
 |---|---|
-| `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM |
+| `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM；文件存储卷 `<服务名>-files` |
 | `deploy/nacos/config/gateway.yaml`（追加） | 仅 `--with-example` 时：向网关路由种子追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
 
 部署步骤：
@@ -229,4 +240,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；经 Nginx 与网关上传 2MB 附件并下载核对摘要、无权限账号下载 403、普通接口仍限 64k；备份（含文件卷）→ 继续写入与上传 → 恢复后只剩备份前的数据与附件（内容一致）且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

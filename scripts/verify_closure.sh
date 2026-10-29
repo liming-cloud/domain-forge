@@ -5,7 +5,8 @@
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
-#   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主）→ 撤销角色后立即被拒。
+#   文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→
+#   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
 #
@@ -102,7 +103,7 @@ assigned=$(put "/api/accounts/$alice_id/roles" "{\"expectedVersion\":$alice_vers
 expect 200 "分配角色"
 
 step "授权后的命令与范围查询"
-post /api/notes '{"title":"备份前","content":""}' "$alice_token" > /dev/null
+note_id=$(post /api/notes '{"title":"备份前","content":""}' "$alice_token" | field id)
 expect 200 "已授权的业务命令"
 [ "$(get /api/notes "$alice_token" | size)" = "1" ] || fail "alice 按本人范围应看到 1 条"
 [ "$(get /api/me/notes "$alice_token" | size)" = "1" ] || fail "alice 本人便笺应为 1 条"
@@ -167,6 +168,29 @@ for attempt in $(seq 1 30); do
     sleep 1
 done
 
+# upload <便笺 ID> <文件> <令牌>：以 multipart 上传附件，输出响应体，HTTP 状态写入 $work/status
+upload() {
+    curl -sS -o "$work/body" -w '%{http_code}' -H "Authorization: Bearer $3" \
+        -F "file=@$2;type=application/pdf;filename=季度报告.pdf" "$base/api/notes/$1/files" > "$work/status"
+    cat "$work/body"
+}
+# download <便笺 ID> <文件 ID> <令牌>：下载到 $work/download，输出 HTTP 状态
+download() {
+    curl -sS -o "$work/download" -w '%{http_code}' -H "Authorization: Bearer $3" "$base/api/notes/$1/files/$2"
+}
+sha256() { python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$1"; }
+
+step "文件存储：附件经 Nginx 与网关上传、下载，按便笺范围授权"
+# 2 MB 超过普通接口 64k 的请求体上限，验证 Nginx 只对 /files 路径放宽。
+head -c 2097152 /dev/urandom > "$work/before.pdf"
+file_id=$(upload "$note_id" "$work/before.pdf" "$alice_token" | field id)
+expect 200 "上传附件"
+[ "$(download "$note_id" "$file_id" "$alice_token")" = "200" ] || fail "下载附件"
+[ "$(sha256 "$work/download")" = "$(sha256 "$work/before.pdf")" ] || fail "下载内容与上传不一致"
+[ "$(download "$note_id" "$file_id" "$bob_token")" = "403" ] || fail "无权限账号下载附件应 403"
+post /api/notes '{"title":"大请求体","content":"'"$(head -c 70000 /dev/zero | tr '\0' x)"'"}' "$alice_token" > /dev/null
+expect 413 "普通接口仍限制请求体为 64k"
+
 step "数据库账号隔离"
 isolation=$(compose exec -T -e PGPASSWORD="$service_db_pw" postgres \
     psql -h 127.0.0.1 -U note_service -d domainforge -tAc 'select count(*) from public.iam_account' 2>&1 || true)
@@ -177,14 +201,21 @@ grep -q 'permission denied' <<< "$isolation" || fail "业务服务账号不应�
 step "备份、继续写入、恢复"
 dump=$("$repo/deploy/backup.sh" "$env_file" "$work/backups" 2> "$work/backup.log" | sed -n 's/^backup=\([^ ]*\) .*/\1/p') \
     || { cat "$work/backup.log"; fail "备份脚本"; }
+ls "${dump%.dump}.files.note-service.tar" > /dev/null || fail "备份应包含 note-service 的文件卷"
 post /api/notes '{"title":"备份后","content":""}' "$alice_token" > /dev/null
 expect 200 "备份后写入"
+head -c 1024 /dev/urandom > "$work/after.pdf"
+upload "$note_id" "$work/after.pdf" "$alice_token" > /dev/null
+expect 200 "备份后上传附件"
 "$repo/deploy/restore.sh" "$env_file" "$dump" --yes > /dev/null 2> "$work/restore.log" \
     || { cat "$work/restore.log"; fail "恢复脚本"; }
 get /api/me/notes "$alice_token" > /dev/null
 expect 401 "恢复前的会话应失效"
 alice_token=$(token alice "$alice_pw")
 [ "$(get /api/notes "$alice_token" | size)" = "1" ] || fail "恢复后应只有备份前的 1 条便笺"
+[ "$(get "/api/notes/$note_id/files" "$alice_token" | size)" = "1" ] || fail "恢复后应只有备份前的 1 个附件"
+[ "$(download "$note_id" "$file_id" "$alice_token")" = "200" ] || fail "恢复后下载备份前的附件"
+[ "$(sha256 "$work/download")" = "$(sha256 "$work/before.pdf")" ] || fail "恢复后附件内容与上传不一致"
 post /api/notes '{"title":"恢复后","content":""}' "$alice_token" > /dev/null
 expect 200 "恢复后业务服务仍可写入自己的 schema"
 tally_is 2

@@ -25,6 +25,12 @@ public class SqlNotes implements NoteRepository {
     }
 
     @Override
+    public Note find(long id) {
+        NoteRow row = mapper.find(id);
+        return row == null ? null : row.toDomain();
+    }
+
+    @Override
     public void insert(Note note) {
         mapper.insert(NoteRow.from(note));
     }

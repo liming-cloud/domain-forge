@@ -9,6 +9,8 @@ import org.apache.ibatis.annotations.Param;
 public interface NoteMapper {
     NoteRow lock(long id);
 
+    NoteRow find(long id);
+
     int insert(NoteRow row);
 
     int update(@Param("row") NoteRow row, @Param("expected") long expected);

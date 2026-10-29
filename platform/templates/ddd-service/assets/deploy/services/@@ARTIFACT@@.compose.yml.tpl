@@ -15,6 +15,7 @@ services:
     entrypoint: [sh, -c]
     command:
       - |
+        set -e
         psql -v ON_ERROR_STOP=1 -q <<'SQL'
         \getenv service_password SERVICE_DB_PASSWORD
         SELECT 'CREATE ROLE @@SCHEMA@@' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '@@SCHEMA@@') \gexec
@@ -59,6 +60,10 @@ services:
       @@ENV@@_SCHEDULING_ENABLED: "true"
       @@ENV@@_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
       @@ENV@@_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
+      # 文件存储（启用时）：本地目录在命名卷 @@ARTIFACT@@-files 中，backup.sh／restore.sh 按挂载点识别并一同备份恢复。
+      @@ENV@@_FILES_ROOT: /var/lib/domain-forge/files
+    volumes:
+      - @@ARTIFACT@@-files:/var/lib/domain-forge/files
     networks: [backend]
     depends_on:
       @@ARTIFACT@@-db-init:
@@ -78,3 +83,6 @@ services:
       timeout: 3s
       start_period: 30s
       retries: 40
+
+volumes:
+  @@ARTIFACT@@-files:

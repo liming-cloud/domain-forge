@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.10.0",
+  "version": "0.11.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -301,6 +301,56 @@
     {
       "source": "assets/src/main/resources/messaging-outbox.yml.tpl",
       "target": "src/main/resources/messaging-outbox.yml",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteFileRepository.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteFileRepository.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/AttachNoteFile.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/AttachNoteFile.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteFiles.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteFiles.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteFileMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteFileMapper.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNoteFiles.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNoteFiles.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileController.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileResponse.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/mapper/note/NoteFileMapper.xml.tpl",
+      "target": "src/main/resources/mapper/note/NoteFileMapper.xml",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/db/migration/V3__note_file.sql.tpl",
+      "target": "src/main/resources/db/migration/V3__note_file.sql",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/file-storage.yml.tpl",
+      "target": "src/main/resources/file-storage.yml",
       "example": true
     },
     {

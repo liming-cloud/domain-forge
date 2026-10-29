@@ -42,4 +42,11 @@ class NoteTest {
         assertThrows(IllegalArgumentException.class, () -> note.edit(" ", "内容"));
         assertThrows(IllegalArgumentException.class, () -> note.edit("标题", "x".repeat(2001)));
     }
+
+    @Test
+    void attachmentsAreLimited() {
+        assertTrue(Note.attachable(0));
+        assertTrue(Note.attachable(Note.MAX_FILES - 1));
+        assertFalse(Note.attachable(Note.MAX_FILES));
+    }
 }

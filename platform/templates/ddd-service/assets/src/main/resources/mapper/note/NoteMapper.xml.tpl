@@ -4,6 +4,9 @@
     <select id="lock" resultType="@@PACKAGE@@.infrastructure.persistence.note.NoteRow">
         SELECT id, owner_id, unit_id, title, content, version FROM note WHERE id = #{id} FOR UPDATE
     </select>
+    <select id="find" resultType="@@PACKAGE@@.infrastructure.persistence.note.NoteRow">
+        SELECT id, owner_id, unit_id, title, content, version FROM note WHERE id = #{id}
+    </select>
     <insert id="insert">
         INSERT INTO note (id, owner_id, unit_id, title, content, version)
         VALUES (#{id}, #{ownerId}, #{unitId}, #{title}, #{content}, #{version})
