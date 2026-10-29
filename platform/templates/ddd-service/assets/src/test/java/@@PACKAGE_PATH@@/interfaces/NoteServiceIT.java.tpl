@@ -53,6 +53,11 @@ class NoteServiceIT {
     @BeforeAll
     static void start() throws IOException {
         assertNotNull(System.getenv("POSTGRES_PORT"), "需要真实数据库验证环境");
+        // 归档库：同一 PostgreSQL 实例中的独立数据库（附加数据源 archive），部署时由 archive-db-init 创建。
+        var admin = new org.springframework.jdbc.core.JdbcTemplate(new org.springframework.jdbc.datasource
+                .DriverManagerDataSource(archiveUrl("domainforge"), "domainforge", env("POSTGRES_PASSWORD")));
+        if (admin.queryForObject("SELECT count(*) FROM pg_database WHERE datname = '@@SCHEMA@@_archive'",
+                Integer.class) == 0) admin.execute("CREATE DATABASE @@SCHEMA@@_archive");
         iam = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         iam.createContext("/internal/access/", NoteServiceIT::answer);
         iam.start();
@@ -70,6 +75,9 @@ class NoteServiceIT {
                 "--spring.data.redis.password=" + env("REDIS_PASSWORD"),
                 "--@@ARTIFACT@@.iam.url=http://127.0.0.1:" + iam.getAddress().getPort(),
                 "--domainforge.messaging.relay.enabled=false",
+                "--domainforge.datasources.archive.url=" + archiveUrl("@@SCHEMA@@_archive"),
+                "--domainforge.datasources.archive.username=domainforge",
+                "--domainforge.datasources.archive.password=" + env("POSTGRES_PASSWORD"),
                 "--domainforge.files.local.root=" + Files.createTempDirectory("@@ARTIFACT@@-files-"),
                 "--spring.servlet.multipart.max-file-size=64KB",
                 "--spring.servlet.multipart.max-request-size=70KB",
@@ -87,9 +95,19 @@ class NoteServiceIT {
     void reset() {
         application.getBean(JdbcTemplate.class)
                 .update("TRUNCATE note, note_file, domainforge_file, domainforge_outbox");
+        archive().update("TRUNCATE note_archive");
         SUBJECTS.clear();
         SCOPES.clear();
         IAM_DOWN.set(false);
+    }
+
+    private static String archiveUrl(String database) {
+        return "jdbc:postgresql://127.0.0.1:" + env("POSTGRES_PORT") + "/" + database;
+    }
+
+    private static org.springframework.jdbc.core.JdbcTemplate archive() {
+        return new org.springframework.jdbc.core.JdbcTemplate(application
+                .getBean(org.domainforge.persistence.api.AdditionalDataSource.class).dataSource());
     }
 
     private static String env(String name) {
@@ -295,6 +313,33 @@ class NoteServiceIT {
                 .header("Idempotency-Key", key)
                 .header(SameTokens.HEADER, SameTokens.current());
         return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    // 归档到第二个数据源：快照写入独立的归档库（主库中没有该表），重复归档覆盖为新版本；范围外按不存在处理。
+    @Test
+    void archiveGoesToSecondDatabase() throws Exception {
+        String writer = user(901, BOTH, scope(false, true, ""), scope(false, true, ""));
+        String note = json(call("POST", "/api/notes", writer, "{\"title\":\"归档前\",\"content\":\"a\"}"))
+                .get("data").get("id").asString();
+        assertEquals("NOTE_NOT_ARCHIVED", json(call("GET", "/api/notes/" + note + "/archive", writer, null))
+                .get("code").asString());
+        assertEquals("归档前", json(call("POST", "/api/notes/" + note + "/archive", writer, null))
+                .get("data").get("title").asString());
+        assertEquals("@@SCHEMA@@_archive", archive().queryForObject("SELECT current_database()", String.class));
+        assertEquals(1, archive().queryForObject("SELECT count(*) FROM note_archive WHERE note_id = ?",
+                Integer.class, Long.parseLong(note)));
+        assertEquals(0, application.getBean(JdbcTemplate.class).queryForObject(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'note_archive'", Integer.class));
+        call("PUT", "/api/notes/" + note, writer, edit(1, "改后"));
+        call("POST", "/api/notes/" + note + "/archive", writer, null);
+        var archived = json(call("GET", "/api/notes/" + note + "/archive", writer, null)).get("data");
+        assertEquals("改后", archived.get("title").asString());
+        assertEquals(2, archived.get("version").asInt());
+        String other = user(902, BOTH, scope(false, true, ""), scope(false, true, ""));
+        assertEquals("NOTE_NOT_FOUND", json(call("POST", "/api/notes/" + note + "/archive", other, null))
+                .get("code").asString());
+        assertEquals("NOTE_NOT_FOUND", json(call("GET", "/api/notes/" + note + "/archive", other, null))
+                .get("code").asString());
     }
 
     // 附件经本服务转发：写范围内上传，读范围内列出与下载（附件响应、内容一致），范围外的便笺按不存在处理；

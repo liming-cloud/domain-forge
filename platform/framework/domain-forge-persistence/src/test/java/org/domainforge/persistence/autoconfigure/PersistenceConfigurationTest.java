@@ -154,6 +154,8 @@ class PersistenceConfigurationTest {
                                 transaction,
                                 session,
                                 flyway,
+                                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                                        .getBeanProvider(org.domainforge.persistence.api.AdditionalDataSource.class),
                                 new org.springframework.boot.transaction.autoconfigure.TransactionProperties(),
                                 new org.springframework.core.env.StandardEnvironment());
         assertThrows(IllegalStateException.class, guard::afterSingletonsInstantiated);

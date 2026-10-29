@@ -83,6 +83,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 | 数据 | 处理 | 恢复后 |
 |---|---|---|
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
+| 其他业务数据库（服务的附加数据源，如归档库 `<schema>_archive`） | `backup.sh` 逐个导出为同名 `.db.<库名>.dump` | `restore.sh` 按备份重建（保留属主，账号与库由服务的 db-init 先建好）；备份中没有的库保持不变 |
 | 业务服务的文件（命名卷 `<服务名>-files`） | `backup.sh` 在导出数据库之后打包为同名 `.files.<服务名>.tar` | `restore.sh` 用备份替换卷中的内容；备份时刻之后上传的文件消失，多出的对象由清理任务删除。备份中没有该文件（功能上线前的备份）时保留现有文件并提示 |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
@@ -223,6 +224,7 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 | 文件 | 内容 |
 |---|---|
 | `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM；文件存储卷 `<服务名>-files` |
+| `deploy/services/<服务名>.archive.compose.yml` | 仅 `--with-example` 时：便笺示例的归档库（附加数据源）。`<服务名>-archive-db-init` 在同一 PostgreSQL 实例中建立属于服务账号的独立数据库 `<schema>_archive`，并为服务提供连接变量；部署时与服务的覆盖文件一起列入 `COMPOSE_FILE` |
 | `deploy/nacos/config/gateway.yaml`（追加） | 仅 `--with-example` 时：向网关路由种子追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
 
 部署步骤：
@@ -233,6 +235,7 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 # 2. 构建 IAM、网关与服务的 jar
 platform/mvnw -f platform/pom.xml -B clean package -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway,services/note-service -am
 # 3. 之后所有 docker compose 命令与 backup.sh／restore.sh／upgrade.sh 都通过 COMPOSE_FILE 列入覆盖文件
+# 带示例生成时再列入归档库的覆盖文件 deploy/services/note-service.archive.compose.yml
 export COMPOSE_FILE=deploy/compose.yml:deploy/services/note-service.compose.yml
 docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 # 4. 由系统管理员把服务的 src/main/resources/iam/permissions.json 安装到 IAM，再建角色授予并分配给账号
@@ -240,4 +243,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；经 Nginx 与网关上传 2MB 附件并下载核对摘要、无权限账号下载 403、普通接口仍限 64k；备份（含文件卷）→ 继续写入与上传 → 恢复后只剩备份前的数据与附件（内容一致）且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；经 Nginx 与网关上传 2MB 附件并下载核对摘要、无权限账号下载 403、普通接口仍限 64k；便笺归档写入独立的归档库（属于服务账号、主库中无该表）；备份（含文件卷与归档库）→ 继续写入、上传与重新归档 → 恢复后只剩备份前的数据、附件与归档快照（两个库一致）且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

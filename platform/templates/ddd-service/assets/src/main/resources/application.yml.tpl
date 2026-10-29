@@ -4,10 +4,11 @@ spring:
   application:
     name: @@ARTIFACT@@
   config:
-    # 带便笺示例时启用 Outbox 与文件存储（文件随示例生成，没有示例时不存在）。
+    # 带便笺示例时启用 Outbox、文件存储与归档库（附加数据源）；这些文件随示例生成，没有示例时不存在。
     import:
       - optional:classpath:messaging-outbox.yml
       - optional:classpath:file-storage.yml
+      - optional:classpath:archive-datasource.yml
   main:
     banner-mode: off
   lifecycle:

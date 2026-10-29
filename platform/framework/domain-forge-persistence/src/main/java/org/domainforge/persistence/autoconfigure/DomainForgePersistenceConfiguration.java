@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.domainforge.persistence.api.AdditionalDataSource;
+import org.domainforge.persistence.internal.TransactionBoundaryGuard;
 import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +26,8 @@ import javax.sql.DataSource;
 import java.time.Duration;
 
 /**
- * 由服务显式导入的单库装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。
+ * 由服务显式导入的主数据源装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。附加数据源见
+ * {@link AdditionalDataSource}。
  */
 @Configuration(proxyBeanMethods = false)
 @EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)
@@ -88,6 +92,7 @@ public class DomainForgePersistenceConfiguration {
             @Qualifier("transactionManager") PlatformTransactionManager manager,
             @Qualifier("sqlSessionFactory") SqlSessionFactory sessions,
             @Qualifier("flyway") Flyway migration,
+            ObjectProvider<AdditionalDataSource> additional,
             TransactionProperties properties,
             Environment environment) {
         if (!(manager instanceof DataSourceTransactionManager transaction)) {
@@ -100,6 +105,9 @@ public class DomainForgePersistenceConfiguration {
                     || migration.getConfiguration().getDataSource() != source) {
                 throw new IllegalStateException("绑定的本地事务、会话与迁移必须使用同一数据源");
             }
+            // 声明了附加数据源时，主数据源同样拒绝在其他数据源的事务中执行（双向防误用）。
+            if (additional.stream().findAny().isPresent())
+                sessions.getConfiguration().addInterceptor(new TransactionBoundaryGuard("dataSource", source));
         };
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.persistence.additional.ExtraRowMapper">
+    <insert id="insert">INSERT INTO extra_row (value) VALUES (#{value})</insert>
+    <select id="count" resultType="int">SELECT count(*) FROM extra_row WHERE value = #{value}</select>
+    <select id="database" resultType="string">SELECT current_database()</select>
+</mapper>

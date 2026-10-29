@@ -51,6 +51,7 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('      - order-service-files:/var/lib/domain-forge/files\n', compose)
         self.assertIn('volumes:\n  order-service-files:\n', compose)
         self.assertFalse((output / 'src/main/resources/file-storage.yml').exists())
+        self.assertFalse((self.root / 'deploy/services/order-service.archive.compose.yml').exists())
         self.assertEqual('iam\norder-service\n',
                          (self.root / 'deploy/powerjob/apps.conf').read_text(encoding='utf-8'))
         for path in output.rglob('*'):
@@ -69,6 +70,10 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('enabled: true', (output / 'src/main/resources/file-storage.yml').read_text(encoding='utf-8'))
         self.assertTrue((output / 'src/main/resources/db/migration/V3__note_file.sql').is_file())
         self.assertIn('${RETAIL_ORDER_FILES_ROOT:}', config)
+        archive = (self.root / 'deploy/services/retail-order.archive.compose.yml').read_text(encoding='utf-8')
+        self.assertIn('CREATE DATABASE retail_order_archive OWNER retail_order', archive)
+        self.assertIn('RETAIL_ORDER_ARCHIVE_DB_URL: jdbc:postgresql://postgres:5432/retail_order_archive', archive)
+        self.assertTrue((output / 'src/main/resources/db/archive/V1__note_archive.sql').is_file())
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
         self.assertIn('      - id: iam\n', routes)
