@@ -20,5 +20,6 @@
         <module>domain-forge-scheduling</module>
         <module>domain-forge-tracing</module>
         <module>domain-forge-file-storage</module>
+        <module>domain-forge-notification</module>
     </modules>
 </project>
