@@ -36,6 +36,10 @@
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-config</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-tracing</artifactId>
+        </dependency>
         <!-- RedissonClient、Lua 脚本与分布式锁；会话与 Same-Token 读取共用同一个客户端。 -->
         <dependency>
             <groupId>org.domainforge</groupId>

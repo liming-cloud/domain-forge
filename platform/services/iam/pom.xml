@@ -55,6 +55,10 @@
             <artifactId>domain-forge-scheduling</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-tracing</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>

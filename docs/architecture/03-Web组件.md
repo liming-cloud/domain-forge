@@ -37,14 +37,6 @@
 
 `SUCCESS`、`ACCEPTED`、上述平台失败代码，以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
 
-## 请求标识
-
-组件为每个请求确定一个请求标识，只用于关联日志，不作为幂等键或安全依据：
-
-- 沿用入口（Nginx，之后经网关透传）给出的 `X-Request-Id`；缺失，或不是 1—64 位 `[A-Za-z0-9._-]` 时，生成新值，防止日志注入。
-- 写入日志上下文（MDC 键 `requestId`）并在响应头 `X-Request-Id` 返回，请求结束后清除。
-- 组件把 `logging.pattern.correlation` 默认设为 `[%X{requestId:--}] `，Boot 默认日志格式因此输出该标识；服务配置可以覆盖。
-
 ## 业务拒绝映射
 
 - 每个 `BusinessRejectionMapping` 只声明一个确切异常类型，不按继承关系或异常名称匹配。

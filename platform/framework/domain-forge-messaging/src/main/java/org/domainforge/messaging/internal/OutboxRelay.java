@@ -3,6 +3,8 @@ package org.domainforge.messaging.internal;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.message.MessageBuilder;
 import org.apache.rocketmq.client.apis.producer.Producer;
@@ -40,6 +42,7 @@ public final class OutboxRelay implements SmartLifecycle {
     private final TransactionOperations transactions;
     private final Producer producer;
     private final Settings settings;
+    private final TraceContexts traces;
     private final Counter sent;
     private final Counter failed;
     private final AtomicBoolean waking = new AtomicBoolean();
@@ -62,12 +65,13 @@ public final class OutboxRelay implements SmartLifecycle {
      * 生产者由组件装配，只消费的服务为空；关闭顺序由 Spring 生命周期保证（先停中继再关客户端）。
      */
     public OutboxRelay(OutboxMapper outbox, InboxMapper inbox, TransactionOperations transactions, Producer producer,
-                       Settings settings, MeterRegistry metrics) {
+                       Settings settings, MeterRegistry metrics, TraceContexts traces) {
         this.outbox = outbox;
         this.inbox = inbox;
         this.transactions = transactions;
         this.producer = producer;
         this.settings = settings;
+        this.traces = traces;
         this.sent = Counter.builder("domainforge.messaging.outbox.sent").register(metrics);
         this.failed = Counter.builder("domainforge.messaging.outbox.failed").register(metrics);
         if (settings.publishing())
@@ -99,24 +103,28 @@ public final class OutboxRelay implements SmartLifecycle {
         int delivered = 0;
         for (OutboxRow row : rows) {
             if (row.orderKey() != null && blocked.contains(row.orderKey())) continue;
-            try {
-                producer.send(message(row));
+            Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
+            try (Tracer.SpanInScope ignored = traces.scope(span)) {
+                producer.send(message(row, traces.inject(span)));
                 outbox.markSent(row.id());
                 sent.increment();
                 delivered++;
             } catch (Exception failure) {
+                span.error(failure);
                 long delay = Math.min(MAX_DELAY_SECONDS, 1L << Math.min(row.attempts(), 9));
                 outbox.markFailed(row.id(), delay, failure.getClass().getName());
                 failed.increment();
                 LOG.warn("messaging_outbox_send_failed event_id={} topic={} attempts={} reason={}",
                         row.eventId(), row.topic(), row.attempts() + 1, failure.getClass().getName());
                 return new Batch(rows.size(), delivered, true);
+            } finally {
+                span.end();
             }
         }
         return new Batch(rows.size(), delivered, false);
     }
 
-    private static org.apache.rocketmq.client.apis.message.Message message(OutboxRow row) {
+    private static org.apache.rocketmq.client.apis.message.Message message(OutboxRow row, String traceParent) {
         MessageBuilder builder = ClientServiceProvider.loadService().newMessageBuilder()
                 .setTopic(row.topic())
                 .setKeys(row.eventId())
@@ -127,6 +135,7 @@ public final class OutboxRelay implements SmartLifecycle {
                 .addProperty(Headers.EVENT_VERSION, Integer.toString(row.version()))
                 .addProperty(Headers.EVENT_KEY, row.eventKey());
         if (row.orderKey() != null) builder.setMessageGroup(row.orderKey());
+        if (traceParent != null) builder.addProperty(TraceContexts.TRACE_PARENT, traceParent);
         return builder.build();
     }
 

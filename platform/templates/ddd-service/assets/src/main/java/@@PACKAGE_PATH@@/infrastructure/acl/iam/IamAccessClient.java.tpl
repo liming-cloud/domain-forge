@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * IAM 当前授权的公开 HTTP 合同；url 为空时经 Nacos 发现名为 iam 的服务。
  *
- * <p>显式传入当前请求经原生解析的 Bearer 令牌，不接收或传递任意账号 ID。Same-Token、请求标识、超时、不重试与失败分类
+ * <p>显式传入当前请求经原生解析的 Bearer 令牌，不接收或传递任意账号 ID。Same-Token、链路上下文、超时、不重试与失败分类
  * 由跨服务调用组件统一提供。
  */
 @FeignClient(name = "iam", url = "${@@ARTIFACT@@.iam.url:}", contextId = "iamAccess")

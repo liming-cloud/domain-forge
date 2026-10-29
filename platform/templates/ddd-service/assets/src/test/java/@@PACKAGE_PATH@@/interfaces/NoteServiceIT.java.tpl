@@ -173,7 +173,7 @@ class NoteServiceIT {
         assertEquals(401, send("GET", "/api/notes", token, null, "forged").statusCode());
         var accepted = call("GET", "/api/notes", token, null);
         assertEquals(200, accepted.statusCode());
-        assertNotNull(accepted.headers().firstValue("X-Request-Id").orElse(null));
+        assertNotNull(accepted.headers().firstValue("X-Trace-Id").orElse(null));
     }
 
     // 写范围决定能在哪些组织下创建；读范围决定列表可见；本人便笺是只需登录的纯查询。

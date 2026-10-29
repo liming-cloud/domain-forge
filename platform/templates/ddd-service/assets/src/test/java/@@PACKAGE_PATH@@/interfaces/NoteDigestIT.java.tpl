@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 跨服务调用示例：本服务以当前用户身份调用 @@PEER@@ 的便笺查询。@@PEER@@ 与 IAM 由本地 HTTP 替身按令牌应答，
- * 验证用户令牌、Same-Token 与请求标识的传递，以及对方 401／403、不可用与超时的翻译。
+ * 验证用户令牌、Same-Token 与链路上下文的传递，以及对方 401／403、不可用与超时的翻译。
  */
 class NoteDigestIT {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
@@ -83,14 +83,14 @@ class NoteDigestIT {
     }
 
     /**
-     * @@PEER@@ 替身：按 Bearer 令牌预置的行为应答；记录收到的用户令牌、Same-Token 与请求标识。
+     * @@PEER@@ 替身：按 Bearer 令牌预置的行为应答；记录收到的用户令牌、Same-Token 与链路上下文。
      */
     private static void answer(HttpExchange exchange) throws IOException {
         var headers = exchange.getRequestHeaders();
         String token = String.valueOf(headers.getFirst("Authorization")).replace("Bearer ", "");
         SEEN.put("authorization", String.valueOf(headers.getFirst("Authorization")));
         SEEN.put("same-token", String.valueOf(headers.getFirst("SA-SAME-TOKEN")));
-        SEEN.put("request-id", String.valueOf(headers.getFirst("X-Request-Id")));
+        SEEN.put("traceparent", String.valueOf(headers.getFirst("traceparent")));
         String behaviour = BEHAVIOUR.getOrDefault(token, "401");
         if (behaviour.equals("slow")) sleep(1500);
         int status = behaviour.equals("ok") || behaviour.equals("slow") ? 200 : Integer.parseInt(behaviour);
@@ -145,13 +145,12 @@ class NoteDigestIT {
 
     private static HttpResponse<String> digest(String token) throws Exception {
         var request = HttpRequest.newBuilder(URI.create(base + "/api/@@NAMESPACE@@/note-digest"))
-                .header(SaSameUtil.SAME_TOKEN, SaSameUtil.getToken())
-                .header("X-Request-Id", "digest-it-1");
+                .header(SaSameUtil.SAME_TOKEN, SaSameUtil.getToken());
         if (token != null) request.header("Authorization", "Bearer " + token);
         return HTTP.send(request.GET().build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    // 以同一用户身份调用：对方收到原令牌、当前 Same-Token 与同一请求标识，摘要来自对方的可见便笺。
+    // 以同一用户身份调用：对方收到原令牌、当前 Same-Token，并在同一条链路中（traceparent 与本服务响应头的 traceId 一致）。
     @Test
     void callsPeerAsCurrentUser() throws Exception {
         String token = user(501, "ok");
@@ -161,7 +160,8 @@ class NoteDigestIT {
         assertTrue(response.body().contains("\"titles\":[\"甲\",\"乙\"]"), response.body());
         assertEquals("Bearer " + token, SEEN.get("authorization"));
         assertEquals(SaSameUtil.getToken(), SEEN.get("same-token"));
-        assertEquals("digest-it-1", SEEN.get("request-id"));
+        String traceId = response.headers().firstValue("X-Trace-Id").orElseThrow();
+        assertTrue(SEEN.get("traceparent").startsWith("00-" + traceId + "-"), SEEN.get("traceparent"));
     }
 
     // 对方的 401、403 保持语义；对方不可用与超时为 503，不当作空摘要；本服务未登录时不调用对方。

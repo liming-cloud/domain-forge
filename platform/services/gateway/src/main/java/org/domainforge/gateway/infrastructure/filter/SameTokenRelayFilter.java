@@ -14,7 +14,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.Optional;
 
 /**
- * 为转发给后端的请求写入当前 Same-Token（客户端自带的同名头已在请求标识过滤器中删除）。
+ * 为转发给后端的请求写入当前 Same-Token（客户端自带的同名头已在 RequestIdentityFilter 中删除）。
  *
  * <p>每次读取 Redis 中的当前值，不缓存；读取失败返回 503，不省略请求头继续转发。
  */

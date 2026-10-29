@@ -4,7 +4,7 @@
 #   注册账号 → 未授权被拒 → 安装权限目录、建角色授予、分配角色 → 业务命令与范围查询成功 →
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
-#   提交的事件在恢复后继续发送）→
+#   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
@@ -16,7 +16,7 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 copy="$work/repo"
 export COMPOSE_PROJECT_NAME="dfclosure$$"
-export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/board-service.compose.yml"
+export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml"
 # shellcheck source=scripts/deploy_lib.sh
 . "$repo/scripts/deploy_lib.sh"
 port=$(free_port)
@@ -122,6 +122,31 @@ tally_is() {
 
 step "集成事件：note-service 发布 NoteCreated，board-service 累加统计"
 tally_is 1
+
+step "链路追踪：一条链路贯穿网关、note-service、IAM 与 board-service"
+curl_image=$(sed -n 's/^    image: \(curlimages\/curl:.*\)$/\1/p' "$copy/deploy/compose.yml" | head -1)
+# Jaeger 2 只提供 v3 查询接口（OTLP JSON）：按 traceId 汇总各 span 所属的服务。
+trace_services='import json, sys
+traces = {}
+for rs in json.load(sys.stdin).get("result", {}).get("resourceSpans", []):
+    attrs = {a["key"]: a["value"].get("stringValue") for a in rs.get("resource", {}).get("attributes", [])}
+    for scope in rs.get("scopeSpans", []):
+        for span in scope.get("spans", []):
+            traces.setdefault(span["traceId"], set()).add(attrs.get("service.name"))
+for services in traces.values():
+    print(",".join(sorted(str(s) for s in services)))'
+window=$(python3 -I -c 'import datetime as d; n = d.datetime.now(d.timezone.utc); f = "%Y-%m-%dT%H:%M:%SZ"
+print("query.start_time_min=" + (n - d.timedelta(hours=1)).strftime(f) + "&query.start_time_max=" + (n + d.timedelta(hours=1)).strftime(f))')
+found=""
+for attempt in $(seq 1 30); do
+    found=$(docker run --rm --network "${COMPOSE_PROJECT_NAME}_backend" "$curl_image" -s \
+        "http://jaeger:16686/api/v3/traces?query.service_name=board-service&query.search_depth=50&$window" \
+        | python3 -I -c "$trace_services" 2>/dev/null || true)
+    echo "$found" | grep -qx "board-service,gateway,iam,note-service" && break
+    sleep 2
+done
+echo "$found" | grep -qx "board-service,gateway,iam,note-service" \
+    || fail "Jaeger 中应有一条贯穿 gateway、note-service、iam、board-service 的链路；查到的链路：${found:-无}"
 
 step "跨服务调用：board-service 以同一用户身份读取 note-service"
 digest=$(get /api/board/note-digest "$alice_token")

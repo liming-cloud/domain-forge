@@ -265,7 +265,7 @@ services:
       start_period: 30s
       retries: 40
   gateway:
-    # API 网关：路由（Nacos 中的 gateway.yaml）、登录前置校验、限流、请求标识，并为转发的请求写入 Same-Token。
+    # API 网关：路由（Nacos 中的 gateway.yaml）、登录前置校验、限流、在响应头返回 traceId，并为转发的请求写入 Same-Token。
     image: domain-forge/gateway:${GATEWAY_IMAGE_TAG:-local}
     build:
       context: ./jvm

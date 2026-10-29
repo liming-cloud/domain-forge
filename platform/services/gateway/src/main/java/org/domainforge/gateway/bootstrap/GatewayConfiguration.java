@@ -36,7 +36,7 @@ public class GatewayConfiguration {
     }
 
     /**
-     * 登录前置校验：Sa-Token 官方的全局过滤器，排在路径检查、请求标识与限流之后。
+     * 登录前置校验：Sa-Token 官方的全局过滤器，排在路径检查、客户端地址与限流之后。
      */
     @Bean
     SaReactorFilter gatewayLoginCheck(DynamicSettings<GatewaySettings> settings) {

@@ -182,9 +182,26 @@ class MessagingIT {
         assertEquals("NoteCreated:1:note-1", NormalHandler.LAST.get(id));
     }
 
-    // 业务回滚时事件一并消失；没有事务时不能发布。
+    // 链路贯穿 Outbox：消费方在发布时的同一条链路中处理（日志上下文的 traceId 与发布时一致）。
     @Test
     @Order(2)
+    void consumerContinuesThePublishersTrace() throws Exception {
+        var tracer = application.getBean(io.micrometer.tracing.Tracer.class);
+        var span = tracer.nextSpan().name("publish-it").start();
+        String id;
+        try (var ignored = tracer.withSpan(span)) {
+            id = publish(application, normal("NoteCreated", "traced"));
+        } finally {
+            span.end();
+        }
+        String eventId = id;
+        await("事件被消费", () -> effects(eventId) == 1);
+        assertEquals(span.context().traceId(), NormalHandler.TRACES.get(id));
+    }
+
+    // 业务回滚时事件一并消失；没有事务时不能发布。
+    @Test
+    @Order(3)
     void rolledBackOrMissingTransactionPublishesNothing() {
         var transactions = application.getBean(TransactionOperations.class);
         var publisher = application.getBean(EventPublisher.class);
@@ -200,7 +217,7 @@ class MessagingIT {
 
     // 业务提交后、发送前应用中断：提交的事件留在 Outbox，由仍在运行或重启后的中继接手发送。
     @Test
-    @Order(3)
+    @Order(4)
     void committedEventSurvivesApplicationStop() throws Exception {
         String id;
         try (var stopped = start(false)) {
@@ -211,7 +228,7 @@ class MessagingIT {
 
     // RocketMQ 中断：发送失败记录次数并退避，恢复后发送；记录不丢弃。
     @Test
-    @Order(4)
+    @Order(5)
     void relayRetriesAfterBrokerOutage() throws Exception {
         docker("pause");
         String id;
@@ -227,7 +244,7 @@ class MessagingIT {
 
     // 记录发送结果前中断导致重发：同一事件 ID 再次投递，只确认不重复生效。
     @Test
-    @Order(5)
+    @Order(6)
     void redeliveryTakesEffectOnce() throws Exception {
         String id = publish(application, normal("NoteCreated", "resent"));
         await("首次消费", () -> effects(id) == 1);
@@ -240,7 +257,7 @@ class MessagingIT {
 
     // 有顺序键：同一键按发布顺序处理，前一条失败重试时后面的不越过；不同键互不阻塞。
     @Test
-    @Order(6)
+    @Order(7)
     void orderedEventsKeepPerKeyOrder() throws Exception {
         String run = UUID.randomUUID().toString().substring(0, 8);
         FLAKY.put(run + "-a-2", new AtomicInteger());
@@ -262,7 +279,7 @@ class MessagingIT {
 
     // 一直失败：超过最大投递次数后计入死信并告警，不被当作成功，也不写入效果。
     @Test
-    @Order(7)
+    @Order(8)
     void poisonMessageGoesToDeadLetter() throws Exception {
         double before = counter("domainforge.messaging.dead-letter", NORMAL_GROUP);
         String id = publish(application, normal("Poison", "poison"));
@@ -298,6 +315,7 @@ class MessagingIT {
      */
     static final class NormalHandler implements EventHandler {
         static final Map<String, String> LAST = new ConcurrentHashMap<>();
+        static final Map<String, String> TRACES = new ConcurrentHashMap<>();
         private final JdbcTemplate jdbc;
 
         NormalHandler(JdbcTemplate jdbc) {
@@ -320,6 +338,8 @@ class MessagingIT {
             jdbc.update("INSERT INTO it_effect (event_id, handled_by) VALUES (?, ?)", event.id(), NORMAL_GROUP);
             HANDLED.computeIfAbsent(event.id(), ignored -> new AtomicInteger()).incrementAndGet();
             LAST.put(event.id(), event.type() + ":" + event.version() + ":" + event.key());
+            String traceId = org.slf4j.MDC.get("traceId");
+            if (traceId != null) TRACES.put(event.id(), traceId);
         }
     }
 

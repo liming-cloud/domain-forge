@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * @@PEER@@ 的便笺公开接口；url 为空时经 Nacos 发现名为 @@PEER@@ 的服务。
  *
- * <p>用户令牌、Same-Token 与请求标识由跨服务调用组件自动附加，这里不声明。
+ * <p>用户令牌、Same-Token 与链路上下文由跨服务调用组件自动附加，这里不声明。
  */
 @FeignClient(name = "@@PEER@@", url = "${@@ENV@@_PEER_URL:}", contextId = "peerNotes")
 public interface PeerNoteClient {

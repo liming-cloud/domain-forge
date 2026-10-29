@@ -2,6 +2,8 @@ package org.domainforge.messaging.internal;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.apache.rocketmq.client.apis.ClientConfiguration;
 import org.apache.rocketmq.client.apis.ClientException;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
@@ -36,6 +38,7 @@ public final class EventConsumers implements SmartLifecycle {
     private final TransactionOperations transactions;
     private final int maxAttempts;
     private final MeterRegistry metrics;
+    private final TraceContexts traces;
     private final List<PushConsumer> consumers = new ArrayList<>();
 
     /**
@@ -44,13 +47,15 @@ public final class EventConsumers implements SmartLifecycle {
      * @param maxAttempts 服务端消费组的最大投递次数（重试次数加 1），用于识别最后一次投递
      */
     public EventConsumers(List<EventHandler> handlers, ClientConfiguration client, InboxMapper inbox,
-                          TransactionOperations transactions, int maxAttempts, MeterRegistry metrics) {
+                          TransactionOperations transactions, int maxAttempts, MeterRegistry metrics,
+                          TraceContexts traces) {
         this.handlers = List.copyOf(handlers);
         this.client = client;
         this.inbox = inbox;
         this.transactions = transactions;
         this.maxAttempts = maxAttempts;
         this.metrics = metrics;
+        this.traces = traces;
     }
 
     /**
@@ -66,7 +71,16 @@ public final class EventConsumers implements SmartLifecycle {
     }
 
     ConsumeResult consume(EventHandler handler, MessageView message) {
-        ReceivedEvent event = event(message);
+        Span span = traces.start(message.getProperties().get(TraceContexts.TRACE_PARENT), "consume " + handler.topic(),
+                Span.Kind.CONSUMER).tag("messaging.consumer.group", handler.group());
+        try (Tracer.SpanInScope ignored = traces.scope(span)) {
+            return consume(handler, event(message), span);
+        } finally {
+            span.end();
+        }
+    }
+
+    private ConsumeResult consume(EventHandler handler, ReceivedEvent event, Span span) {
         try {
             Boolean fresh = transactions.execute(status -> {
                 if (inbox.record(handler.group(), event.id()) == 0) return false;
@@ -80,6 +94,7 @@ public final class EventConsumers implements SmartLifecycle {
             }
             return ConsumeResult.SUCCESS;
         } catch (RuntimeException failure) {
+            span.error(failure);
             if (event.attempt() >= maxAttempts) {
                 Counter.builder("domainforge.messaging.dead-letter").tag("group", handler.group())
                         .register(metrics).increment();

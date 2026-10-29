@@ -5,7 +5,6 @@ import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.domainforge.servicecall.api.ServiceCallException;
 import org.domainforge.servicecall.api.ServiceCallFailure;
-import org.slf4j.MDC;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -15,13 +14,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *   <li>Same-Token：证明调用来自系统内服务，被调方据此放行；读取失败时不发出请求。</li>
  *   <li>Authorization：当前 HTTP 请求带有用户令牌时原样转发，被调方以同一用户身份认证授权；
  *       客户端方法已显式声明该头时不覆盖。没有用户上下文（定时任务等）时不带，只能调用被调方的服务专用接口。</li>
- *   <li>X-Request-Id：沿用当前请求的标识，被调方日志可与之关联。</li>
  * </ul>
+ *
+ * <p>链路上下文（W3C traceparent）由 OpenFeign 的 Micrometer 观测传播，不在这里处理。
  */
 public final class IdentityPropagation implements RequestInterceptor {
     static final String SAME_TOKEN = SaSameUtil.SAME_TOKEN;
     static final String AUTHORIZATION = "Authorization";
-    static final String REQUEST_ID = "X-Request-Id";
 
     @Override
     public void apply(RequestTemplate template) {
@@ -31,8 +30,6 @@ public final class IdentityPropagation implements RequestInterceptor {
             String authorization = currentAuthorization();
             if (authorization != null) template.header(AUTHORIZATION, authorization);
         }
-        String requestId = MDC.get("requestId");
-        if (requestId != null && !template.headers().containsKey(REQUEST_ID)) template.header(REQUEST_ID, requestId);
     }
 
     private static String sameToken() {

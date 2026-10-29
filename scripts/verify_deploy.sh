@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
-#   首次部署与管理员初始化 → 网关（请求标识、直连后端被拒、限流与动态调整）→ 定时任务（IAM 清理任务经 PowerJob 登记并执行）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
+#   首次部署与管理员初始化 → 网关（traceId、直连后端被拒、限流与动态调整）→ 定时任务（IAM 清理任务经 PowerJob 登记并执行）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
 #   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
 #   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退 →
@@ -73,11 +73,13 @@ case "$(get_status /api/%2e%2e/internal/access/current "$admin_token")" in
     *) fail "可能被后端规范化成 /internal/ 的路径不应转发" ;;
 esac
 
-step "网关：请求标识与直连后端被拒"
-request_id=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $admin_token" "$base/api/me" \
-    | tr -d '\r' | sed -n 's/^[Xx]-[Rr]equest-[Ii]d: //p')
-[[ "$request_id" =~ ^[0-9a-f]{32}$ ]] || fail "响应应只带一个入口生成的请求标识：$(tr '\n' ' ' <<< "$request_id")"
-compose logs gateway | grep -q "request_id=$request_id" || fail "网关访问日志应带同一请求标识"
+step "网关：traceId 与直连后端被拒"
+trace_id=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $admin_token" \
+    -H "traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" "$base/api/me" \
+    | tr -d '\r' | sed -n 's/^[Xx]-[Tt]race-[Ii]d: //p')
+[[ "$trace_id" =~ ^[0-9a-f]{32}$ ]] || fail "响应应只带一个 traceId：$(tr '\n' ' ' <<< "$trace_id")"
+[ "$trace_id" != "0af7651916cd43dd8448eb211c80319c" ] || fail "入口应丢弃客户端带来的追踪上下文"
+compose logs gateway | grep -q "trace_id=$trace_id" || fail "网关访问日志应带同一 traceId"
 direct() { compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $admin_token" "$@"; }
 [ "$(direct http://iam:8080/api/me)" = "401" ] || fail "网段内直连 IAM（无 Same-Token）应被拒"
 [ "$(direct -H 'SA-SAME-TOKEN: forged' http://iam:8080/internal/access/current)" = "401" ] \

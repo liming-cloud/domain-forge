@@ -14,7 +14,9 @@ CREATE TABLE domainforge_outbox
     attempts        integer      NOT NULL DEFAULT 0,
     next_attempt_at timestamptz  NOT NULL DEFAULT now(),
     sent_at         timestamptz,
-    last_error      varchar(200)
+    last_error      varchar(200),
+    -- 发布时的链路上下文（W3C traceparent），中继发送与消费方以它为父继续同一条链路；未启用追踪时为空。
+    trace_parent    varchar(64)
 );
 CREATE INDEX domainforge_outbox_due ON domainforge_outbox (next_attempt_at, id) WHERE sent_at IS NULL;
 CREATE INDEX domainforge_outbox_order ON domainforge_outbox (order_key, id) WHERE sent_at IS NULL AND order_key IS NOT NULL;

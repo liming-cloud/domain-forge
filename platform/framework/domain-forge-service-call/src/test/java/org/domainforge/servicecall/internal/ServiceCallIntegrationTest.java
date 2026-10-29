@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.slf4j.MDC;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -39,7 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 真实 Boot 与 OpenFeign 装配下的跨服务调用合同：身份与请求标识传递、失败分类、默认不重试。
+ * 真实 Boot 与 OpenFeign 装配下的跨服务调用合同：身份传递、失败分类、默认不重试。
  *
  * <p>被调方用本地 HTTP 替身；Same-Token 使用 Sa-Token 原生内存存储。
  */
@@ -74,7 +73,6 @@ class ServiceCallIntegrationTest {
     @AfterEach
     void clearRequest() {
         RequestContextHolder.resetRequestAttributes();
-        MDC.clear();
     }
 
     private static int closedPort() throws IOException {
@@ -90,7 +88,7 @@ class ServiceCallIntegrationTest {
         String path = exchange.getRequestURI().getPath();
         CALLS.computeIfAbsent(path, ignored -> new AtomicInteger()).incrementAndGet();
         var headers = new ConcurrentHashMap<String, String>();
-        for (String name : new String[]{"SA-SAME-TOKEN", "Authorization", "X-Request-Id"}) {
+        for (String name : new String[]{"SA-SAME-TOKEN", "Authorization"}) {
             var values = exchange.getRequestHeaders().get(name);
             if (values != null) headers.put(name, String.join("|", values));
         }
@@ -118,39 +116,36 @@ class ServiceCallIntegrationTest {
         }
     }
 
-    private static void inRequest(String authorization, String requestId) {
+    private static void inRequest(String authorization) {
         var request = new MockHttpServletRequest();
         if (authorization != null) request.addHeader("Authorization", authorization);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-        if (requestId != null) MDC.put("requestId", requestId);
     }
 
     private static ServiceCallException failure(Executable call) {
         return assertThrows(ServiceCallException.class, call);
     }
 
-    // 请求内调用：Same-Token 为当前值，用户令牌与请求标识原样转发；客户端伪造的 Same-Token 被替换。
+    // 请求内调用：Same-Token 为当前值，用户令牌原样转发；客户端伪造的 Same-Token 被替换。
     @Test
     void propagatesIdentityWithinRequest() {
-        inRequest("Bearer user-token", "rid-1");
+        inRequest("Bearer user-token");
         assertEquals("value", ServiceCalls.data(stub.ok("forged")));
         var seen = SEEN.get("/ok");
         assertEquals(SaSameUtil.getToken(), seen.get("SA-SAME-TOKEN"));
         assertEquals("Bearer user-token", seen.get("Authorization"));
-        assertEquals("rid-1", seen.get("X-Request-Id"));
     }
 
     // 客户端显式声明 Authorization 时不重复添加；没有用户上下文时只带 Same-Token。
     @Test
     void explicitOrMissingUserToken() {
-        inRequest("Bearer from-request", null);
+        inRequest("Bearer from-request");
         stub.explicit("Bearer explicit");
         assertEquals("Bearer explicit", SEEN.get("/explicit").get("Authorization"));
         RequestContextHolder.resetRequestAttributes();
         stub.background();
         var seen = SEEN.get("/background");
         assertNull(seen.get("Authorization"));
-        assertNull(seen.get("X-Request-Id"));
         assertEquals(SaSameUtil.getToken(), seen.get("SA-SAME-TOKEN"));
     }
 

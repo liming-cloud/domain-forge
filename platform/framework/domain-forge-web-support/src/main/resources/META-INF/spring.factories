@@ -1,1 +1,0 @@
-org.springframework.boot.EnvironmentPostProcessor=org.domainforge.web.autoconfigure.WebDefaults
