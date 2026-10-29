@@ -4,8 +4,10 @@ spring:
   application:
     name: @@ARTIFACT@@
   config:
-    # 带便笺示例时启用 Outbox（文件随示例生成，没有示例时不存在）。
-    import: optional:classpath:messaging-outbox.yml
+    # 带便笺示例时启用 Outbox 与文件存储（文件随示例生成，没有示例时不存在）。
+    import:
+      - optional:classpath:messaging-outbox.yml
+      - optional:classpath:file-storage.yml
   main:
     banner-mode: off
   lifecycle:
@@ -47,6 +49,13 @@ spring:
       host: ${@@ENV@@_REDIS_HOST}
       port: ${@@ENV@@_REDIS_PORT}
       password: ${@@ENV@@_REDIS_PASSWORD}
+  servlet:
+    multipart:
+      # 上传内容由 Servlet 容器完整接收（超过 1MB 暂存到临时目录）后再进入用例；超过上限返回 413。
+      # 与 domainforge.files.max-size 及入口 Nginx 对 /files 路径的上限保持一致。
+      max-file-size: 20MB
+      max-request-size: 21MB
+      file-size-threshold: 1MB
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -54,7 +63,20 @@ spring:
 # 本地直连 IAM 时设置 @@ENV@@_IAM_URL（如 http://127.0.0.1:8080）；为空时经 Nacos 发现 iam。
 # 消息组件连接 RocketMQ Proxy 的地址；只有发布或消费事件时才连接，部署时为 rocketmq-broker:8081。
 # 定时任务（PowerJob）：实现 ScheduledTask 的 Bean 由调度组件登记；部署时启用，本地与测试默认不启用。
+# 文件存储（启用后）：默认本地目录，部署时为容器内挂载的命名卷；改用 S3 兼容存储时设置 @@ENV@@_FILES_STORAGE=s3
+# 与 @@ENV@@_FILES_S3_* （桶由运维事先创建，密钥只来自环境变量），见 docs/architecture/11-文件存储.md。
 domainforge:
+  files:
+    storage: ${@@ENV@@_FILES_STORAGE:local}
+    max-size: 20MB
+    local:
+      root: ${@@ENV@@_FILES_ROOT:}
+    s3:
+      endpoint: ${@@ENV@@_FILES_S3_ENDPOINT:}
+      region: ${@@ENV@@_FILES_S3_REGION:us-east-1}
+      bucket: ${@@ENV@@_FILES_S3_BUCKET:}
+      access-key: ${@@ENV@@_FILES_S3_ACCESS_KEY:}
+      secret-key: ${@@ENV@@_FILES_S3_SECRET_KEY:}
   messaging:
     endpoints: ${@@ENV@@_MESSAGING_ENDPOINTS:}
   scheduling:

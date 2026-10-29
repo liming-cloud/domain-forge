@@ -24,7 +24,8 @@ class ResponseContractTest {
                         "SERVICE_UNAVAILABLE",
                         "INTERNAL_ERROR",
                         "RATE_LIMITED",
-                        "GATEWAY_TIMEOUT")) {
+                        "GATEWAY_TIMEOUT",
+                        "PAYLOAD_TOO_LARGE")) {
             assertThrows(IllegalArgumentException.class, () -> ApiResponse.rejected(code, "拒绝"));
         }
         assertNull(ApiResponse.success(null).data());
@@ -32,6 +33,7 @@ class ResponseContractTest {
         assertEquals(401, HttpFailureResponses.unauthenticated().getStatusCode().value());
         assertEquals(403, HttpFailureResponses.forbidden().getStatusCode().value());
         assertEquals(503, HttpFailureResponses.unavailable().getStatusCode().value());
+        assertEquals(413, HttpFailureResponses.payloadTooLarge().getStatusCode().value());
     }
 
     @Test

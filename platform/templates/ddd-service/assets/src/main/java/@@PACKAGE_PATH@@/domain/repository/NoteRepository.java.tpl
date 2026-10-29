@@ -11,6 +11,11 @@ public interface NoteRepository {
      */
     Note lock(long id);
 
+    /**
+     * 读取便笺，不加锁（只用于读取前的范围判断）。
+     */
+    Note find(long id);
+
     void insert(Note note);
 
     /**

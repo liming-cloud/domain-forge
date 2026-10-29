@@ -14,6 +14,7 @@
 | | [消息与 Outbox](architecture/08-消息与Outbox.md) | 投递合同、顺序与去重、中继、RocketMQ 部署 |
 | | [定时任务](architecture/09-定时任务.md) | PowerJob 调度、执行语义、任务登记与部署 |
 | | [链路追踪](architecture/10-链路追踪.md) | traceId 贯穿网关、调用、消息与任务，采样与导出 |
+| | [文件存储](architecture/11-文件存储.md) | 本地与 S3 存取合同、业务授权后转发、清理与备份恢复 |
 | 规范 | [需求与领域建模](standards/01-需求与领域建模.md) | 从需求到场景、模型和上下文 |
 | | [系统设计](standards/02-系统设计.md) | 模块、依赖、端口与用例 |
 | | [技术与构建](standards/03-技术与构建.md) | 技术栈、依赖与漏洞 |

@@ -19,5 +19,6 @@
         <module>domain-forge-messaging</module>
         <module>domain-forge-scheduling</module>
         <module>domain-forge-tracing</module>
+        <module>domain-forge-file-storage</module>
     </modules>
 </project>

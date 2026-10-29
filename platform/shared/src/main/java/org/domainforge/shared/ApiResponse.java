@@ -28,7 +28,8 @@ public record ApiResponse<T>(
                     "SERVICE_UNAVAILABLE",
                     "INTERNAL_ERROR",
                     "RATE_LIMITED",
-                    "GATEWAY_TIMEOUT");
+                    "GATEWAY_TIMEOUT",
+                    "PAYLOAD_TOO_LARGE");
 
     /**
      * 拒绝缺失标识或提示；调用方负责提示中不包含秘密或内部异常。

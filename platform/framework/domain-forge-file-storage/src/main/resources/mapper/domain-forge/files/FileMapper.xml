@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.files.internal.FileMapper">
+    <resultMap id="row" type="org.domainforge.files.internal.FileRow">
+        <constructor>
+            <arg column="id" javaType="java.lang.String"/>
+            <arg column="storage_key" javaType="java.lang.String"/>
+            <arg column="name" javaType="java.lang.String"/>
+            <arg column="content_type" javaType="java.lang.String"/>
+            <arg column="size" javaType="_long"/>
+            <arg column="sha256" javaType="java.lang.String"/>
+            <arg column="uploaded_by" javaType="java.lang.Long"/>
+            <arg column="uploaded_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO domainforge_file (id, storage_key, name, content_type, size, sha256, uploaded_by, uploaded_at)
+        VALUES (#{row.id}, #{row.storageKey}, #{row.name}, #{row.contentType}, #{row.size}, #{row.sha256},
+                #{row.uploadedBy}, #{row.uploadedAt})
+    </insert>
+
+    <select id="find" resultMap="row">
+        SELECT id, storage_key, name, content_type, size, sha256, uploaded_by, uploaded_at
+        FROM domainforge_file
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <update id="markDeleted">
+        UPDATE domainforge_file SET deleted_at = now() WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <select id="expired" resultMap="row">
+        SELECT id, storage_key, name, content_type, size, sha256, uploaded_by, uploaded_at
+        FROM domainforge_file
+        WHERE deleted_at IS NOT NULL AND deleted_at &lt; now() - make_interval(secs => #{graceSeconds})
+        ORDER BY deleted_at
+        LIMIT #{limit}
+    </select>
+
+    <delete id="purge">
+        DELETE FROM domainforge_file WHERE id = #{id} AND deleted_at IS NOT NULL
+    </delete>
+
+    <select id="knownKeys" resultType="string">
+        SELECT storage_key FROM domainforge_file
+        WHERE storage_key IN
+        <foreach collection="keys" item="key" open="(" separator="," close=")">#{key}</foreach>
+    </select>
+</mapper>

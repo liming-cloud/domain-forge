@@ -19,7 +19,9 @@ services:
       - postgres-data:/var/lib/postgresql
     networks: [backend]
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U domainforge -d domainforge']
+      # 走 TCP：首次初始化时镜像先起一个只监听 Unix 套接字的临时实例，初始化后再重启；经套接字检查会在临时实例上
+      # 提前通过，依赖它的一次性任务随即撞上重启而失败。
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U domainforge -d domainforge']
       interval: 2s
       timeout: 2s
       retries: 30
@@ -157,6 +159,7 @@ services:
     entrypoint: [sh, -c]
     command:
       - |
+        set -e
         psql -v ON_ERROR_STOP=1 -q <<'SQL'
         \getenv service_password SERVICE_DB_PASSWORD
         SELECT 'CREATE ROLE powerjob' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'powerjob') \gexec

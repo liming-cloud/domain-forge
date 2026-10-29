@@ -41,6 +41,15 @@ public final class HttpFailureResponses {
     }
 
     /**
+     * 请求体超过上限的 HTTP 413 结果（如上传超过 multipart 上限）。
+     *
+     * @return 请求体超过上限的 HTTP 413 结果
+     */
+    public static ResponseEntity<ApiResponse<Void>> payloadTooLarge() {
+        return failure(413, "PAYLOAD_TOO_LARGE", "请求内容过大");
+    }
+
+    /**
      * 已明确不可用的 HTTP 503 结果。
      *
      * @return 已明确不可用的 HTTP 503 结果

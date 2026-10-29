@@ -12,6 +12,11 @@ import java.util.Set;
 public record Note(long id, long ownerId, Long unitId, String title, String content, long version)
         implements AggregateRoot {
     /**
+     * 一条便笺最多的附件数。
+     */
+    public static final int MAX_FILES = 10;
+
+    /**
      * 恢复状态也校验标题、内容与版本。
      */
     public Note {
@@ -51,6 +56,13 @@ public record Note(long id, long ownerId, Long unitId, String title, String cont
      */
     public static boolean creatable(Long unitId, boolean all, boolean self, Set<Long> units) {
         return all || (unitId == null ? self : units.contains(unitId));
+    }
+
+    /**
+     * 附件规则：已有附件少于上限时才能再添加。
+     */
+    public static boolean attachable(int attached) {
+        return attached < MAX_FILES;
     }
 
     /**

@@ -25,7 +25,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -67,6 +70,9 @@ class NoteServiceIT {
                 "--spring.data.redis.password=" + env("REDIS_PASSWORD"),
                 "--@@ARTIFACT@@.iam.url=http://127.0.0.1:" + iam.getAddress().getPort(),
                 "--domainforge.messaging.relay.enabled=false",
+                "--domainforge.files.local.root=" + Files.createTempDirectory("@@ARTIFACT@@-files-"),
+                "--spring.servlet.multipart.max-file-size=64KB",
+                "--spring.servlet.multipart.max-request-size=70KB",
                 "--logging.level.root=WARN");
         base = "http://127.0.0.1:" + application.getBean(Environment.class).getProperty("local.server.port");
     }
@@ -79,7 +85,8 @@ class NoteServiceIT {
 
     @BeforeEach
     void reset() {
-        application.getBean(JdbcTemplate.class).update("TRUNCATE note, domainforge_outbox");
+        application.getBean(JdbcTemplate.class)
+                .update("TRUNCATE note, note_file, domainforge_file, domainforge_outbox");
         SUBJECTS.clear();
         SCOPES.clear();
         IAM_DOWN.set(false);
@@ -146,6 +153,34 @@ class NoteServiceIT {
         if (token != null) request.header("Authorization", "Bearer " + token);
         if (sameToken != null) request.header(SameTokens.HEADER, sameToken);
         return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    /**
+     * 以 multipart 上传一个附件（字段 file）。
+     */
+    private static HttpResponse<String> upload(String noteId, String token, String name, String type, byte[] content)
+            throws Exception {
+        String boundary = "----df" + UUID.randomUUID();
+        byte[] head = ("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + name
+                + "\"\r\nContent-Type: " + type + "\r\n\r\n").getBytes(StandardCharsets.UTF_8);
+        byte[] tail = ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
+        byte[] body = new byte[head.length + content.length + tail.length];
+        System.arraycopy(head, 0, body, 0, head.length);
+        System.arraycopy(content, 0, body, head.length, content.length);
+        System.arraycopy(tail, 0, body, head.length + content.length, tail.length);
+        var request = HttpRequest.newBuilder(URI.create(base + "/api/notes/" + noteId + "/files"))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("Authorization", "Bearer " + token)
+                .header(SameTokens.HEADER, SameTokens.current());
+        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static HttpResponse<byte[]> download(String path, String token) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create(base + path)).GET()
+                .header("Authorization", "Bearer " + token)
+                .header(SameTokens.HEADER, SameTokens.current());
+        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 
     private static String edit(long version, String title) {
@@ -228,6 +263,54 @@ class NoteServiceIT {
         assertEquals("NOTE_NOT_FOUND", json(hidden).get("code").asString());
         var invalid = call("POST", "/api/notes", writer, "{\"title\":\" \",\"content\":\"\"}");
         assertEquals("NOTE_INVALID", json(invalid).get("code").asString());
+    }
+
+    // 附件经本服务转发：写范围内上传，读范围内列出与下载（附件响应、内容一致），范围外的便笺按不存在处理；
+    // 不允许的类型为业务拒绝，超过 multipart 上限 413；删除后读取不到。
+    @Test
+    void attachmentsFollowNoteScopes() throws Exception {
+        String writer = user(701, BOTH, scope(false, true, ""), scope(false, true, ""));
+        String note = json(call("POST", "/api/notes", writer, "{\"title\":\"带附件\",\"content\":\"\"}"))
+                .get("data").get("id").asString();
+        byte[] content = "第一季度".getBytes(StandardCharsets.UTF_8);
+        var uploaded = json(upload(note, writer, "报告.txt", "text/plain", content));
+        assertEquals("SUCCESS", uploaded.get("code").asString(), uploaded.toString());
+        String file = uploaded.get("data").get("id").asString();
+        var listed = json(call("GET", "/api/notes/" + note + "/files", writer, null)).get("data");
+        assertEquals(1, listed.size());
+        assertEquals("报告.txt", listed.get(0).get("name").asString());
+        assertEquals(content.length, listed.get(0).get("size").asInt());
+        var downloaded = download("/api/notes/" + note + "/files/" + file, writer);
+        assertEquals(200, downloaded.statusCode());
+        assertTrue(Arrays.equals(content, downloaded.body()));
+        assertTrue(downloaded.headers().firstValue("Content-Disposition").orElse("").startsWith("attachment"));
+        assertEquals("nosniff", downloaded.headers().firstValue("X-Content-Type-Options").orElse(null));
+
+        String other = user(702, BOTH, scope(false, true, ""), scope(false, true, ""));
+        assertEquals("NOTE_NOT_FOUND", json(call("GET", "/api/notes/" + note + "/files", other, null))
+                .get("code").asString());
+        assertEquals("NOTE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/" + file, other)
+                .body()).get("code").asString());
+        assertEquals("NOTE_NOT_FOUND", json(upload(note, other, "a.txt", "text/plain", content))
+                .get("code").asString());
+        String reader = user(703, "\"" + READ + "\"", scope(true, false, ""), scope(false, false, ""));
+        assertEquals(403, upload(note, reader, "a.txt", "text/plain", content).statusCode());
+
+        assertEquals("FILE_TYPE_NOT_ALLOWED", json(upload(note, writer, "a.html", "text/html", content))
+                .get("code").asString());
+        var tooLarge = upload(note, writer, "big.txt", "text/plain", new byte[100 * 1024]);
+        assertEquals(413, tooLarge.statusCode());
+        assertEquals("PAYLOAD_TOO_LARGE", json(tooLarge).get("code").asString());
+        assertEquals("NOTE_FILE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/"
+                + UUID.randomUUID(), writer).body()).get("code").asString());
+
+        assertEquals("SUCCESS", json(call("DELETE", "/api/notes/" + note + "/files/" + file, writer, null))
+                .get("code").asString());
+        assertEquals("NOTE_FILE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/" + file, writer)
+                .body()).get("code").asString());
+        assertEquals(0, json(call("GET", "/api/notes/" + note + "/files", writer, null)).get("data").size());
+        assertNotNull(application.getBean(JdbcTemplate.class).queryForObject(
+                "SELECT deleted_at FROM domainforge_file WHERE id = ?", java.sql.Timestamp.class, file));
     }
 
     // IAM 不可用时拒绝为 503，不降级为匿名或允许。

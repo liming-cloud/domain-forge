@@ -48,6 +48,9 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('source: nacos', seed)
         self.assertIn('SPRING_PROFILES_ACTIVE: config-center', compose)
         self.assertIn('ORDER_SERVICE_SCHEDULING_ENABLED: "true"', compose)
+        self.assertIn('      - order-service-files:/var/lib/domain-forge/files\n', compose)
+        self.assertIn('volumes:\n  order-service-files:\n', compose)
+        self.assertFalse((output / 'src/main/resources/file-storage.yml').exists())
         self.assertEqual('iam\norder-service\n',
                          (self.root / 'deploy/powerjob/apps.conf').read_text(encoding='utf-8'))
         for path in output.rglob('*'):
@@ -63,6 +66,9 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('${RETAIL_ORDER_DB_URL}', config)
         it = next(output.rglob('NoteServiceIT.java')).read_text(encoding='utf-8')
         self.assertIn('currentSchema=retail_order', it)
+        self.assertIn('enabled: true', (output / 'src/main/resources/file-storage.yml').read_text(encoding='utf-8'))
+        self.assertTrue((output / 'src/main/resources/db/migration/V3__note_file.sql').is_file())
+        self.assertIn('${RETAIL_ORDER_FILES_ROOT:}', config)
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
         self.assertIn('      - id: iam\n', routes)
