@@ -1,0 +1,32 @@
+name: 切片
+description: 跟踪 issue 的一个纵向切片，一个 PR 解决，至少闭合一条验收场景
+title: "[切片] "
+labels: ["kind/slice"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: 跟踪 issue
+      description: 建好后在跟踪 issue 中把本 issue 加为 sub-issue
+      placeholder: "#"
+    validations:
+      required: true
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: 闭合的验收场景
+      description: 从跟踪 issue 中摘出本切片闭合的场景，以及验证它的测试或脚本（以命令、测试名或可观察结果表述）
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: 改动范围
+      description: 涉及的模块与入口（组件、模板、部署、验证脚本、文档），以及不能碰的部分
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与风险
+      description: 依赖的其他切片（用 issue 依赖标注）、已知风险
