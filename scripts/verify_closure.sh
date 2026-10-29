@@ -5,7 +5,7 @@
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
-#   文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
+#   幂等创建（同一 Idempotency-Key 重复提交只创建一条）→ 文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
@@ -103,8 +103,18 @@ assigned=$(put "/api/accounts/$alice_id/roles" "{\"expectedVersion\":$alice_vers
 expect 200 "分配角色"
 
 step "授权后的命令与范围查询"
-note_id=$(post /api/notes '{"title":"备份前","content":""}' "$alice_token" | field id)
+# 幂等创建：同一 Idempotency-Key 经 Nginx 与网关重复提交，只创建一条并返回首次结果（下面的“1 条”同时证明）。
+keyed_note() {
+    curl -sS -o "$work/body" -D "$work/headers" -w '%{http_code}' -X POST "$base/api/notes" \
+        -H 'Content-Type: application/json' -H "Authorization: Bearer $alice_token" \
+        -H "Idempotency-Key: $1" -d '{"title":"备份前","content":""}' > "$work/status"
+    cat "$work/body"
+}
+idempotency_key=$(python3 -I -c 'import uuid; print(uuid.uuid4())')
+note_id=$(keyed_note "$idempotency_key" | field id)
 expect 200 "已授权的业务命令"
+[ "$(keyed_note "$idempotency_key" | field id)" = "$note_id" ] || fail "同一幂等键的重复提交应返回首次结果"
+grep -qi '^idempotent-replayed: true' "$work/headers" || fail "重复提交的响应应标记 Idempotent-Replayed"
 [ "$(get /api/notes "$alice_token" | size)" = "1" ] || fail "alice 按本人范围应看到 1 条"
 [ "$(get /api/me/notes "$alice_token" | size)" = "1" ] || fail "alice 本人便笺应为 1 条"
 get /api/notes "$bob_token" > /dev/null

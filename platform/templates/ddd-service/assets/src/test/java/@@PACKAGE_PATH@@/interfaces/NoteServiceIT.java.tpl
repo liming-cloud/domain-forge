@@ -265,6 +265,38 @@ class NoteServiceIT {
         assertEquals("NOTE_INVALID", json(invalid).get("code").asString());
     }
 
+    // 幂等创建：同一 Idempotency-Key 的重复提交返回首次结果，只有一条便笺与一个事件；同一键换了内容 422。
+    @Test
+    void repeatedCreationIsIdempotent() throws Exception {
+        String writer = user(801, BOTH, scope(false, true, ""), scope(false, true, ""));
+        String body = "{\"title\":\"幂等\",\"content\":\"\"}";
+        String key = UUID.randomUUID().toString();
+        var first = keyed(writer, key, body);
+        var again = keyed(writer, key, body);
+        assertEquals(200, first.statusCode(), first.body());
+        assertEquals(first.body(), again.body());
+        assertEquals("true", again.headers().firstValue("Idempotent-Replayed").orElse(null));
+        var jdbc = application.getBean(JdbcTemplate.class);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM note WHERE owner_id = 801", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
+        var reused = keyed(writer, key, "{\"title\":\"换了内容\",\"content\":\"\"}");
+        assertEquals(422, reused.statusCode());
+        assertEquals("IDEMPOTENCY_KEY_REUSED", json(reused).get("code").asString());
+        assertEquals(200, keyed(writer, UUID.randomUUID().toString(), body).statusCode(), "新的键再创建一条");
+        assertEquals(200, call("POST", "/api/notes", writer, body).statusCode(), "不带键照常创建");
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM note WHERE owner_id = 801", Integer.class));
+    }
+
+    private static HttpResponse<String> keyed(String token, String key, String body) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create(base + "/api/notes"))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", key)
+                .header(SameTokens.HEADER, SameTokens.current());
+        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     // 附件经本服务转发：写范围内上传，读范围内列出与下载（附件响应、内容一致），范围外的便笺按不存在处理；
     // 不允许的类型为业务拒绝，超过 multipart 上限 413；删除后读取不到。
     @Test

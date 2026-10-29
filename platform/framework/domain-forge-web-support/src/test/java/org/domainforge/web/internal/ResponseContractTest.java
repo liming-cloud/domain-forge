@@ -25,7 +25,9 @@ class ResponseContractTest {
                         "INTERNAL_ERROR",
                         "RATE_LIMITED",
                         "GATEWAY_TIMEOUT",
-                        "PAYLOAD_TOO_LARGE")) {
+                        "PAYLOAD_TOO_LARGE",
+                        "IDEMPOTENCY_IN_PROGRESS",
+                        "IDEMPOTENCY_KEY_REUSED")) {
             assertThrows(IllegalArgumentException.class, () -> ApiResponse.rejected(code, "拒绝"));
         }
         assertNull(ApiResponse.success(null).data());

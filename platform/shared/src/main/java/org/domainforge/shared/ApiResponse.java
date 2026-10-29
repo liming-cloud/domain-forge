@@ -29,7 +29,9 @@ public record ApiResponse<T>(
                     "INTERNAL_ERROR",
                     "RATE_LIMITED",
                     "GATEWAY_TIMEOUT",
-                    "PAYLOAD_TOO_LARGE");
+                    "PAYLOAD_TOO_LARGE",
+                    "IDEMPOTENCY_IN_PROGRESS",
+                    "IDEMPOTENCY_KEY_REUSED");
 
     /**
      * 拒绝缺失标识或提示；调用方负责提示中不包含秘密或内部异常。

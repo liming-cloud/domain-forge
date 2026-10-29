@@ -68,6 +68,11 @@
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-tracing</artifactId>
         </dependency>
+        <!-- 请求幂等：入口方法标 @Idempotent，按 Idempotency-Key 头只执行一次（便笺示例的创建）。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-idempotency</artifactId>
+        </dependency>
         <!-- 文件存储：domainforge.files.enabled=true 时启用（便笺示例的附件）。 -->
         <dependency>
             <groupId>org.domainforge</groupId>

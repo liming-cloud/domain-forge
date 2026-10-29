@@ -7,6 +7,7 @@ import @@PACKAGE@@.application.command.note.WriteNote;
 import @@PACKAGE@@.application.query.note.ListVisibleNotes;
 import @@PACKAGE@@.application.query.note.NoteQueries;
 import org.domainforge.access.api.CurrentAccess;
+import org.domainforge.idempotency.api.Idempotent;
 import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,9 +44,10 @@ public class NoteController {
     }
 
     /**
-     * 命令：在写范围内新建便笺。
+     * 命令：在写范围内新建便笺。带 {@code Idempotency-Key} 头时，同一键的重复提交只创建一条并返回首次结果。
      */
     @SaCheckPermission(NotePermissions.WRITE)
+    @Idempotent
     @PostMapping("/api/notes")
     public ApiResponse<NoteChangeResponse> create(@RequestBody CreateNoteRequest input) {
         return ApiResponse.success(NoteChangeResponse.of(
