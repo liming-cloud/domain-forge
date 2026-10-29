@@ -53,9 +53,14 @@ spring:
 
 # 本地直连 IAM 时设置 @@ENV@@_IAM_URL（如 http://127.0.0.1:8080）；为空时经 Nacos 发现 iam。
 # 消息组件连接 RocketMQ Proxy 的地址；只有发布或消费事件时才连接，部署时为 rocketmq-broker:8081。
+# 定时任务（PowerJob）：实现 ScheduledTask 的 Bean 由调度组件登记；部署时启用，本地与测试默认不启用。
 domainforge:
   messaging:
     endpoints: ${@@ENV@@_MESSAGING_ENDPOINTS:}
+  scheduling:
+    enabled: ${@@ENV@@_SCHEDULING_ENABLED:false}
+    server-address: ${@@ENV@@_SCHEDULING_SERVER_ADDRESS:}
+    app-password: ${@@ENV@@_SCHEDULING_APP_PASSWORD:}
 
 @@ARTIFACT@@:
   iam:

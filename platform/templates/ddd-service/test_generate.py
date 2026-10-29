@@ -23,6 +23,8 @@ class GenerateTest(unittest.TestCase):
         (deploy / 'nacos' / 'config').mkdir(parents=True)
         (deploy / 'rocketmq').mkdir(parents=True)
         (deploy / 'rocketmq' / 'topics.conf').write_text('# topics\n', encoding='utf-8')
+        (deploy / 'powerjob').mkdir(parents=True)
+        (deploy / 'powerjob' / 'apps.conf').write_text('iam\n', encoding='utf-8')
         (deploy / 'nacos' / 'config' / 'gateway.yaml').write_text(
             'gateway:\n  routing:\n    routes:\n      - id: iam\n        service: iam\n        paths: [/api/**]\n', encoding='utf-8')
         (deploy / 'compose.yml').write_text('services:\n  postgres:\n    image: postgres:18@sha256:abc\n',
@@ -45,6 +47,9 @@ class GenerateTest(unittest.TestCase):
         seed = (self.root / 'deploy/nacos/config/order-service.yaml').read_text(encoding='utf-8')
         self.assertIn('source: nacos', seed)
         self.assertIn('SPRING_PROFILES_ACTIVE: config-center', compose)
+        self.assertIn('ORDER_SERVICE_SCHEDULING_ENABLED: "true"', compose)
+        self.assertEqual('iam\norder-service\n',
+                         (self.root / 'deploy/powerjob/apps.conf').read_text(encoding='utf-8'))
         for path in output.rglob('*'):
             if path.is_file():
                 self.assertNotIn('@@', path.read_text(encoding='utf-8'), path)

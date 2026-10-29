@@ -1,0 +1,7 @@
+# 运维控制台覆盖文件：在主机回环地址发布 PowerJob 控制台（任务周期、暂停／恢复、手动触发、执行记录）。
+# 用法：COMPOSE_FILE=deploy/compose.yml:deploy/compose.console.yml，再经 SSH 隧道访问 http://127.0.0.1:<端口>；
+# 不要发布到公网，控制台账号体系与 IAM 分离（管理员 ADMIN，密码为环境文件中的 POWERJOB_ADMIN_PASSWORD）。
+services:
+  powerjob-server:
+    ports:
+      - "127.0.0.1:${POWERJOB_CONSOLE_PORT:-7700}:7700"

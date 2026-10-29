@@ -142,6 +142,82 @@ services:
     depends_on:
       rocketmq-broker:
         condition: service_healthy
+  powerjob-db-init:
+    # 一次性任务：建立 PowerJob 专用的数据库账号与同名 schema（与业务服务的 db-init 相同做法），可重复执行，
+    # 每次把密码同步为环境文件中的值。表在 domainforge 库中，因此随 backup.sh 一并备份恢复。
+    image: postgres:18.4-alpine3.24@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    logging: *logging
+    environment:
+      PGHOST: postgres
+      PGUSER: domainforge
+      PGDATABASE: domainforge
+      PGPASSWORD: ${POSTGRES_PASSWORD:?provide POSTGRES_PASSWORD}
+      SERVICE_DB_PASSWORD: ${POWERJOB_DB_PASSWORD:?provide POWERJOB_DB_PASSWORD}
+    entrypoint: [sh, -c]
+    command:
+      - |
+        psql -v ON_ERROR_STOP=1 -q <<'SQL'
+        \getenv service_password SERVICE_DB_PASSWORD
+        SELECT 'CREATE ROLE powerjob' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'powerjob') \gexec
+        ALTER ROLE powerjob WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'service_password';
+        CREATE SCHEMA IF NOT EXISTS powerjob AUTHORIZATION powerjob;
+        SQL
+        echo "powerjob database account ready"
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  powerjob-server:
+    # 定时任务调度（PowerJob）：任务登记、周期、暂停／恢复、手动触发与执行记录；控制台经 compose.console.yml 访问。
+    # 官方镜像运行时为 Java 8；只用 HTTP 通信，对外声明固定地址供各服务的 worker 连接。
+    image: powerjob/powerjob-server:v5.1.7@sha256:2b1f7e86cc500668c39d870b1bfac40dbd795258736de2e4e7142766bf836d73
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      JVMOPTIONS: -Xms256m -Xmx512m -Dpowerjob.network.external.address=172.31.250.30
+      # PostgreSQL 需要 AdpPostgreSQLDialect：默认方言把大字段建成 oid，调度时报错。
+      PARAMS: >-
+        --spring.profiles.active=product
+        --spring.datasource.core.driver-class-name=org.postgresql.Driver
+        --spring.datasource.core.jdbc-url=jdbc:postgresql://postgres:5432/domainforge?currentSchema=powerjob
+        --spring.datasource.core.username=powerjob
+        --spring.datasource.core.password=${POWERJOB_DB_PASSWORD:?provide POWERJOB_DB_PASSWORD}
+        --spring.datasource.remote.hibernate.properties.hibernate.dialect=tech.powerjob.server.persistence.config.dialect.AdpPostgreSQLDialect
+        --oms.auth.initiliaze.admin.password=${POWERJOB_ADMIN_PASSWORD:?provide POWERJOB_ADMIN_PASSWORD}
+        --oms.auth.openapi.enable=true
+        --oms.transporter.active.protocols=HTTP
+        --oms.transporter.main.protocol=HTTP
+        --oms.instanceinfo.retention=30
+    networks:
+      backend:
+        # 与 JVMOPTIONS 中的对外地址一致：worker 按它连接服务端。
+        ipv4_address: 172.31.250.30
+    depends_on:
+      powerjob-db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD-SHELL, 'curl -sf -o /dev/null http://127.0.0.1:7700/auth/supportLoginTypes']
+      interval: 3s
+      timeout: 3s
+      start_period: 60s
+      retries: 60
+  powerjob-init:
+    # 一次性任务：创建命名空间并按 powerjob/apps.conf 注册各服务的应用，成功后退出。
+    image: curlimages/curl:8.17.0@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40
+    restart: "no"
+    logging: *logging
+    entrypoint: [sh, /init/init.sh]
+    environment:
+      POWERJOB_ADMIN_PASSWORD: ${POWERJOB_ADMIN_PASSWORD:?provide POWERJOB_ADMIN_PASSWORD}
+      POWERJOB_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
+    volumes:
+      - ./powerjob/init.sh:/init/init.sh:ro
+      - ./powerjob/apps.conf:/init/apps.conf:ro
+    networks: [backend]
+    depends_on:
+      powerjob-server:
+        condition: service_healthy
   iam:
     image: domain-forge/iam:${IAM_IMAGE_TAG:-local}
     build:
@@ -167,6 +243,10 @@ services:
       # 只信任网关固定地址给出的 X-Forwarded-For（网关已按 Nginx 给出的值确定客户端地址），登录防护按真实客户端地址计数。
       SERVER_FORWARDHEADERSSTRATEGY: NATIVE
       SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES: '172\.31\.250\.11'
+      # 定时任务：IAM 的过期数据清理由 PowerJob 调度（应用 iam 由 powerjob-init 注册）。
+      IAM_SCHEDULING_ENABLED: "true"
+      IAM_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
+      IAM_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
     networks: [backend]
     depends_on:
       postgres:
@@ -174,6 +254,8 @@ services:
       redis:
         condition: service_healthy
       nacos-init:
+        condition: service_completed_successfully
+      powerjob-init:
         condition: service_completed_successfully
     healthcheck:
       # 管理端口只绑定容器内回环地址，不对网络开放。

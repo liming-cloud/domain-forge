@@ -115,6 +115,11 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.domainforge</groupId>
+                <artifactId>domain-forge-scheduling</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>

@@ -12,6 +12,8 @@
 | nacos | 服务注册与发现、配置中心，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限、配置；实例信息可重建） |
 | nacos-init | 一次性任务：设置管理员密码、创建服务专用账号、发布配置种子 | 无 | 无 |
 | rocketmq-namesrv、rocketmq-broker | 集成事件的传输：broker 内置 proxy，服务经 `rocketmq-broker:8081` 连接（见[消息与 Outbox](../docs/architecture/08-消息与Outbox.md#部署)） | 无 | 卷 `rocketmq-store`（不进入备份，Outbox 在 PostgreSQL 中） |
+| powerjob-server | 定时任务调度与控制台（见[定时任务](#定时任务)） | 无（控制台经 `compose.console.yml` 在回环地址发布） | 无（表在 PostgreSQL 的 `powerjob` schema） |
+| powerjob-db-init、powerjob-init | 一次性任务：PowerJob 数据库账号与 schema；命名空间与各服务的应用注册（`powerjob/apps.conf`） | 无 | 无 |
 | rocketmq-store-init、rocketmq-init | 一次性任务：修正存储卷属主；按 `rocketmq/topics.conf` 创建主题与消费组 | 无 | 无 |
 | `<服务名>`、`<服务名>-db-init` | 业务服务及其数据库账号初始化（覆盖文件 `services/<服务名>.compose.yml`） | 无 | 无（数据在 PostgreSQL） |
 
@@ -96,6 +98,15 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 备份含密码摘要与敏感输入指纹，按机密数据保存；异地副本、加密与保留周期由运维负责，本参考不提供定时任务。
 
+
+## 定时任务
+
+服务实现 `ScheduledTask` 的任务由 PowerJob 调度（设计与执行语义见[定时任务](../docs/architecture/09-定时任务.md)）：同一任务同一时刻只在一个实例上执行，停机期间错过的触发不补跑，失败不自动重试。
+
+- **控制台**：`COMPOSE_FILE=deploy/compose.yml:deploy/compose.console.yml docker compose --env-file <环境文件> up -d powerjob-server` 后，经 SSH 隧道访问 `http://127.0.0.1:${POWERJOB_CONSOLE_PORT:-7700}`，以 `ADMIN`／`POWERJOB_ADMIN_PASSWORD` 登录。在控制台修改周期、暂停或恢复、手动触发并查看执行记录；修改立即生效，重新部署不会覆盖（服务启动时只登记不存在的任务）。
+- **应用**：每个服务一个应用，名称与服务名相同，在 `powerjob/apps.conf` 登记，`powerjob-init` 在每次部署时注册尚不存在的应用；所有服务共用 `POWERJOB_APP_PASSWORD`。
+- **备份**：PowerJob 的表在 `domainforge` 库的 `powerjob` schema 中，任务定义（含控制台修改）与执行记录随 `backup.sh` 备份、`restore.sh` 恢复。执行记录保留 30 天。
+- **改密**：`POWERJOB_ADMIN_PASSWORD` 只在首次启动时生效，之后在控制台修改并同步环境文件；应用密码同理。
 
 ## 消息
 

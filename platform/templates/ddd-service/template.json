@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -371,6 +371,13 @@
       "source": "assets/deploy/nacos/config/gateway-tally-route.yaml.tpl",
       "target": "deploy/nacos/config/gateway.yaml",
       "example": "consume",
+      "root": "repository",
+      "mode": "append"
+    },
+    {
+      "source": "assets/deploy/powerjob/apps.conf.tpl",
+      "target": "deploy/powerjob/apps.conf",
+      "example": false,
       "root": "repository",
       "mode": "append"
     }

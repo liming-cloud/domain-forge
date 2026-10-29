@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
-#   首次部署与管理员初始化 → 网关（请求标识、直连后端被拒、限流与动态调整）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
+#   首次部署与管理员初始化 → 网关（请求标识、直连后端被拒、限流与动态调整）→ 定时任务（IAM 清理任务经 PowerJob 登记并执行）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
 #   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
 #   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退 →
@@ -101,10 +101,51 @@ for attempt in $(seq 1 40); do
 done
 [ "$raised" = "1" ] || fail "调高限流阈值未生效"
 
+# powerjob <路径> <JSON> [应用 ID]：在 backend 网络内以控制台管理员身份调用 PowerJob 控制台接口（服务端不对外开放端口）
+cat > "$work/powerjob.sh" <<'SH'
+#!/bin/sh
+set -eu
+server=http://powerjob-server:7700
+token=$(curl -sS -X POST "$server/auth/thirdPartyLoginDirect" -H 'Content-Type: application/json' \
+    -d "{\"loginType\":\"PWJB\",\"originParams\":\"{\\\"username\\\":\\\"ADMIN\\\",\\\"password\\\":\\\"$POWERJOB_ADMIN_PASSWORD\\\"}\"}" \
+    | sed -n 's/.*"jwtToken":"\([^"]*\)".*/\1/p')
+curl -sS -X POST "$server$1" -H 'Content-Type: application/json' -H "Power_jwt: $token" -H "AppId: ${3:-}" -d "$2"
+SH
+curl_image=$(sed -n 's/^    image: \(curlimages\/curl:.*\)$/\1/p' "$repo/deploy/compose.yml" | head -1)
+powerjob() {
+    docker run --rm --network "${COMPOSE_PROJECT_NAME}_backend" -v "$work/powerjob.sh:/powerjob.sh:ro" \
+        -e POWERJOB_ADMIN_PASSWORD="$(sed -n 's/^POWERJOB_ADMIN_PASSWORD=//p' "$env_file")" \
+        --entrypoint sh "$curl_image" /powerjob.sh "$@"
+}
+# scheduling_check：IAM 的清理任务在 PowerJob 中恰好登记一次，并且实际执行成功（以 IAM 的执行计数为准）
+scheduling_check() {
+    local app jobs attempt runs
+    app=$(powerjob /appInfo/list '{"index":0,"pageSize":50}' | python3 -I -c 'import json, sys
+print(next(a["id"] for a in json.load(sys.stdin)["data"]["data"] if a["appName"] == "iam"))') || fail "PowerJob 中没有应用 iam"
+    jobs=$(powerjob /job/list "{\"appId\":$app,\"index\":0,\"pageSize\":50}" "$app" | python3 -I -c 'import json, sys
+print(sum(1 for j in json.load(sys.stdin)["data"]["data"] if j["jobName"] == "iam-retention"))') || fail "无法读取 PowerJob 任务"
+    [ "$jobs" = "1" ] || fail "iam-retention 应恰好登记一次：$jobs"
+    for attempt in $(seq 1 50); do
+        runs=$(compose exec -T iam curl -s 'http://127.0.0.1:9091/actuator/metrics/domainforge.scheduling.run?tag=task:iam-retention&tag=result:success' \
+            | python3 -I -c 'import json, sys
+try: print(int(json.load(sys.stdin)["measurements"][0]["value"]))
+except Exception: print(0)')
+        [ "$runs" -ge 1 ] && return
+        sleep 3
+    done
+    fail "iam-retention 应由 PowerJob 调度并执行成功"
+}
+
+step "定时任务：IAM 清理任务登记并按周期执行"
+grep -q 'powerjob app registered: iam' <<< "$(compose logs powerjob-init)" || fail "PowerJob 应用 iam 未注册"
+scheduling_check
+
 step "普通重启保留数据"
 compose down > /dev/null 2>&1
 compose up -d --wait > /dev/null 2>&1 || fail "重启未全部健康"
 [ "$(login alice "$alice_pw")" = "200" ] || fail "重启后 alice 登录"
+grep -q 'powerjob app kept: iam' <<< "$(compose logs powerjob-init)" || fail "重新部署时应保留已注册的应用"
+scheduling_check
 admin_token=$(token admin "$admin_pw")
 
 step "备份"
@@ -139,6 +180,7 @@ step "核对恢复结果"
 [ "$(get_status /api/me "$stale_token")" = "401" ] || fail "恢复前的会话应失效"
 admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
+scheduling_check
 
 step "配置中心：种子已发布并被 IAM 读取"
 configs export "$env_file" "$work/configs.json" > /dev/null
