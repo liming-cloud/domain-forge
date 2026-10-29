@@ -81,7 +81,16 @@ class GatewayIT {
         publish(BASE_ROUTES, 1, 5, "replenish-per-second: 1");
         iam = stub("iam");
         notes = stub("notes");
-        gateway = new SpringApplicationBuilder(GatewayApplication.class).run(
+        gateway = launch(http);
+        base = "http://127.0.0.1:" + gateway.getBean(Environment.class).getProperty("local.server.port");
+        session = gateway.getBean(StpLogic.class).createLoginSession(1001L);
+    }
+
+    /**
+     * 启动一个网关实例（随机端口）；多个实例共用同一 Nacos 与 Redis。
+     */
+    private static ConfigurableApplicationContext launch(int http) {
+        return new SpringApplicationBuilder(GatewayApplication.class).run(
                 "--spring.main.banner-mode=off",
                 "--logging.level.root=WARN",
                 "--spring.profiles.active=config-center",
@@ -97,8 +106,6 @@ class GatewayIT {
                 "--GATEWAY_RESPONSE_TIMEOUT=1s",
                 "--spring.cloud.discovery.client.simple.instances.iam[0].uri=" + uri(iam),
                 "--spring.cloud.discovery.client.simple.instances.notes[0].uri=" + uri(notes));
-        base = "http://127.0.0.1:" + gateway.getBean(Environment.class).getProperty("local.server.port");
-        session = gateway.getBean(StpLogic.class).createLoginSession(1001L);
     }
 
     @AfterAll
@@ -267,6 +274,60 @@ class GatewayIT {
         assertTrue(get("/api/me", "203.0.113.10").body().contains("iam"));
         String iamTrace = RECEIVED.get("iam").get("traceparent");
         assertTrue(iamTrace.matches("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}"), iamTrace);
+    }
+
+    // 路由声明的接口限流：按账号计数（换客户端地址不绕过、其他账号不受影响），未声明的接口不受限，
+    // 两个网关实例共享计数，补充令牌后恢复。
+    @Test
+    @Order(10)
+    void limitsPerRouteAndAccount() throws Exception {
+        String limited = BASE_ROUTES.replace("        paths: [/api/notes/**, /api/me/notes]", String.join("\n",
+                "        paths: [/api/notes/**, /api/me/notes]",
+                "        limits:",
+                "          - endpoint: POST /api/notes/*/files",
+                "            by: account",
+                "            replenish-per-minute: 60",
+                "            burst: 3"));
+        publish(limited, 5, 50, "replenish-per-minute: 60");
+        String other = gateway.getBean(StpLogic.class).createLoginSession(1002L);
+        await("规则生效", () -> {
+            try {
+                return upload(base, session, "198.51.100.201") == 429;
+            } catch (Exception unavailable) {
+                return false;
+            }
+        });
+        try (var second = launch(Integer.parseInt(System.getenv("NACOS_PORT")))) {
+            String secondBase = "http://127.0.0.1:"
+                    + second.getBean(Environment.class).getProperty("local.server.port");
+            Thread.sleep(3100);
+            for (int index = 0; index < 3; index++)
+                assertEquals(200, upload(index == 1 ? secondBase : base, session, "198.51.100." + (210 + index)),
+                        "第 " + index + " 次（两个实例交替）");
+            assertEquals(429, upload(secondBase, session, "198.51.100.219"), "另一个网关实例共享计数");
+            // 余下断言在第二个实例关闭前完成：同一进程中的实例共用 Reactor Netty 全局资源，关闭任一实例会将其释放。
+            remainingLimitAssertions(other);
+        }
+    }
+
+    private static void remainingLimitAssertions(String other) throws Exception {
+        var rejected = call("POST", "/api/notes/7/files", "198.51.100.220",
+                Map.of("Authorization", "Bearer " + session));
+        assertEquals(429, rejected.statusCode());
+        assertTrue(rejected.body().contains("\"code\":\"RATE_LIMITED\""));
+        assertEquals("1", rejected.headers().firstValue("Retry-After").orElseThrow());
+        assertEquals(200, upload(base, other, "198.51.100.221"), "其他账号不受影响");
+        assertEquals(200, get("/api/notes/7", "198.51.100.222").statusCode(), "未声明限流的接口不受影响");
+        Thread.sleep(1100);
+        assertEquals(200, upload(base, session, "198.51.100.224"), "补充令牌后恢复");
+    }
+
+    private static int upload(String target, String token, String client) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create(target + "/api/notes/7/files"))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .header("X-Forwarded-For", client)
+                .header("Authorization", "Bearer " + token);
+        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString()).statusCode();
     }
 
     // 发布配置引起的刷新不影响已登录的请求：刷新期间持续用有效令牌请求，不应出现 401（#49）。

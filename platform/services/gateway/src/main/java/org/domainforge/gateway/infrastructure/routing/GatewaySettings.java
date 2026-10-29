@@ -1,5 +1,8 @@
 package org.domainforge.gateway.infrastructure.routing;
 
+import org.springframework.http.server.PathContainer;
+
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +28,14 @@ public record GatewaySettings(List<RouteSettings> routes, RateLimitSettings rate
             for (String path : route.paths())
                 if (!paths.add(path)) throw new IllegalArgumentException("路径出现在多条路由中: " + path);
         }
+    }
+
+    /**
+     * 请求路径会被转发到的路由：与路由定位器一致，取字面前缀最长的匹配。
+     */
+    public Optional<RouteSettings> routeFor(PathContainer path) {
+        return routes.stream().filter(route -> route.specificity(path) >= 0)
+                .max(Comparator.comparingInt(route -> route.specificity(path)));
     }
 
     /**

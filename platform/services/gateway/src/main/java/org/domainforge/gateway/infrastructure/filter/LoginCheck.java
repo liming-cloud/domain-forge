@@ -24,6 +24,10 @@ public final class LoginCheck {
      * WebFlux 的管理端口复用主应用的 WebFilter，健康检查不能要求登录；主端口上这些路径不在任何路由中，仍为 404。
      */
     private static final String MANAGEMENT = "/actuator/**";
+    /**
+     * 交换属性：已通过登录校验的账号 ID，按账号限流时使用；匿名接口没有该属性。
+     */
+    public static final String ACCOUNT = "domainforge.account-id";
     private static final String UNAUTHENTICATED =
             "{\"code\":\"UNAUTHENTICATED\",\"message\":\"需要身份认证\",\"data\":null}";
     private static final String UNAVAILABLE =
@@ -42,7 +46,10 @@ public final class LoginCheck {
         return new SaReactorFilter()
                 .addInclude("/**")
                 .addExclude(MANAGEMENT)
-                .setAuth(ignored -> SaRouter.match(!anonymous(settings)).check(route -> StpUtil.checkLogin()))
+                .setAuth(ignored -> SaRouter.match(!anonymous(settings)).check(route -> {
+                    StpUtil.checkLogin();
+                    SaHolder.getStorage().set(ACCOUNT, String.valueOf(StpUtil.getLoginId()));
+                }))
                 .setError(LoginCheck::respond);
     }
 

@@ -5,7 +5,7 @@
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
-#   文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→
+#   文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
@@ -190,6 +190,26 @@ expect 200 "上传附件"
 [ "$(download "$note_id" "$file_id" "$bob_token")" = "403" ] || fail "无权限账号下载附件应 403"
 post /api/notes '{"title":"大请求体","content":"'"$(head -c 70000 /dev/zero | tr '\0' x)"'"}' "$alice_token" > /dev/null
 expect 413 "普通接口仍限制请求体为 64k"
+
+step "网关按路由与账号限流：附件上传"
+# 种子中便笺附件上传按账号突发 10 次。bob 没有权限，后端返回 403，但网关按账号计数在先：突发用尽后 429。
+head -c 1024 /dev/urandom > "$work/small.pdf"
+denied=0
+limited=""
+for attempt in $(seq 1 15); do
+    upload "$note_id" "$work/small.pdf" "$bob_token" > /dev/null
+    case "$(cat "$work/status")" in
+        403) denied=$((denied + 1)) ;;
+        429) limited=yes; break ;;
+        *) fail "附件上传限流：意外状态 $(cat "$work/status") $(cat "$work/body")" ;;
+    esac
+done
+[ -n "$limited" ] && [ "$denied" -ge 10 ] || fail "按账号突发 10 次后应 429：403 次数 $denied，是否 429：${limited:-否}"
+grep -q '"code":"RATE_LIMITED"' "$work/body" || fail "限流响应应为 RATE_LIMITED"
+small_id=$(upload "$note_id" "$work/small.pdf" "$alice_token" | field id)
+expect 200 "其他账号的附件上传不受 bob 的限流影响"
+call DELETE "/api/notes/$note_id/files/$small_id" "" "$alice_token" > /dev/null
+expect 200 "删除用于验证的附件"
 
 step "数据库账号隔离"
 isolation=$(compose exec -T -e PGPASSWORD="$service_db_pw" postgres \
