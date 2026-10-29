@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -84,7 +85,9 @@ public final class SqlFileStore implements FileStore {
         }
         Spool spool = spool(upload.content(), Math.min(policy.maxBytes(), settings.maxBytes()));
         try {
-            OffsetDateTime now = OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC);
+            // 截到微秒：PostgreSQL 只保存到微秒，返回值须与之后读到的一致（Linux 时钟精度为纳秒）。
+            OffsetDateTime now = OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC)
+                    .truncatedTo(ChronoUnit.MICROS);
             String id = UUID.randomUUID().toString();
             String key = DAY.format(now) + id;
             storage.write(key, spool.path(), spool.size());
