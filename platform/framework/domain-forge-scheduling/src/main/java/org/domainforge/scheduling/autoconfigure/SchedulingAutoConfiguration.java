@@ -2,6 +2,7 @@ package org.domainforge.scheduling.autoconfigure;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.tracing.Tracer;
 import org.domainforge.scheduling.api.ScheduledTask;
 import org.domainforge.scheduling.internal.TaskDispatcher;
 import org.domainforge.scheduling.internal.TaskRegistrar;
@@ -34,8 +35,10 @@ public class SchedulingAutoConfiguration {
          */
         @Bean(TaskDispatcher.BEAN)
         TaskDispatcher domainforgeTaskDispatcher(ObjectProvider<ScheduledTask> tasks,
-                                                 ObjectProvider<MeterRegistry> metrics) {
-            return new TaskDispatcher(tasks.orderedStream().toList(), metrics.getIfAvailable(SimpleMeterRegistry::new));
+                                                 ObjectProvider<MeterRegistry> metrics,
+                                                 ObjectProvider<Tracer> tracer) {
+            return new TaskDispatcher(tasks.orderedStream().toList(), metrics.getIfAvailable(SimpleMeterRegistry::new),
+                    tracer.getIfAvailable(() -> Tracer.NOOP));
         }
 
         /**

@@ -9,7 +9,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 路径检查、请求标识与客户端地址的判定规则。
+ * 路径检查与客户端地址的判定规则。
  */
 class RequestFiltersTest {
     // 可能被后端解码或规范化成其他路径的写法一律拒绝。
@@ -21,14 +21,6 @@ class RequestFiltersTest {
             assertFalse(PathGuardFilter.safe(path), path);
         for (String path : List.of("/api/notes", "/api/notes/1", "/api/me/notes", "/api/a.b/c-d_e"))
             assertTrue(PathGuardFilter.safe(path), path);
-    }
-
-    // 合法标识沿用，含换行或超长的值重新生成。
-    @Test
-    void requestIdKeepsOnlySafeValues() {
-        assertEquals("abc-1.2_x", RequestIdentityFilter.requestId("abc-1.2_x"));
-        for (String supplied : new String[]{null, "", "a\nb", "x".repeat(65)})
-            assertTrue(RequestIdentityFilter.requestId(supplied).matches("[0-9a-f]{32}"));
     }
 
     // 只有可信代理给出的转发地址被采用；伪造的头和非地址内容退回连接地址。

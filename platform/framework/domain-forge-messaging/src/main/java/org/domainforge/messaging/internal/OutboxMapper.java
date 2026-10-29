@@ -14,7 +14,8 @@ public interface OutboxMapper {
     /**
      * 写入一条待发送记录。
      */
-    int insert(@Param("event") OutgoingEvent event, @Param("eventId") String eventId);
+    int insert(@Param("event") OutgoingEvent event, @Param("eventId") String eventId,
+               @Param("traceParent") String traceParent);
 
     /**
      * 抢占到期的记录（FOR UPDATE SKIP LOCKED）；有顺序键的只取该键最早的一条未发送记录。

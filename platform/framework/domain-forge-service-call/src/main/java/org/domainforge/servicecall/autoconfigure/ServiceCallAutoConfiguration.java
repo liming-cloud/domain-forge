@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Bean;
 @ConditionalOnClass(Feign.class)
 public class ServiceCallAutoConfiguration {
     /**
-     * Same-Token、用户令牌与请求标识。
+     * Same-Token 与用户令牌（链路上下文由 OpenFeign 的 Micrometer 观测传递）。
      */
     @Bean
     RequestInterceptor serviceCallIdentity() {

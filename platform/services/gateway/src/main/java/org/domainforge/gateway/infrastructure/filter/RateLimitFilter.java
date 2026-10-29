@@ -74,7 +74,7 @@ public class RateLimitFilter implements WebFilter, Ordered {
     }
 
     /**
-     * 请求标识之后、登录校验（Sa-Token 全局过滤器）之前：未登录的请求与匿名的登录接口同样受限。
+     * 确定客户端地址之后、登录校验（Sa-Token 全局过滤器）之前：未登录的请求与匿名的登录接口同样受限。
      */
     @Override
     public int getOrder() {

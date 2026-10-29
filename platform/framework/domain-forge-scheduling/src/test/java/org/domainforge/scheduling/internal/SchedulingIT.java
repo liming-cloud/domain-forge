@@ -51,6 +51,7 @@ class SchedulingIT {
     private static final AtomicInteger SLOW_MAX = new AtomicInteger();
     private static final AtomicInteger SLOW_RUNS = new AtomicInteger();
     private static final List<String> MANUAL = new CopyOnWriteArrayList<>();
+    private static final List<String> TRACE_IDS = new CopyOnWriteArrayList<>();
     private static final Map<String, Long> IDS = new ConcurrentHashMap<>();
     private static String server;
     private static ConfigurableApplicationContext application;
@@ -168,6 +169,9 @@ class SchedulingIT {
         await("执行记录为成功", Duration.ofSeconds(30), () -> instances("it-tick").stream()
                 .anyMatch(item -> item.getStatus() == InstanceStatus.SUCCEED.getV()));
         assertTrue(counter("it-tick", "success") >= 2);
+        // 每次执行开启一条新链路：日志带 traceId，且各次不同。
+        assertTrue(TRACE_IDS.stream().allMatch(id -> id.matches("[0-9a-f]{32}")), TRACE_IDS.toString());
+        assertEquals(TRACE_IDS.size(), TRACE_IDS.stream().distinct().count(), TRACE_IDS.toString());
     }
 
     // 手动触发带参数；失败只记录一次，不自动重试，原因为异常类型。
@@ -235,7 +239,10 @@ class SchedulingIT {
 
         @Bean
         ScheduledTask tick() {
-            return task("it-tick", "0/3 * * * * ?", run -> TICKS.incrementAndGet());
+            return task("it-tick", "0/3 * * * * ?", run -> {
+                TICKS.incrementAndGet();
+                TRACE_IDS.add(String.valueOf(org.slf4j.MDC.get("traceId")));
+            });
         }
 
         @Bean

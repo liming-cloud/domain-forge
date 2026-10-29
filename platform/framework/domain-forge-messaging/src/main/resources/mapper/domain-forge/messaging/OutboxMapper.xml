@@ -2,15 +2,16 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.domainforge.messaging.internal.OutboxMapper">
     <insert id="insert">
-        INSERT INTO domainforge_outbox (event_id, topic, event_type, event_version, event_key, order_key, payload)
+        INSERT INTO domainforge_outbox (event_id, topic, event_type, event_version, event_key, order_key, payload,
+                                        trace_parent)
         VALUES (#{eventId}, #{event.topic}, #{event.type}, #{event.version}, #{event.key}, #{event.orderKey},
-                #{event.payload})
+                #{event.payload}, #{traceParent})
     </insert>
 
     <!-- 同一顺序键只有最早的未发送记录可被抢占；它被其他实例锁住时，后面的记录同样不可见，因此按键串行。 -->
     <select id="claim" resultType="org.domainforge.messaging.internal.OutboxRow">
         SELECT o.id, o.event_id AS eventId, o.topic, o.event_type AS eventType, o.event_version AS version,
-               o.event_key AS eventKey, o.order_key AS orderKey, o.payload, o.attempts
+               o.event_key AS eventKey, o.order_key AS orderKey, o.payload, o.attempts, o.trace_parent AS traceParent
         FROM domainforge_outbox o
         WHERE o.sent_at IS NULL
           AND o.next_attempt_at &lt;= now()

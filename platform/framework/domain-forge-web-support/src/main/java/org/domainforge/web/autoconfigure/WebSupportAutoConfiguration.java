@@ -4,7 +4,6 @@ import org.domainforge.web.api.BusinessRejectionMapping;
 import org.domainforge.web.internal.AdviceConflicts;
 import org.domainforge.web.internal.PlatformExceptionAdvice;
 import org.domainforge.web.internal.RejectionMappings;
-import org.domainforge.web.internal.RequestIdFilter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -55,15 +54,5 @@ public class WebSupportAutoConfiguration {
     AdviceConflicts adviceConflicts(
             ApplicationContext context, List<RequestMappingHandlerMapping> handlers) {
         return new AdviceConflicts(context, handlers);
-    }
-
-    /**
-     * 请求标识写入日志上下文与响应头；Boot 按过滤器自身的顺序注册。
-     *
-     * @return 请求标识过滤器
-     */
-    @Bean
-    RequestIdFilter requestIdFilter() {
-        return new RequestIdFilter();
     }
 }

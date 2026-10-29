@@ -4,7 +4,7 @@
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
-| nginx | 唯一公开入口：`/api/` 全部转发到网关，生成请求标识 | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
+| nginx | 唯一公开入口：`/api/` 全部转发到网关，删除客户端带来的追踪头 | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
 | gateway | API 网关：按 Nacos 中 `gateway.yaml` 的路由分发到各服务，登录前置校验、限流，写入 Same-Token（见[API 网关](../docs/architecture/06-API网关.md)） | 无 | 无（路由在 Nacos） |
 | iam | 身份权限服务，启动后注册到 Nacos | 无 | 无（数据在 PostgreSQL） |
 | postgres | 库 `domainforge`：IAM 在 `public`，每个业务服务一个同名 schema | 无 | 卷 `postgres-data` |
@@ -63,7 +63,8 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **客户端地址**：Nginx 用 `$remote_addr` 覆盖 `X-Forwarded-For`；网关只信任 Nginx 固定地址给出的该头，转发时再以确定的客户端地址覆盖；IAM 只信任网关固定地址给出的该头。登录防护与网关限流都按真实客户端地址计数，客户端伪造的头无效。前面再加一层负载均衡时，需要把它的地址加入 Nginx 的 `set_real_ip_from`，否则所有请求都会被算成同一个地址。
 - **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/architecture/06-API网关.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
 - **限流**：网关按客户端地址限流（默认每秒 20 个、突发 40 个，超出 429），阈值在 Nacos 的 `gateway.yaml` 中调整、立即生效。前面再加负载均衡或客户端经同一 NAT 出口时，需要相应调高。
-- **请求标识**：Nginx 为每个请求生成 `X-Request-Id`，覆盖客户端传入的值；网关访问日志（`gateway_access request_id=…`）与后端日志都带上该标识，并在响应头返回，排查时按它关联日志。
+- **链路标识**：Nginx 删除客户端带来的 `traceparent`、`tracestate`、`baggage`，链路从网关开始；响应头 `X-Trace-Id` 即 traceId，网关访问日志（`gateway_access trace_id=…`）与各服务日志都带上它，排查时按它关联。
+- **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
 - **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。
@@ -157,7 +158,7 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 | 场景 | 核对 |
 |---|---|
 | 首次部署、管理员初始化、普通重启 | 全部 healthy，仅 nginx 有主机端口；`/internal/`、管理端点经入口为 404，歧义路径不转发；重启后账号仍可登录 |
-| 网关 | 响应带请求标识且见于网关访问日志；网段内直连 IAM（含伪造 Same-Token 访问 `/internal/`）401；同一地址的突发请求被限流，经配置中心调高阈值后实际生效 |
+| 网关 | 响应带 traceId（不沿用客户端的追踪头）且见于网关访问日志；网段内直连 IAM（含伪造 Same-Token 访问 `/internal/`）401；同一地址的突发请求被限流，经配置中心调高阈值后实际生效 |
 | 备份、备份后继续变更、删除数据库卷、恢复 | 备份前的账号和密码可用，备份后注册的账号与改密不存在，恢复前的会话被拒绝，审计可查询 |
 | 升级到带新增迁移的版本 | 自动生成升级前备份，迁移已执行，账号可登录 |
 | 应用回退 | 旧版本在新结构上正常运行，新增的表保留 |
@@ -228,4 +229,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；备份 → 继续写入 → 恢复后只剩备份前数据且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。

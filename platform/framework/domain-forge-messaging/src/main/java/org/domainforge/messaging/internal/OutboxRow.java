@@ -11,7 +11,8 @@ package org.domainforge.messaging.internal;
  * @param eventKey  业务键
  * @param orderKey  顺序键，可为空
  * @param payload   JSON 文本
- * @param attempts  已失败次数
+ * @param attempts    已失败次数
+ * @param traceParent 发布时的链路上下文，可为空
  */
 public record OutboxRow(
         long id,
@@ -22,5 +23,6 @@ public record OutboxRow(
         String eventKey,
         String orderKey,
         String payload,
-        int attempts) {
+        int attempts,
+        String traceParent) {
 }

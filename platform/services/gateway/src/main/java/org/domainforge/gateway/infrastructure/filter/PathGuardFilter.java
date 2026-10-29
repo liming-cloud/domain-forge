@@ -39,7 +39,7 @@ public class PathGuardFilter implements WebFilter, Ordered {
     }
 
     /**
-     * 先于请求标识与路由执行。
+     * 先于确定客户端地址与路由执行。
      */
     @Override
     public int getOrder() {

@@ -1,0 +1,16 @@
+# 链路追踪组件默认值。导出默认关闭：配置 management.opentelemetry.tracing.export.otlp.endpoint
+# （如 http://collector:4318/v1/traces）后才把采样的链路发往业务项目提供的采集端。
+management:
+  tracing:
+    # 只用 W3C traceparent 传播；入口（Nginx）删除客户端带来的追踪头，链路从网关开始。
+    propagation:
+      consume: [W3C]
+      produce: [W3C]
+domainforge:
+  tracing:
+    # 新链路的采样率（动态配置组，可在 Nacos 中调整）；未采样的链路仍有 traceId，日志与响应头照常输出。
+    sampling-probability: 0.1
+spring:
+  reactor:
+    # 响应式应用（网关）中把链路上下文传到日志等线程本地机制。
+    context-propagation: auto

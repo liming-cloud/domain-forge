@@ -2,6 +2,8 @@ package org.domainforge.messaging.autoconfigure;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.apache.rocketmq.client.apis.ClientConfiguration;
 import org.apache.rocketmq.client.apis.ClientException;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
@@ -13,6 +15,7 @@ import org.domainforge.messaging.internal.InboxMapper;
 import org.domainforge.messaging.internal.OutboxMapper;
 import org.domainforge.messaging.internal.OutboxPublisher;
 import org.domainforge.messaging.internal.OutboxRelay;
+import org.domainforge.messaging.internal.TraceContexts;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -60,12 +63,13 @@ public class MessagingAutoConfiguration {
      * 发布接口：只在启用 Outbox 的服务中存在。
      */
     @Bean
-    EventPublisher eventPublisher(Environment environment, OutboxMapper outbox, ObjectProvider<OutboxRelay> relay) {
+    EventPublisher eventPublisher(Environment environment, OutboxMapper outbox, ObjectProvider<OutboxRelay> relay,
+                                  TraceContexts traces) {
         if (!flag(environment, "domainforge.messaging.outbox.enabled", false))
             return event -> {
                 throw new IllegalStateException("未启用 Outbox（domainforge.messaging.outbox.enabled）");
             };
-        return new OutboxPublisher(outbox, () -> relay.ifAvailable(OutboxRelay::wake));
+        return new OutboxPublisher(outbox, () -> relay.ifAvailable(OutboxRelay::wake), traces);
     }
 
     /**
@@ -74,7 +78,7 @@ public class MessagingAutoConfiguration {
     @Bean
     OutboxRelay outboxRelay(Environment environment, MessagingClient client, OutboxMapper outbox, InboxMapper inbox,
                             TransactionOperations transactions, ObjectProvider<EventHandler> handlers,
-                            ObjectProvider<MeterRegistry> metrics) throws ClientException {
+                            ObjectProvider<MeterRegistry> metrics, TraceContexts traces) throws ClientException {
         boolean publishing = flag(environment, "domainforge.messaging.outbox.enabled", false)
                 && flag(environment, "domainforge.messaging.relay.enabled", true);
         boolean consuming = handlers.stream().findAny().isPresent();
@@ -88,7 +92,7 @@ public class MessagingAutoConfiguration {
                 environment.getProperty("domainforge.messaging.retention-hours", Long.class, 168L),
                 publishing, consuming);
         return new OutboxRelay(outbox, inbox, transactions, producer, settings,
-                metrics.getIfAvailable(SimpleMeterRegistry::new));
+                metrics.getIfAvailable(SimpleMeterRegistry::new), traces);
     }
 
     /**
@@ -97,12 +101,22 @@ public class MessagingAutoConfiguration {
     @Bean
     EventConsumers eventConsumers(Environment environment, MessagingClient client,
                                   ObjectProvider<EventHandler> handlers, InboxMapper inbox,
-                                  TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics) {
+                                  TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics,
+                                  TraceContexts traces) {
         List<EventHandler> all = flag(environment, "domainforge.messaging.consumer.enabled", true)
                 ? handlers.orderedStream().toList() : List.of();
         return new EventConsumers(all, all.isEmpty() ? null : client.require(), inbox, transactions,
                 environment.getProperty("domainforge.messaging.consumer.max-attempts", Integer.class, 5),
-                metrics.getIfAvailable(SimpleMeterRegistry::new));
+                metrics.getIfAvailable(SimpleMeterRegistry::new), traces);
+    }
+
+    /**
+     * 链路上下文：服务启用了链路追踪时使用其 Tracer 与 Propagator，否则为空实现。
+     */
+    @Bean
+    TraceContexts messagingTraceContexts(ObjectProvider<Tracer> tracer, ObjectProvider<Propagator> propagator) {
+        return new TraceContexts(tracer.getIfAvailable(() -> Tracer.NOOP),
+                propagator.getIfAvailable(() -> Propagator.NOOP));
     }
 
     /**

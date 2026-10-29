@@ -13,16 +13,19 @@ import java.util.UUID;
 public final class OutboxPublisher implements EventPublisher {
     private final OutboxMapper outbox;
     private final Runnable wake;
+    private final TraceContexts traces;
 
     /**
      * 写入与唤醒分离，未启用中继时唤醒为空操作。
      *
      * @param outbox Outbox 写入
      * @param wake   提交后唤醒中继
+     * @param traces 链路上下文：记下发布时的当前链路
      */
-    public OutboxPublisher(OutboxMapper outbox, Runnable wake) {
+    public OutboxPublisher(OutboxMapper outbox, Runnable wake, TraceContexts traces) {
         this.outbox = outbox;
         this.wake = wake;
+        this.traces = traces;
     }
 
     @Override
@@ -30,7 +33,7 @@ public final class OutboxPublisher implements EventPublisher {
         if (!TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("集成事件必须在业务事务内发布");
         String id = UUID.randomUUID().toString();
-        outbox.insert(event, id);
+        outbox.insert(event, id, traces.current());
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

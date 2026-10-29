@@ -125,7 +125,7 @@ class GatewayIT {
         var headers = exchange.getRequestHeaders();
         var seen = new ConcurrentHashMap<String, String>();
         seen.put("path", exchange.getRequestURI().getRawPath());
-        for (String header : new String[]{"Authorization", "X-Request-Id", "X-Forwarded-For", "SA-SAME-TOKEN"}) {
+        for (String header : new String[]{"Authorization", "traceparent", "X-Forwarded-For", "SA-SAME-TOKEN"}) {
             String value = headers.getFirst(header);
             if (value != null) seen.put(header, value);
         }
@@ -134,9 +134,9 @@ class GatewayIT {
         byte[] body = ("{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":\"" + name + "\"}")
                 .getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
-        // 与 web-support 一样回传请求标识，验证网关响应中不会出现两个值。
-        String requestId = headers.getFirst("X-Request-Id");
-        if (requestId != null) exchange.getResponseHeaders().add("X-Request-Id", requestId);
+        // 与后端的追踪组件一样回传 traceId，验证网关响应中不会出现两个值。
+        String traceparent = headers.getFirst("traceparent");
+        if (traceparent != null) exchange.getResponseHeaders().add("X-Trace-Id", traceparent.split("-")[1]);
         exchange.sendResponseHeaders(200, body.length);
         exchange.getResponseBody().write(body);
         exchange.close();
@@ -241,27 +241,30 @@ class GatewayIT {
         return found == null ? 0 : found.count();
     }
 
-    // 最长前缀决定服务；令牌、请求标识与客户端地址原样到达，客户端伪造的 Same-Token 被替换为当前值。
+    // 最长前缀决定服务；令牌与客户端地址原样到达，链路上下文传到后端且与响应头的 traceId 一致；伪造的 Same-Token 被替换。
     @Test
     @Order(1)
     void forwardsWithIdentityHeaders() throws Exception {
         var response = call("GET", "/api/notes/7", "203.0.113.10", Map.of(
-                "Authorization", "Bearer " + session, "X-Request-Id", "it-req-1", "SA-SAME-TOKEN", "forged"));
+                "Authorization", "Bearer " + session, "SA-SAME-TOKEN", "forged"));
         assertEquals(200, response.statusCode(), () -> response.body() + " DEBUG tokenName="
                 + SaManager.getConfig().getTokenName() + " loginId="
                 + gateway.getBean(StpLogic.class).getLoginIdNotHandle(session) + " byToken="
                 + gateway.getBean(StpLogic.class).getLoginIdByToken(session) + " dao="
                 + SaManager.getSaTokenDao().getClass().getSimpleName());
-        assertEquals(List.of("it-req-1"), response.headers().allValues("X-Request-Id"));
+        List<String> traceIds = response.headers().allValues("X-Trace-Id");
+        assertEquals(1, traceIds.size(), traceIds.toString());
+        assertTrue(traceIds.getFirst().matches("[0-9a-f]{32}"), traceIds.toString());
         var seen = RECEIVED.get("notes");
         assertEquals("/api/notes/7", seen.get("path"));
         assertEquals("Bearer " + session, seen.get("Authorization"));
-        assertEquals("it-req-1", seen.get("X-Request-Id"));
+        assertTrue(seen.get("traceparent").startsWith("00-" + traceIds.getFirst() + "-"), seen.get("traceparent"));
         assertEquals("203.0.113.10", seen.get("X-Forwarded-For"));
         assertEquals(SaSameUtil.getTokenNh(), seen.get("SA-SAME-TOKEN"));
         assertTrue(get("/api/me/notes", "203.0.113.10").body().contains("notes"));
         assertTrue(get("/api/me", "203.0.113.10").body().contains("iam"));
-        assertTrue(RECEIVED.get("iam").get("X-Request-Id").matches("[0-9a-f]{32}"));
+        String iamTrace = RECEIVED.get("iam").get("traceparent");
+        assertTrue(iamTrace.matches("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}"), iamTrace);
     }
 
     // 未登录、无效令牌、只在参数中给令牌都在网关拒绝；匿名清单中的登录接口放行。
