@@ -11,7 +11,9 @@ gateway:
     rate-limit:
       replenish-per-second: 20
       burst: 40
-    # 每条路由：服务名（Nacos 中注册的名字）、公开路径、无需登录的接口。路径越具体越先匹配，IAM 的 /api/** 兜底。
+    # 每条路由：服务名（Nacos 中注册的名字）、公开路径、无需登录的接口，以及可选的接口限流 limits
+    # （endpoint：“方法 路径模式”；by：account 按账号或 client 按客户端地址；replenish-per-minute 与 burst）。
+    # 路径越具体越先匹配，IAM 的 /api/** 兜底。
     # 模板生成服务时在下方追加该服务的路由。
     routes:
       - id: iam
