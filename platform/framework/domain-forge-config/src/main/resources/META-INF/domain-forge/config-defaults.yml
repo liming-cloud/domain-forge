@@ -1,6 +1,11 @@
 # 配置组件默认值（最低优先级）。
 spring:
   cloud:
+    refresh:
+      # Nacos 发布配置时 Spring Cloud 会重新绑定所有 @ConfigurationProperties 对象；重新绑定期间对象字段短暂回到默认值。
+      # Sa-Token 的会话策略不是动态配置，重新绑定会让并发请求读到默认的令牌请求头名而误判未登录（#49），因此排除。
+      # 前一项是 Spring Cloud 的默认值，覆盖列表时须保留。
+      never-refreshable: com.zaxxer.hikari.HikariDataSource,cn.dev33.satoken.config.SaTokenConfig
     nacos:
       config:
         # 未启用 config-center profile 时不创建 Nacos 配置客户端；启用时由 NacosClientDefaults 开启。

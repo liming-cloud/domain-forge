@@ -30,6 +30,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
@@ -265,6 +267,35 @@ class GatewayIT {
         assertTrue(get("/api/me", "203.0.113.10").body().contains("iam"));
         String iamTrace = RECEIVED.get("iam").get("traceparent");
         assertTrue(iamTrace.matches("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}"), iamTrace);
+    }
+
+    // 发布配置引起的刷新不影响已登录的请求：刷新期间持续用有效令牌请求，不应出现 401（#49）。
+    @Test
+    @Order(9)
+    void configRefreshKeepsSessions() throws Exception {
+        var unauthenticated = new AtomicInteger();
+        var succeeded = new AtomicInteger();
+        var stop = new AtomicBoolean();
+        var worker = new Thread(() -> {
+            for (int i = 0; !stop.get(); i++) {
+                // 轮换客户端地址，避开按地址的限流。
+                int code = status("/api/notes/7", "198.51.100." + (i % 200 + 1));
+                if (code == 401) unauthenticated.incrementAndGet();
+                if (code == 200) succeeded.incrementAndGet();
+            }
+        });
+        worker.start();
+        try {
+            for (int round = 0; round < 4; round++) {
+                publish(BASE_ROUTES, 1, 6 + round, "burst: " + (6 + round));
+                Thread.sleep(1500);
+            }
+        } finally {
+            stop.set(true);
+            worker.join();
+        }
+        assertTrue(succeeded.get() > 0, "刷新期间应有成功的请求");
+        assertEquals(0, unauthenticated.get(), "刷新期间有效会话不应被判为未登录");
     }
 
     // 未登录、无效令牌、只在参数中给令牌都在网关拒绝；匿名清单中的登录接口放行。
