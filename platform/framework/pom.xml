@@ -21,5 +21,6 @@
         <module>domain-forge-tracing</module>
         <module>domain-forge-file-storage</module>
         <module>domain-forge-notification</module>
+        <module>domain-forge-idempotency</module>
     </modules>
 </project>

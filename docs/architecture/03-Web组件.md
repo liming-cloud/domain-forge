@@ -31,12 +31,13 @@
 | 已判定的业务拒绝 | 200 | 业务自定义的稳定代码，`data` 为 `null` |
 | 请求体或参数解析失败 | 400 | `INVALID_REQUEST` |
 | 请求体超过上限（上传超过 multipart 上限，由文件存储组件映射） | 413 | `PAYLOAD_TOO_LARGE` |
+| 幂等请求：首次仍在处理、同一键用于不同请求（由幂等组件返回，见[请求幂等](13-请求幂等.md)） | 409 / 422 | `IDEMPOTENCY_IN_PROGRESS` / `IDEMPOTENCY_KEY_REUSED` |
 | 未认证 / 无权限 | 401 / 403 | `UNAUTHENTICATED` / `FORBIDDEN` |
 | 依赖不可用 | 503 | `SERVICE_UNAVAILABLE` |
 | 未知异常、映射失败 | 500 | `INTERNAL_ERROR`，固定安全提示 |
 | 路由不存在、方法不允许 | 保持框架默认（404 / 405） | 不改写 |
 
-`SUCCESS`、`ACCEPTED`、上述平台失败代码（含 `PAYLOAD_TOO_LARGE`），以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
+`SUCCESS`、`ACCEPTED`、上述平台失败代码（含 `PAYLOAD_TOO_LARGE` 与两个幂等代码），以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
 
 ## 业务拒绝映射
 
