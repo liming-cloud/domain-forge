@@ -1,0 +1,46 @@
+name: 能力跟踪
+description: 一行首版验收场景对应的完整能力（跟踪 issue），按能力级完成定义关闭
+title: "[能力] "
+labels: ["kind/capability", "status/needs-decision"]
+body:
+  - type: markdown
+    attributes:
+      value: 描述是唯一事实来源，进度与决定更新在描述中。流程见 docs/workflow/01-开发流程.md 的“任务与 issue”。
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 引用产品定义“验收场景提纲”中对应行的原文与链接
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围
+      description: 包含什么、不做什么；已有的部分
+    validations:
+      required: true
+  - type: textarea
+    id: questions
+    attributes:
+      label: 未决问题
+      description: 需要人决定的问题（范围、公开合同、安全语义、新依赖、放宽规则），答复后勾选并写进设计文档的“决定”小节
+      value: "- [ ] "
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: 验收场景
+      description: 每条写明验证它的测试或脚本；只能手动验证的写明执行人与结果记录位置
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: textarea
+    id: slices
+    attributes:
+      label: 切片
+      description: 开工时按纵向切片建 sub-issue，每个切片一个 PR，至少闭合一条验收场景
+  - type: textarea
+    id: history
+    attributes:
+      label: 实施历史
+      description: 合并的 PR 链接

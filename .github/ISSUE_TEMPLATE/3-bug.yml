@@ -1,0 +1,31 @@
+name: 缺陷
+description: 行为与合同或文档不符
+title: "[缺陷] "
+labels: ["kind/bug"]
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: 现象
+      description: 原样粘贴错误信息、日志或响应，不要转述
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望
+      description: 依据的合同或文档链接
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现
+      description: 可以执行的命令、测试或请求
+    validations:
+      required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: 怀疑原因
+      description: 可选；未证实的写明是猜测
