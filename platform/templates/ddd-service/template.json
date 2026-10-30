@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.11.0",
+  "version": "0.12.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -352,6 +352,72 @@
       "source": "assets/src/main/resources/file-storage.yml.tpl",
       "target": "src/main/resources/file-storage.yml",
       "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/ArchiveDataSourceConfiguration.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/ArchiveDataSourceConfiguration.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/archive/ArchivedNote.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/archive/ArchivedNote.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/archive/NoteArchive.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/archive/NoteArchive.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/ArchiveNote.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/ArchiveNote.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteArchive.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteArchive.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/NoteArchiveMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/NoteArchiveMapper.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/SqlNoteArchive.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/SqlNoteArchive.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteArchiveController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteArchiveController.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/ArchivedNoteResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/ArchivedNoteResponse.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/mapper-archive/NoteArchiveMapper.xml.tpl",
+      "target": "src/main/resources/mapper-archive/NoteArchiveMapper.xml",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/db/archive/V1__note_archive.sql.tpl",
+      "target": "src/main/resources/db/archive/V1__note_archive.sql",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/archive-datasource.yml.tpl",
+      "target": "src/main/resources/archive-datasource.yml",
+      "example": true
+    },
+    {
+      "source": "assets/deploy/services/@@ARTIFACT@@.archive.compose.yml.tpl",
+      "target": "deploy/services/@@ARTIFACT@@.archive.compose.yml",
+      "example": true,
+      "root": "repository"
     },
     {
       "source": "assets/deploy/rocketmq/topics-notes.conf.tpl",

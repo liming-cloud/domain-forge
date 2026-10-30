@@ -5,7 +5,7 @@
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
-#   幂等创建（同一 Idempotency-Key 重复提交只创建一条）→ 文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
+#   幂等创建（同一 Idempotency-Key 重复提交只创建一条）→ 多数据源（便笺归档到独立的归档库）→ 文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
@@ -17,7 +17,7 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 copy="$work/repo"
 export COMPOSE_PROJECT_NAME="dfclosure$$"
-export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml"
+export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/note-service.archive.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml"
 # shellcheck source=scripts/deploy_lib.sh
 . "$repo/scripts/deploy_lib.sh"
 port=$(free_port)
@@ -221,6 +221,18 @@ expect 200 "其他账号的附件上传不受 bob 的限流影响"
 call DELETE "/api/notes/$note_id/files/$small_id" "" "$alice_token" > /dev/null
 expect 200 "删除用于验证的附件"
 
+step "多数据源：便笺归档到第二个库"
+post "/api/notes/$note_id/archive" "" "$alice_token" > /dev/null
+expect 200 "归档便笺"
+[ "$(get "/api/notes/$note_id/archive" "$alice_token" | field title)" = "备份前" ] || fail "读取归档快照"
+archive_sql() { compose exec -T postgres psql -U domainforge -d note_service_archive -tAc "$1"; }
+[ "$(archive_sql "select count(*) from note_archive where note_id = $note_id")" = "1" ] \
+    || fail "快照应写在独立的归档库 note_service_archive 中"
+[ "$(archive_sql "select tableowner from pg_tables where tablename = 'note_archive'")" = "note_service" ] \
+    || fail "归档库的表应属于服务自己的账号"
+[ "$(sql "select count(*) from information_schema.tables where table_name = 'note_archive'")" = "0" ] \
+    || fail "主库中不应有归档表"
+
 step "数据库账号隔离"
 isolation=$(compose exec -T -e PGPASSWORD="$service_db_pw" postgres \
     psql -h 127.0.0.1 -U note_service -d domainforge -tAc 'select count(*) from public.iam_account' 2>&1 || true)
@@ -232,6 +244,11 @@ step "备份、继续写入、恢复"
 dump=$("$repo/deploy/backup.sh" "$env_file" "$work/backups" 2> "$work/backup.log" | sed -n 's/^backup=\([^ ]*\) .*/\1/p') \
     || { cat "$work/backup.log"; fail "备份脚本"; }
 ls "${dump%.dump}.files.note-service.tar" > /dev/null || fail "备份应包含 note-service 的文件卷"
+ls "${dump%.dump}.db.note_service_archive.dump" > /dev/null || fail "备份应包含归档库"
+put "/api/notes/$note_id" '{"expectedVersion":1,"title":"备份后改","content":""}' "$alice_token" > /dev/null
+expect 200 "备份后修改便笺"
+post "/api/notes/$note_id/archive" "" "$alice_token" > /dev/null
+[ "$(get "/api/notes/$note_id/archive" "$alice_token" | field title)" = "备份后改" ] || fail "备份后重新归档"
 post /api/notes '{"title":"备份后","content":""}' "$alice_token" > /dev/null
 expect 200 "备份后写入"
 head -c 1024 /dev/urandom > "$work/after.pdf"
@@ -244,6 +261,8 @@ expect 401 "恢复前的会话应失效"
 alice_token=$(token alice "$alice_pw")
 [ "$(get /api/notes "$alice_token" | size)" = "1" ] || fail "恢复后应只有备份前的 1 条便笺"
 [ "$(get "/api/notes/$note_id/files" "$alice_token" | size)" = "1" ] || fail "恢复后应只有备份前的 1 个附件"
+[ "$(get "/api/notes/$note_id/archive" "$alice_token" | field title)" = "备份前" ] \
+    || fail "恢复后归档库应回到备份时刻，与主库一致"
 [ "$(download "$note_id" "$file_id" "$alice_token")" = "200" ] || fail "恢复后下载备份前的附件"
 [ "$(sha256 "$work/download")" = "$(sha256 "$work/before.pdf")" ] || fail "恢复后附件内容与上传不一致"
 post /api/notes '{"title":"恢复后","content":""}' "$alice_token" > /dev/null
