@@ -128,10 +128,11 @@ print(next(a["id"] for a in json.load(sys.stdin)["data"]["data"] if a["appName"]
 print(sum(1 for j in json.load(sys.stdin)["data"]["data"] if j["jobName"] == "iam-retention"))') || fail "无法读取 PowerJob 任务"
     [ "$jobs" = "1" ] || fail "iam-retention 应恰好登记一次：$jobs"
     for attempt in $(seq 1 50); do
-        runs=$(compose exec -T iam curl -s 'http://127.0.0.1:9091/actuator/metrics/domainforge.scheduling.run?tag=task:iam-retention&tag=result:success' \
-            | python3 -I -c 'import json, sys
-try: print(int(json.load(sys.stdin)["measurements"][0]["value"]))
-except Exception: print(0)')
+        runs=$(compose exec -T iam curl -s 'http://127.0.0.1:9091/actuator/prometheus' | python3 -I -c 'import re, sys
+values = [float(m.group(1)) for line in sys.stdin
+          if line.startswith("domainforge_scheduling_run_total{") and "task=\"iam-retention\"" in line
+          and "result=\"success\"" in line for m in [re.search(r"\s([0-9.eE+-]+)$", line.strip())] if m]
+print(int(sum(values)))')
         [ "$runs" -ge 1 ] && return
         sleep 3
     done

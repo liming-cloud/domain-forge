@@ -1,0 +1,8 @@
+# scripts/compose.metrics-verify.yml 的抓取配置：各服务的管理端口只在内部网络可达。
+global:
+  scrape_interval: 2s
+scrape_configs:
+  - job_name: domain-forge
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [gateway:9093, iam:9091, note-service:9092, board-service:9092]

@@ -390,6 +390,22 @@ class NoteServiceIT {
                 "SELECT deleted_at FROM domainforge_file WHERE id = ?", java.sql.Timestamp.class, file));
     }
 
+    // 管理端口只开放健康检查与 Prometheus 指标；平台组件的指标以 Prometheus 格式输出。
+    @Test
+    void managementExposesPrometheusOnly() throws Exception {
+        String management = "http://127.0.0.1:"
+                + application.getBean(Environment.class).getProperty("local.management.port");
+        call("GET", "/api/notes", user(1001, BOTH, scope(true, false, ""), scope(true, false, "")), null);
+        var metrics = HTTP.send(HttpRequest.newBuilder(URI.create(management + "/actuator/prometheus")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, metrics.statusCode());
+        assertTrue(metrics.body().contains("http_server_requests_seconds_count"), "应有 HTTP 请求指标");
+        assertTrue(metrics.body().contains("application=\"@@ARTIFACT@@\""), "指标带服务名标签");
+        for (String hidden : new String[]{"/actuator/env", "/actuator/metrics", "/actuator/beans"})
+            assertEquals(404, HTTP.send(HttpRequest.newBuilder(URI.create(management + hidden)).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode(), hidden);
+    }
+
     // IAM 不可用时拒绝为 503，不降级为匿名或允许。
     @Test
     void iamFailureIsUnavailable() throws Exception {

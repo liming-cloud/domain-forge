@@ -6,6 +6,10 @@ management:
     propagation:
       consume: [W3C]
       produce: [W3C]
+    # 指标不附带链路 exemplars：Prometheus 注册表的 exemplars 依赖 Tracer，而采样器依赖动态配置组、动态配置组又依赖
+    # 指标注册表，会形成 Bean 循环。按 traceId 关联日志与链路，不经指标。
+    exemplars:
+      include: none
 domainforge:
   tracing:
     # 新链路的采样率（动态配置组，可在 Nacos 中调整）；未采样的链路仍有 traceId，日志与响应头照常输出。

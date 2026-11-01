@@ -387,6 +387,15 @@ class GatewayIT {
                 URI.create("http://127.0.0.1:" + management + "/actuator/health/readiness")).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(200, health.statusCode(), health.body());
+        // 管理端口只开放健康检查与 Prometheus 指标。
+        var metrics = HTTP.send(HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + management + "/actuator/prometheus")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, metrics.statusCode());
+        assertTrue(metrics.body().contains("http_server_requests_seconds_count"), "应有 HTTP 请求指标");
+        for (String hidden : List.of("/actuator/env", "/actuator/metrics", "/actuator/gateway/routes"))
+            assertEquals(404, HTTP.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + management + hidden))
+                    .GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode(), hidden);
         assertEquals(400, get("/api/%2e%2e/internal/access/current", client).statusCode());
         assertEquals(400, get("/api/..;/internal/access/current", client).statusCode());
         assertEquals(400, get("/api/notes/%2F..%2Finternal", client).statusCode());

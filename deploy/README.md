@@ -67,7 +67,7 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
-- **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。
+- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）只在内部网络可达，不发布到主机、不经 Nginx；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[故障与可观测性 F-10](../docs/standards/09-故障与可观测性.md#f-10-采集存储看板告警由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
 - **请求体上限**：Nginx 对普通接口限制请求体为 64k；只有路径以 `/files` 结尾的上传接口放宽到 21m（`nginx/locations.inc`），与服务的 multipart 上限 20MB 一致。
 
 ## 停止与数据

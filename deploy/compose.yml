@@ -243,6 +243,8 @@ services:
       IAM_NACOS_SERVER_ADDR: nacos:8848
       IAM_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       IAM_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
+      IAM_MANAGEMENT_ADDRESS: 0.0.0.0
       # 只信任网关固定地址给出的 X-Forwarded-For（网关已按 Nginx 给出的值确定客户端地址），登录防护按真实客户端地址计数。
       SERVER_FORWARDHEADERSSTRATEGY: NATIVE
       SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES: '172\.31\.250\.11'
@@ -261,7 +263,7 @@ services:
       powerjob-init:
         condition: service_completed_successfully
     healthcheck:
-      # 管理端口只绑定容器内回环地址，不对网络开放。
+      # 健康检查在容器内执行。
       test: [CMD-SHELL, 'curl -sf http://127.0.0.1:9091/actuator/health/readiness > /dev/null']
       interval: 3s
       timeout: 3s
@@ -287,6 +289,8 @@ services:
       GATEWAY_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
       # 只采用 Nginx 固定地址给出的 X-Forwarded-For。
       GATEWAY_TRUSTED_PROXIES: 172.31.250.10
+      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
+      GATEWAY_MANAGEMENT_ADDRESS: 0.0.0.0
     networks:
       backend:
         ipv4_address: 172.31.250.11
@@ -296,7 +300,7 @@ services:
       nacos-init:
         condition: service_completed_successfully
     healthcheck:
-      # 管理端口只绑定容器内回环地址，不对网络开放。
+      # 健康检查在容器内执行。
       test: [CMD-SHELL, 'curl -sf http://127.0.0.1:9093/actuator/health/readiness > /dev/null']
       interval: 3s
       timeout: 3s

@@ -108,12 +108,14 @@ server:
 
 management:
   server:
-    address: 127.0.0.1
+    # 默认只在回环地址；部署时设为 0.0.0.0，使内部网络中的 Prometheus 可以抓取（端口不发布到主机、不经 Nginx）。
+    address: ${@@ENV@@_MANAGEMENT_ADDRESS:127.0.0.1}
     port: ${@@ENV@@_MANAGEMENT_PORT:9092}
   endpoints:
     web:
       exposure:
-        include: health,metrics
+        # 只开放健康检查与 Prometheus 指标（/actuator/prometheus）。
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
