@@ -5,6 +5,7 @@
 #   跨服务调用（board-service 以同一用户身份读取 note-service 的便笺：权限与范围由被调方判定，被调方停机时 503）→
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
+#   指标（临时 Prometheus 在内部网络抓取各服务的 /actuator/prometheus）→
 #   幂等创建（同一 Idempotency-Key 重复提交只创建一条）→ 多数据源（便笺归档到独立的归档库）→ 文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
@@ -17,7 +18,7 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 copy="$work/repo"
 export COMPOSE_PROJECT_NAME="dfclosure$$"
-export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/note-service.archive.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml"
+export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/note-service.compose.yml:$copy/deploy/services/note-service.archive.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml:$copy/scripts/compose.metrics-verify.yml"
 # shellcheck source=scripts/deploy_lib.sh
 . "$repo/scripts/deploy_lib.sh"
 port=$(free_port)
@@ -159,6 +160,28 @@ done
 echo "$found" | grep -qx "board-service,gateway,iam,note-service" \
     || fail "Jaeger 中应有一条贯穿 gateway、note-service、iam、board-service 的链路；查到的链路：${found:-无}"
 
+step "指标：临时 Prometheus 在内部网络抓取各服务的 /actuator/prometheus"
+# promql <查询>：经内部网络向临时 Prometheus 查询，输出每条结果的 instance=值
+promql() {
+    docker run --rm --network "${COMPOSE_PROJECT_NAME}_backend" "$curl_image" -s -G \
+        --data-urlencode "query=$1" http://prometheus:9090/api/v1/query \
+        | python3 -I -c 'import json, sys
+for r in json.load(sys.stdin).get("data", {}).get("result", []):
+    print(r["metric"].get("instance", "-") + "=" + r["value"][1])' 2>/dev/null || true
+}
+for attempt in $(seq 1 30); do
+    up=$(promql 'up' | grep -c '=1$' || true)
+    [ "$up" = "4" ] && break
+    sleep 2
+done
+[ "$up" = "4" ] || fail "Prometheus 应能抓取 gateway、iam、note-service、board-service 四个目标：$(promql 'up' | tr '\n' ' ')"
+for target in gateway:9093 iam:9091 note-service:9092; do
+    promql 'sum by (instance) (http_server_requests_seconds_count)' | grep -q "^$target=" \
+        || fail "$target 的 HTTP 请求指标应可查询"
+done
+promql 'domainforge_messaging_outbox_pending' | grep -q '^note-service:9092=' \
+    || fail "note-service 的 Outbox 积压指标应可查询"
+
 step "跨服务调用：board-service 以同一用户身份读取 note-service"
 digest=$(get /api/board/note-digest "$alice_token")
 expect 200 "调用方读取被调方便笺"
@@ -254,6 +277,8 @@ expect 200 "备份后写入"
 head -c 1024 /dev/urandom > "$work/after.pdf"
 upload "$note_id" "$work/after.pdf" "$alice_token" > /dev/null
 expect 200 "备份后上传附件"
+# 按恢复前提：停止写入后等备份之后的事件消费完毕，再恢复（否则恢复后消费方会处理发布方已回滚的事件，见 #61）。
+tally_is 2
 "$repo/deploy/restore.sh" "$env_file" "$dump" --yes > /dev/null 2> "$work/restore.log" \
     || { cat "$work/restore.log"; fail "恢复脚本"; }
 get /api/me/notes "$alice_token" > /dev/null

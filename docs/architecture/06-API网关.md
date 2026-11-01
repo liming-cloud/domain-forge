@@ -30,7 +30,7 @@
 - 位置 `platform/services/gateway`，遵守五个职责包和架构规则；网关没有领域模型，只有 `bootstrap`（启动与装配）与 `infrastructure`（`routing` 路由配置、`filter` 过滤器与错误响应、`security` Same-Token 刷新）。
 - 技术：Spring Cloud Gateway Server WebFlux 5.0（随 Spring Cloud BOM），`sa-token-reactor-spring-boot4-starter` 与官方 Redisson DAO，Nacos 服务发现与配置（复用 `domain-forge-config`），Redis 客户端、Lua 脚本与分布式锁复用 `domain-forge-cache`。网关是 WebFlux 应用，不依赖 Servlet 版的 `domain-forge-web-support`、`domain-forge-access-control`；会话与 Same-Token 的 Redis 键名由 `sa-token.token-name` 决定，网关配置必须与 access-control 组件一致（`Authorization`）。
 - 不连接 PostgreSQL；只用 Redis（会话查询、限流、Same-Token）和 Nacos。Redis 读写都是阻塞调用，在 `boundedElastic` 线程上执行，不占用事件循环。
-- 端口：业务 8000，管理 9093（只绑定回环地址）。
+- 端口：业务 8000，管理 9093（只在内部网络可达，开放健康检查与 `/actuator/prometheus`）。
 - 实例列表直接取 Nacos 发现客户端（订阅变更推送），关闭 Spring Cloud LoadBalancer 的实例缓存（默认 35 秒）：否则后端重建换地址后，旧地址仍会被使用 35 秒（CI 升级场景中曾因此登录失败）。
 
 请求在网关内的处理顺序：

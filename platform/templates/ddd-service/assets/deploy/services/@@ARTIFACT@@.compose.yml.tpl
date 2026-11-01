@@ -62,6 +62,8 @@ services:
       @@ENV@@_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
       # 文件存储（启用时）：本地目录在命名卷 @@ARTIFACT@@-files 中，backup.sh／restore.sh 按挂载点识别并一同备份恢复。
       @@ENV@@_FILES_ROOT: /var/lib/domain-forge/files
+      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
+      @@ENV@@_MANAGEMENT_ADDRESS: 0.0.0.0
     volumes:
       - @@ARTIFACT@@-files:/var/lib/domain-forge/files
     networks: [backend]
@@ -77,7 +79,7 @@ services:
       powerjob-init:
         condition: service_completed_successfully
     healthcheck:
-      # 管理端口只绑定容器内回环地址，不对网络开放。
+      # 健康检查在容器内执行。
       test: [CMD-SHELL, 'curl -sf http://127.0.0.1:9092/actuator/health/readiness > /dev/null']
       interval: 3s
       timeout: 3s

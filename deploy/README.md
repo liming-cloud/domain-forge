@@ -67,7 +67,7 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
-- **管理端口**：IAM 管理端口只绑定容器内回环地址，健康检查在容器内执行。
+- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）只在内部网络可达，不发布到主机、不经 Nginx；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[故障与可观测性 F-10](../docs/standards/09-故障与可观测性.md#f-10-采集存储看板告警由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
 - **请求体上限**：Nginx 对普通接口限制请求体为 64k；只有路径以 `/files` 结尾的上传接口放宽到 21m（`nginx/locations.inc`），与服务的 multipart 上限 20MB 一致。
 
 ## 停止与数据
@@ -75,6 +75,8 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 ```bash
 docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   # 保留卷
 ```
+
+内部网络 `backend` 的固定地址只在子网前一半，容器的动态地址只分配在后一半（`ip_range`），避免固定地址被占用。网络配置只在创建网络时生效：此前部署的环境执行一次 `down`（保留卷）再 `up`，网络按新配置重建。
 
 不要使用 `down -v`，它会删除 PostgreSQL、Nacos 与业务服务文件存储的卷。数据库迁移不执行 clean／repair。
 
@@ -85,6 +87,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
 | 其他业务数据库（服务的附加数据源，如归档库 `<schema>_archive`） | `backup.sh` 逐个导出为同名 `.db.<库名>.dump` | `restore.sh` 按备份重建（保留属主，账号与库由服务的 db-init 先建好）；备份中没有的库保持不变 |
 | 业务服务的文件（命名卷 `<服务名>-files`） | `backup.sh` 在导出数据库之后打包为同名 `.files.<服务名>.tar` | `restore.sh` 用备份替换卷中的内容；备份时刻之后上传的文件消失，多出的对象由清理任务删除。备份中没有该文件（功能上线前的备份）时保留现有文件并提示 |
+| RocketMQ 中的消息 | 不备份，消费进度不随恢复回退 | 恢复前须停止写入并等事件消费完毕（见[消息](#消息)）；否则恢复时仍在途的事件会在恢复后被处理，与已回滚的发布方不一致 |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
 | Nacos 账号、权限与实例 | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的账号修改需手工重做 |
@@ -120,6 +123,7 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 - RocketMQ 停机时业务照常提交，事件留在各服务的 `domainforge_outbox` 表中，恢复后继续发送；积压看指标 `domainforge.messaging.outbox.pending`。
 - 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
 - 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
+- 恢复前先停止业务写入，确认 `domainforge.messaging.outbox.pending` 为 0、消费组没有积压，再执行 `restore.sh`。
 
 ## 文件存储
 

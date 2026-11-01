@@ -1,0 +1,11 @@
+# 仅供 scripts/verify_closure.sh 使用：临时加入 Prometheus，在内部网络抓取各服务管理端口上的 /actuator/prometheus，
+# 用于核对指标能被观测端采集与查询。部署参考不内置观测工具（采集、存储、看板与告警由业务项目提供）。
+services:
+  prometheus:
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
+    restart: "no"
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes:
+      # 多个 Compose 文件中的相对路径按第一个文件（deploy/compose.yml）所在目录解析。
+      - ../scripts/prometheus-verify.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [backend]
