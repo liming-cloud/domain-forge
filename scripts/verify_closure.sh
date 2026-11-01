@@ -277,6 +277,8 @@ expect 200 "备份后写入"
 head -c 1024 /dev/urandom > "$work/after.pdf"
 upload "$note_id" "$work/after.pdf" "$alice_token" > /dev/null
 expect 200 "备份后上传附件"
+# 按恢复前提：停止写入后等备份之后的事件消费完毕，再恢复（否则恢复后消费方会处理发布方已回滚的事件，见 #61）。
+tally_is 2
 "$repo/deploy/restore.sh" "$env_file" "$dump" --yes > /dev/null 2> "$work/restore.log" \
     || { cat "$work/restore.log"; fail "恢复脚本"; }
 get /api/me/notes "$alice_token" > /dev/null

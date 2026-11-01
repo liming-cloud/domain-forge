@@ -85,7 +85,8 @@ for service in $(file_services); do
     compose run --rm --no-deps -T --entrypoint sh "$service" -c \
         'find /var/lib/domain-forge/files -mindepth 1 -delete && tar -C /var/lib/domain-forge/files -xf -' < "$files"
 done
-compose restart redis
+# 重建而不是原地重启：较新的 Docker 重启时沿用原地址，恢复期间该地址可能已被一次性容器占用。
+compose up -d --no-deps --force-recreate --wait redis
 if [ -f "$configs" ]; then
     compose up -d --wait nacos
     python3 -I "$deploy/nacos/configs.py" import "$env_file" "$configs" > /dev/null

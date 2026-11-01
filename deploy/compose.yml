@@ -334,9 +334,12 @@ services:
 networks:
   backend:
     # Nginx 的固定地址与网关的可信代理一致，网关的固定地址与各后端的可信代理一致；修改网段时同步修改。
+    # 动态分配只用子网的后一半：固定地址（.10 Nginx、.11 网关、.20 RocketMQ broker、.30 PowerJob）在前一半，
+    # 不会被先创建的容器或恢复时的一次性容器占用（否则固定地址的服务创建或重建失败：Address already in use）。
     ipam:
       config:
         - subnet: 172.31.250.0/24
+          ip_range: 172.31.250.128/25
 
 volumes:
   postgres-data:
