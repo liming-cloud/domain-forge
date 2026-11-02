@@ -92,7 +92,7 @@
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-jsqlparser</artifactId>
-                <version>3.5.17</version>
+                <version>3.5.18.1</version>
             </dependency>
             <dependency>
                 <groupId>org.domainforge</groupId>
