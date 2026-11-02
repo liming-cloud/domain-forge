@@ -143,7 +143,7 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
-            <version>7.0.7</version>
+            <version>7.1.2</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
