@@ -67,6 +67,7 @@ register alice "$alice_pw" "$admin_token" > /dev/null
 [ "$(login alice "$alice_pw")" = "200" ] || fail "alice 登录"
 [ "$(get_status /internal/access/current "$admin_token")" = "404" ] || fail "/internal/ 不应对外"
 [ "$(get_status /actuator/health "$admin_token")" = "404" ] || fail "管理端点不应对外"
+[ "$(get_status /actuator/prometheus "$admin_token")" = "404" ] || fail "指标端点不应对外"
 # Nginx 先解码再匹配 location，这类路径可能在 Nginx 即为 404；到达网关则为 400。两者都不能转到后端。
 case "$(get_status /api/%2e%2e/internal/access/current "$admin_token")" in
     400 | 404) ;;
