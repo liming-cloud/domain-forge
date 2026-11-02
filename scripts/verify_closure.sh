@@ -221,6 +221,12 @@ expect 200 "上传附件"
 [ "$(download "$note_id" "$file_id" "$alice_token")" = "200" ] || fail "下载附件"
 [ "$(sha256 "$work/download")" = "$(sha256 "$work/before.pdf")" ] || fail "下载内容与上传不一致"
 [ "$(download "$note_id" "$file_id" "$bob_token")" = "403" ] || fail "无权限账号下载附件应 403"
+# 文件存储计数器在首次写入时登记，等下一轮抓取后可在 Prometheus 中查询。
+for attempt in $(seq 1 15); do
+    promql 'domainforge_files_stored_total' | grep -q '^note-service:9092=' && break
+    [ "$attempt" = "15" ] && fail "note-service 的文件存储指标应可查询"
+    sleep 2
+done
 post /api/notes '{"title":"大请求体","content":"'"$(head -c 70000 /dev/zero | tr '\0' x)"'"}' "$alice_token" > /dev/null
 expect 413 "普通接口仍限制请求体为 64k"
 
