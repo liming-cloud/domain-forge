@@ -1,5 +1,8 @@
 package org.domainforge.gateway;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.ConsoleAppender;
+import ch.qos.logback.core.status.StatusUtil;
 import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.same.SaSameUtil;
 import cn.dev33.satoken.stp.StpLogic;
@@ -14,7 +17,10 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.logging.logback.StructuredLogEncoder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
 
@@ -192,7 +198,7 @@ class GatewayIT {
         await("发布内容可读", () -> {
             try {
                 var query = HttpRequest.newBuilder(URI.create(
-                                nacos + "/client/cs/config?dataId=gateway.yaml&groupName=DEFAULT_GROUP"))
+                        nacos + "/client/cs/config?dataId=gateway.yaml&groupName=DEFAULT_GROUP"))
                         .header("accessToken", nacosToken).GET().build();
                 return HTTP.send(query, HttpResponse.BodyHandlers.ofString()).body().contains(marker);
             } catch (Exception unavailable) {
@@ -248,6 +254,17 @@ class GatewayIT {
         for (int index = 0; index < tags.length; index += 2) search = search.tag(tags[index], tags[index + 1]);
         var found = search.counter();
         return found == null ? 0 : found.count();
+    }
+
+    // 部署环境（config-center）的控制台日志为结构化 JSON；有状态监听器，Logback 的 WARN 状态不以文本打到标准输出。
+    @Test
+    @Order(0)
+    void deploymentLoggingIsStructured() {
+        var context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        assertTrue(StatusUtil.contextHasStatusListener(context), "应注册状态监听器");
+        var console = context.getLogger(Logger.ROOT_LOGGER_NAME).getAppender("CONSOLE");
+        assertInstanceOf(ConsoleAppender.class, console);
+        assertInstanceOf(StructuredLogEncoder.class, ((ConsoleAppender<?>) console).getEncoder());
     }
 
     // 最长前缀决定服务；令牌与客户端地址原样到达，链路上下文传到后端且与响应头的 traceId 一致；伪造的 Same-Token 被替换。

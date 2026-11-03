@@ -135,11 +135,6 @@ spring:
         group: ${IAM_NACOS_GROUP:DEFAULT_GROUP}
         username: ${IAM_NACOS_USERNAME:}
         password: ${IAM_NACOS_PASSWORD:}
-logging:
-  structured:
-    format:
-      # 部署环境向标准输出写 ECS 结构化 JSON 日志（时间、级别、服务名、traceId、日志器与消息）；本地开发为文本。
-      console: ecs
 domainforge:
   config:
     expected-source: nacos
