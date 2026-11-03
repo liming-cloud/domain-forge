@@ -64,6 +64,7 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/architecture/06-API网关.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
 - **限流**：网关按客户端地址限流（默认每秒 20 个、突发 40 个，超出 429），阈值在 Nacos 的 `gateway.yaml` 中调整、立即生效。前面再加负载均衡或客户端经同一 NAT 出口时，需要相应调高。
 - **链路标识**：Nginx 删除客户端带来的 `traceparent`、`tracestate`、`baggage`，链路从网关开始；响应头 `X-Trace-Id` 即 traceId，网关访问日志（`gateway_access trace_id=…`）与各服务日志都带上它，排查时按它关联。
+- **日志**：各服务向标准输出逐行写 ECS JSON（`docker compose logs` 或业务项目的采集端读取），每个请求一条访问日志；字段见[故障与可观测性 F-10](../docs/standards/09-故障与可观测性.md#f-10-采集存储看板告警由业务项目提供)。
 - **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。

@@ -6,6 +6,7 @@
 #   集成事件（note-service 创建便笺同事务写 Outbox，board-service 消费 NoteCreated 维护便笺统计；RocketMQ 停机期间
 #   提交的事件在恢复后继续发送）→ 链路追踪（临时 Jaeger 中查到一条贯穿网关、业务服务、IAM 与消息消费方的链路）→
 #   指标（临时 Prometheus 在内部网络抓取各服务的 /actuator/prometheus）→
+#   日志（各服务逐行输出 ECS JSON，同一请求的 traceId 在网关、业务服务与 IAM 的日志中都能找到）→
 #   幂等创建（同一 Idempotency-Key 重复提交只创建一条）→ 多数据源（便笺归档到独立的归档库）→ 文件存储（附件经 Nginx 与网关上传、下载，按便笺范围授权）→ 网关按账号限流附件上传 →
 #   备份 → 备份后继续写入 → 恢复（含业务服务 schema 与属主、文件卷）→ 撤销角色后立即被拒。
 # 同时核对网关按生成的路由转发、绕过网关直连业务服务被拒、业务服务经 Nacos 发现 IAM、从 Nacos 读取自身配置、
@@ -181,6 +182,46 @@ for target in gateway:9093 iam:9091 note-service:9092; do
 done
 promql 'domainforge_messaging_outbox_pending' | grep -q '^note-service:9092=' \
     || fail "note-service 的 Outbox 积压指标应可查询"
+
+step "日志：各服务逐行输出 ECS JSON，同一请求的 traceId 在 gateway、note-service、IAM 的日志中都能找到"
+log_trace=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $alice_token" "$base/api/notes" \
+    | tr -d '\r' | sed -n 's/^[Xx]-[Tt]race-[Ii]d: //p')
+[[ "$log_trace" =~ ^[0-9a-f]{32}$ ]] || fail "响应应带 traceId：$log_trace"
+# 输出 ok，或不能按 JSON 解析的行、缺失的固定字段、未找到 traceId。网关访问日志的 traceId 在消息的 trace_id= 中。
+log_check='import json, sys
+service, trace = sys.argv[1], sys.argv[2]
+bad, missing, found = [], set(), False
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        record = json.loads(line)
+    except ValueError:
+        record = None
+    if not isinstance(record, dict):
+        bad.append(line[:200])
+        continue
+    for path in ("@timestamp", "log.level", "log.logger", "service.name", "message"):
+        value = record
+        for key in path.split("."):
+            value = value.get(key) if isinstance(value, dict) else None
+        if value is None:
+            missing.add(path)
+    if record.get("service", {}).get("name") != service:
+        missing.add("service.name=" + service)
+    found = found or record.get("traceId") == trace or ("trace_id=" + trace) in str(record.get("message"))
+problems = (["非 JSON 对象的行 %d 条，如 %s" % (len(bad), " ／ ".join(sorted(set(bad))[:3]))] if bad else []) \
+    + (["缺少字段 " + ",".join(sorted(missing))] if missing else []) + ([] if found else ["未找到 traceId"])
+print("; ".join(problems) or "ok")'
+for service in gateway note-service iam; do
+    for attempt in $(seq 1 10); do
+        result=$(compose logs --no-color --no-log-prefix "$service" | python3 -I -c "$log_check" "$service" "$log_trace")
+        [ "$result" = "ok" ] && break
+        sleep 1
+    done
+    [ "$result" = "ok" ] || fail "$service 的日志：$result"
+done
 
 step "跨服务调用：board-service 以同一用户身份读取 note-service"
 digest=$(get /api/board/note-digest "$alice_token")

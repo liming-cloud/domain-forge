@@ -11,4 +11,7 @@ WORKDIR /app
 COPY --from=dist --chown=root:root --chmod=0444 *.jar /app/app.jar
 
 USER 10001:10001
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]
+# RocketMQ 客户端自带日志实现（不经 SLF4J），默认写服务用户不存在的家目录，失败时把 Logback 状态以文本打到标准输出；
+# 指到容器内可写目录，标准输出只保留结构化 JSON 日志。消息收发结果由消息组件的日志与指标记录。
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-Drocketmq.log.root=/tmp/rocketmq", \
+        "-jar", "/app/app.jar"]
