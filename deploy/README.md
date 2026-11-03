@@ -229,7 +229,7 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 | 文件 | 内容 |
 |---|---|
 | `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM；文件存储卷 `<服务名>-files` |
-| `deploy/services/<服务名>.archive.compose.yml` | 仅 `--with-example` 时：便笺示例的归档库（附加数据源）。`<服务名>-archive-db-init` 在同一 PostgreSQL 实例中建立属于服务账号的独立数据库 `<schema>_archive`，并为服务提供连接变量；部署时与服务的覆盖文件一起列入 `COMPOSE_FILE` |
+| `deploy/services/<服务名>.archive.compose.yml` | 仅 `--with-example` 时：便笺示例的归档库（附加数据源）。`<服务名>-archive-db-init` 在 `<服务名>-db-init` 完成后，在同一 PostgreSQL 实例中建立属于服务账号的独立数据库 `<schema>_archive`，并为服务提供连接变量；部署时与服务的覆盖文件一起列入 `COMPOSE_FILE` |
 | `deploy/nacos/config/gateway.yaml`（追加） | 仅 `--with-example` 时：向网关路由种子追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
 
 部署步骤：
