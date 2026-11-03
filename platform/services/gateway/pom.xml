@@ -31,6 +31,14 @@
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+            <exclusions>
+                <!-- Nacos 的 Logback 适配器在过滤器链最前面放行 Nacos 日志，绕过 Boot 在日志初始化前的屏蔽，部署环境因此混入
+                     文本日志；排除后 Nacos 客户端日志随应用写成结构化 JSON，也不再写容器内的 ~/logs/nacos 文件。 -->
+                <exclusion>
+                    <groupId>com.alibaba.nacos</groupId>
+                    <artifactId>logback-adapter</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.domainforge</groupId>

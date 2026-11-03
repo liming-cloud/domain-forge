@@ -3,6 +3,7 @@ package org.domainforge.tracing.autoconfigure;
 import io.micrometer.tracing.Tracer;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import org.domainforge.config.api.DynamicSettingsBinder;
+import org.domainforge.tracing.internal.AccessLogServletFilter;
 import org.domainforge.tracing.internal.DynamicRatioSampler;
 import org.domainforge.tracing.internal.TraceIdServletFilter;
 import org.domainforge.tracing.internal.TraceIdWebFilter;
@@ -13,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 链路追踪装配：动态采样率（父决定优先），以及在响应头返回 traceId。导出由 Spring Boot 的 OTLP 导出器负责，
+ * 链路追踪装配：动态采样率（父决定优先），在响应头返回 traceId，Servlet 应用写带 traceId 的访问日志。导出由 Spring Boot 的 OTLP 导出器负责，
  * 只在配置了 {@code management.opentelemetry.tracing.export.otlp.endpoint} 时启用。
  */
 @AutoConfiguration(beforeName = "org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure"
@@ -28,7 +29,7 @@ public class TracingAutoConfiguration {
     }
 
     /**
-     * Servlet 应用的 traceId 响应头。
+     * Servlet 应用的 traceId 响应头与访问日志（网关的访问日志由网关自己的过滤器写）。
      */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -36,6 +37,11 @@ public class TracingAutoConfiguration {
         @Bean
         TraceIdServletFilter traceIdServletFilter(Tracer tracer) {
             return new TraceIdServletFilter(tracer);
+        }
+
+        @Bean
+        AccessLogServletFilter accessLogServletFilter() {
+            return new AccessLogServletFilter();
         }
     }
 

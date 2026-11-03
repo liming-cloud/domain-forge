@@ -2,6 +2,7 @@ package org.domainforge.persistence.api;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
@@ -39,7 +40,7 @@ public final class AdditionalDataSource implements AutoCloseable {
     private final SqlSessionFactory sqlSessionFactory;
 
     private AdditionalDataSource(String name, HikariDataSource dataSource, DataSourceTransactionManager manager,
-                                 SqlSessionFactory sessions) {
+            SqlSessionFactory sessions) {
         this.name = name;
         this.dataSource = dataSource;
         this.transactionManager = manager;
@@ -98,6 +99,10 @@ public final class AdditionalDataSource implements AutoCloseable {
         var factory = new MybatisSqlSessionFactoryBean();
         factory.setDataSource(pool);
         factory.setConfiguration(configuration);
+        // 与主数据源一致不打印 MyBatis-Plus 的文本 banner：部署环境的标准输出只有结构化日志。
+        var global = GlobalConfigUtils.defaults();
+        global.setBanner(false);
+        factory.setGlobalConfig(global);
         factory.setPlugins(pagination, new TransactionBoundaryGuard(name, pool));
         try {
             factory.setMapperLocations(new PathMatchingResourcePatternResolver()
