@@ -1,5 +1,7 @@
 package @@PACKAGE@@.interfaces;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.status.StatusUtil;
 import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.stp.StpLogic;
 import @@PACKAGE@@.application.command.note.NotePermissions;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
@@ -388,6 +391,13 @@ class NoteServiceIT {
         assertEquals(0, json(call("GET", "/api/notes/" + note + "/files", writer, null)).get("data").size());
         assertNotNull(application.getBean(JdbcTemplate.class).queryForObject(
                 "SELECT deleted_at FROM domainforge_file WHERE id = ?", java.sql.Timestamp.class, file));
+    }
+
+    // logback-spring.xml 注册了状态监听器：Logback 的 WARN 状态不以文本打到标准输出，部署环境只有 JSON 日志行。
+    @Test
+    void logbackHasStatusListener() {
+        assertTrue(StatusUtil.contextHasStatusListener((LoggerContext) LoggerFactory.getILoggerFactory()),
+                "应注册状态监听器");
     }
 
     // 管理端口只开放健康检查与 Prometheus 指标；平台组件的指标以 Prometheus 格式输出。

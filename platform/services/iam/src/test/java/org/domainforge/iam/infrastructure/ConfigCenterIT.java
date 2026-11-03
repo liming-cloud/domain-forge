@@ -1,5 +1,8 @@
 package org.domainforge.iam.infrastructure;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.ConsoleAppender;
+import ch.qos.logback.core.status.StatusUtil;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.iam.application.port.IamException;
@@ -13,9 +16,11 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.logging.logback.StructuredLogEncoder;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import java.net.URI;
@@ -31,6 +36,7 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,7 +123,7 @@ class ConfigCenterIT {
     private static boolean readable(String marker) {
         try {
             var query = HttpRequest.newBuilder(URI.create(
-                            nacos + "/client/cs/config?dataId=" + DATA_ID + "&groupName=DEFAULT_GROUP"))
+                    nacos + "/client/cs/config?dataId=" + DATA_ID + "&groupName=DEFAULT_GROUP"))
                     .header("accessToken", token).GET().build();
             return HTTP.send(query, HttpResponse.BodyHandlers.ofString()).body().contains(marker);
         } catch (Exception unavailable) {
@@ -218,6 +224,11 @@ class ConfigCenterIT {
         application = start();
         assertEquals(2, limits().accountAttempts());
         assertEquals(3, limitedAt());
+        // 部署环境的控制台日志为结构化 JSON；有状态监听器，Logback 的 WARN 状态不以文本打到标准输出。
+        var context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        assertTrue(StatusUtil.contextHasStatusListener(context), "应注册状态监听器");
+        var console = context.getLogger(Logger.ROOT_LOGGER_NAME).getAppender("CONSOLE");
+        assertInstanceOf(StructuredLogEncoder.class, ((ConsoleAppender<?>) console).getEncoder());
     }
 
     // 运行中发布更严格的阈值，之后的登录预占按新阈值限流；日志级别同样实际改变。
