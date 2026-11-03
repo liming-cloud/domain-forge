@@ -2,7 +2,8 @@
 # 归档库是同一 PostgreSQL 实例中的独立数据库 @@SCHEMA@@_archive，属于本服务的数据库账号；backup.sh／restore.sh 一并备份恢复。
 services:
   @@ARTIFACT@@-archive-db-init:
-    # 一次性任务：建立归档库，可重复执行。账号不存在时先建（密码由 @@ARTIFACT@@-db-init 设置），与执行顺序无关。
+    # 一次性任务：建立归档库，可重复执行。启动时等 @@ARTIFACT@@-db-init 建好账号与密码，避免两者并发建同一账号；
+    # restore.sh 以 --no-deps 逐个执行 db-init 时不保证先后，因此账号不存在时仍先建。
     image: @@POSTGRES_IMAGE@@
     restart: "no"
     environment:
@@ -24,6 +25,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      @@ARTIFACT@@-db-init:
+        condition: service_completed_successfully
   @@ARTIFACT@@:
     environment:
       @@ENV@@_ARCHIVE_DB_URL: jdbc:postgresql://postgres:5432/@@SCHEMA@@_archive

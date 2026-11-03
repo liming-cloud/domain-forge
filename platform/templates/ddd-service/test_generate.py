@@ -73,6 +73,8 @@ class GenerateTest(unittest.TestCase):
         archive = (self.root / 'deploy/services/retail-order.archive.compose.yml').read_text(encoding='utf-8')
         self.assertIn('CREATE DATABASE retail_order_archive OWNER retail_order', archive)
         self.assertIn('RETAIL_ORDER_ARCHIVE_DB_URL: jdbc:postgresql://postgres:5432/retail_order_archive', archive)
+        # 归档库任务等主 db-init 建好账号，两者不并发建同一账号。
+        self.assertIn('      retail-order-db-init:\n        condition: service_completed_successfully\n', archive)
         self.assertTrue((output / 'src/main/resources/db/archive/V1__note_archive.sql').is_file())
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
