@@ -84,7 +84,7 @@ class LocalCachingIT {
         var client = client();
         String name = unique();
         try (var caches =
-                     new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
             var cache = caches.region(name, String.class);
             for (int index = 0; index < 512; index++) {
                 assertNull(cache.get("absent-" + index));
@@ -110,7 +110,7 @@ class LocalCachingIT {
         var client = client(user, password);
         String name = unique();
         try (var caches =
-                     new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
             var cache = caches.region(name, String.class);
             cache.put("key", "live-l2", Duration.ofSeconds(60));
             Thread.sleep(100);
@@ -130,19 +130,19 @@ class LocalCachingIT {
     @Test
     void nativeBootClientSupportsMixedSwitchAndCrossInstanceInvalidation() throws Exception {
         try (var context =
-                     new SpringApplicationBuilder(Application.class)
-                             .web(WebApplicationType.NONE)
-                             .run(
-                                     "--spring.data.redis.port=" + required("REDIS_PORT"),
-                                     "--spring.data.redis.password=" + required("REDIS_PASSWORD"),
-                                     "--spring.main.banner-mode=off",
-                                     "--logging.level.root=WARN")) {
+                new SpringApplicationBuilder(Application.class)
+                        .web(WebApplicationType.NONE)
+                        .run(
+                                "--spring.data.redis.port=" + required("REDIS_PORT"),
+                                "--spring.data.redis.password=" + required("REDIS_PASSWORD"),
+                                "--spring.main.banner-mode=off",
+                                "--logging.level.root=WARN")) {
             assertEquals(1, context.getBeansOfType(RedissonClient.class).size());
             var client = context.getBean(RedissonClient.class);
             var writer = client();
             String name = unique();
             try (var on =
-                         new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))));
+                    new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))));
                  var off =
                          new RedisCacheRegions(writer, List.of(definition(name, 0, Duration.ofSeconds(30))))) {
                 var cached = on.region(name, String.class);
@@ -178,7 +178,7 @@ class LocalCachingIT {
         var client = client();
         String name = unique();
         try (var caches =
-                     new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(500))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(500))))) {
             var cache = caches.region(name, String.class);
             cache.put("key", "near-expiry", Duration.ofMillis(700));
             Thread.sleep(450);
@@ -212,7 +212,7 @@ class LocalCachingIT {
         var writer = client();
         String name = unique();
         try (var caches =
-                     new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))))) {
             var cache = caches.region(name, String.class);
             cache.put("key", "old", Duration.ofSeconds(60));
             Thread.sleep(100);
@@ -246,7 +246,7 @@ class LocalCachingIT {
                     IllegalStateException.class,
                     () -> new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(1)))));
             try (var caches =
-                         new RedisCacheRegions(client, List.of(definition(name, 0, Duration.ofSeconds(1))))) {
+                    new RedisCacheRegions(client, List.of(definition(name, 0, Duration.ofSeconds(1))))) {
                 var cache = caches.region(name, String.class);
                 cache.put("key", "value", Duration.ofSeconds(5));
                 assertEquals("value", cache.get("key"));
@@ -266,9 +266,8 @@ class LocalCachingIT {
         try {
             assertThrows(
                     RuntimeException.class,
-                    () ->
-                            new RedisCacheRegions(
-                                    client, List.of(definition(unique(), 8, Duration.ofSeconds(1)))));
+                    () -> new RedisCacheRegions(
+                            client, List.of(definition(unique(), 8, Duration.ofSeconds(1)))));
         } finally {
             client.shutdown();
             redis("ACL", "DELUSER", user);
@@ -347,7 +346,7 @@ class LocalCachingIT {
         var writer = client();
         String name = unique();
         try (var on =
-                     new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))));
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))));
              var off =
                      new RedisCacheRegions(writer, List.of(definition(name, 0, Duration.ofSeconds(30))))) {
             var cache = on.region(name, String.class);

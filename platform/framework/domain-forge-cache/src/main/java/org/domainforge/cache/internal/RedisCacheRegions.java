@@ -61,8 +61,7 @@ final class RedisCacheRegions implements AutoCloseable {
                     0,
                     notifications.addListener(
                             String.class,
-                            (pattern, channel, key) ->
-                                    regions.values().forEach(region -> region.invalidate(key))));
+                            (pattern, channel, key) -> regions.values().forEach(region -> region.invalidate(key))));
         } catch (RuntimeException failure) {
             try {
                 close();

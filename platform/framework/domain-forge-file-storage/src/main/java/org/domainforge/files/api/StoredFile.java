@@ -14,5 +14,5 @@ import java.time.Instant;
  * @param uploadedAt  上传时间
  */
 public record StoredFile(String id, String name, String contentType, long size, String sha256, Long uploadedBy,
-                         Instant uploadedAt) {
+        Instant uploadedAt) {
 }

@@ -14,20 +14,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class ResponseContractTest {
     @Test
     void reservedCodesCannotBecomeBusinessRejections() {
-        for (String code :
-                List.of(
-                        "SUCCESS",
-                        "ACCEPTED",
-                        "INVALID_REQUEST",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "SERVICE_UNAVAILABLE",
-                        "INTERNAL_ERROR",
-                        "RATE_LIMITED",
-                        "GATEWAY_TIMEOUT",
-                        "PAYLOAD_TOO_LARGE",
-                        "IDEMPOTENCY_IN_PROGRESS",
-                        "IDEMPOTENCY_KEY_REUSED")) {
+        for (String code : List.of(
+                "SUCCESS",
+                "ACCEPTED",
+                "INVALID_REQUEST",
+                "UNAUTHENTICATED",
+                "FORBIDDEN",
+                "SERVICE_UNAVAILABLE",
+                "INTERNAL_ERROR",
+                "RATE_LIMITED",
+                "GATEWAY_TIMEOUT",
+                "PAYLOAD_TOO_LARGE",
+                "IDEMPOTENCY_IN_PROGRESS",
+                "IDEMPOTENCY_KEY_REUSED")) {
             assertThrows(IllegalArgumentException.class, () -> ApiResponse.rejected(code, "拒绝"));
         }
         assertNull(ApiResponse.success(null).data());

@@ -130,7 +130,7 @@ public final class AliyunSmsSender implements SmsSender {
      * @param requestTimeout  请求超时
      */
     record Settings(URI endpoint, String accessKeyId, String accessKeySecret, String signName,
-                    Map<String, String> templates, Duration connectTimeout, Duration requestTimeout) {
+            Map<String, String> templates, Duration connectTimeout, Duration requestTimeout) {
         @Override
         public String toString() {
             return "Settings[endpoint=" + endpoint + ", signName=" + signName + ", templates=" + templates + "]";

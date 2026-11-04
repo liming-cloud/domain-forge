@@ -22,7 +22,8 @@ public final class TransportFailures implements Capability {
      */
     static boolean beforeSending(IOException failure) {
         if (failure instanceof ConnectException || failure instanceof UnknownHostException
-                || failure instanceof NoRouteToHostException) return true;
+                || failure instanceof NoRouteToHostException)
+            return true;
         return failure instanceof SocketTimeoutException timeout && timeout.getMessage() != null
                 && timeout.getMessage().toLowerCase(Locale.ROOT).contains("connect");
     }

@@ -66,10 +66,10 @@ class BootResourceBindingIT {
         String schema = "boot_binding_" + UUID.randomUUID().toString().replace("-", "");
         try {
             try (var context =
-                         new SpringApplicationBuilder(Application.class)
-                                 .web(WebApplicationType.NONE)
-                                 .properties(properties(schema))
-                                 .run()) {
+                    new SpringApplicationBuilder(Application.class)
+                            .web(WebApplicationType.NONE)
+                            .properties(properties(schema))
+                            .run()) {
                 var source = context.getBean("dataSource", javax.sql.DataSource.class);
                 assertSame(
                         source, context.getBean("flyway", Flyway.class).getConfiguration().getDataSource());
@@ -104,10 +104,10 @@ class BootResourceBindingIT {
                 RuntimeException.class,
                 () -> {
                     try (var ignored =
-                                 new SpringApplicationBuilder(Application.class)
-                                         .web(WebApplicationType.NONE)
-                                         .properties(properties)
-                                         .run()) {
+                            new SpringApplicationBuilder(Application.class)
+                                    .web(WebApplicationType.NONE)
+                                    .properties(properties)
+                                    .run()) {
                         fail("独立 Flyway 连接不得通过同资源核对");
                     }
                 });

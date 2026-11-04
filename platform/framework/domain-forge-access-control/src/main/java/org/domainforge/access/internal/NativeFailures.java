@@ -20,7 +20,8 @@ final class NativeFailures {
         if (failure instanceof NotLoginException login) return unauthenticated(login);
         if (failure instanceof NotPermissionException
                 || failure instanceof NotRoleException
-                || failure instanceof AccessException) return failure;
+                || failure instanceof AccessException)
+            return failure;
         return new AccessException(AccessFailure.UNAVAILABLE);
     }
 

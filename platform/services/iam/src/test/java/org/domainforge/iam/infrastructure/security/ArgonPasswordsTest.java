@@ -14,10 +14,9 @@ class ArgonPasswordsTest {
     @Test
     void hashesOriginalUnicodeWithRandomSalt() {
         try (var passwords =
-                     new ArgonPasswords(
-                             new PasswordHashingSettings(2, 8, 1000))) {
-            for (String value :
-                    new String[]{" ".repeat(15), "😀".repeat(128), "identity password e\u0301"}) {
+                new ArgonPasswords(
+                        new PasswordHashingSettings(2, 8, 1000))) {
+            for (String value : new String[]{" ".repeat(15), "😀".repeat(128), "identity password e\u0301"}) {
                 String digest = passwords.encode(value);
                 assertTrue(digest.startsWith("$argon2id$v=19$m=19456,t=2,p=1$"));
                 assertTrue(passwords.matches(value, digest));
@@ -33,12 +32,11 @@ class ArgonPasswordsTest {
     @Test
     void rejectsInvalidOrBlockedPasswords() {
         try (var passwords =
-                     new ArgonPasswords(
-                             new PasswordHashingSettings(2, 8, 1000))) {
-            for (String value :
-                    new String[]{
-                            "x".repeat(14), "x".repeat(129), "x".repeat(15) + "\uD800", "passwordpassword"
-                    }) {
+                new ArgonPasswords(
+                        new PasswordHashingSettings(2, 8, 1000))) {
+            for (String value : new String[]{
+                    "x".repeat(14), "x".repeat(129), "x".repeat(15) + "\uD800", "passwordpassword"
+            }) {
                 assertThrows(IamException.class, () -> passwords.encode(value));
             }
         }

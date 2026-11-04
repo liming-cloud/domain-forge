@@ -31,7 +31,7 @@ public final class FileStorageAssembly implements AutoCloseable {
     private final AutoCloseable resource;
 
     private FileStorageAssembly(ObjectStorage storage, SqlFileStore store, FileCleanup cleanup,
-                                AutoCloseable resource) {
+            AutoCloseable resource) {
         this.storage = storage;
         this.store = store;
         this.cleanup = cleanup;

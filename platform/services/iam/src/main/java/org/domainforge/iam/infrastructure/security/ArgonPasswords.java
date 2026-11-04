@@ -42,7 +42,7 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
                         },
                         new ThreadPoolExecutor.AbortPolicy());
         try (var stream =
-                     ArgonPasswords.class.getResourceAsStream("/security/common-passwords-v1.txt")) {
+                ArgonPasswords.class.getResourceAsStream("/security/common-passwords-v1.txt")) {
             if (stream == null) throw new IllegalStateException("缺少固定密码阻断列表");
             policy =
                     new PasswordPolicy(

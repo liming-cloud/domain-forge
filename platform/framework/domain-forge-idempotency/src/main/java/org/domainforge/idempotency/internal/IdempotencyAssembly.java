@@ -22,7 +22,7 @@ public final class IdempotencyAssembly {
      * 保存 24 小时、处理租期 60 秒、请求体与响应体上限 1MB，均可配置。
      */
     public static IdempotencyFilter filter(Environment environment, RedissonClient redis,
-                                           List<RequestMappingHandlerMapping> mappings) {
+            List<RequestMappingHandlerMapping> mappings) {
         var settings = new IdempotencyFilter.Settings(
                 environment.getProperty("spring.application.name", "app"),
                 environment.getProperty(PREFIX + "ttl", Duration.class, Duration.ofHours(24)),

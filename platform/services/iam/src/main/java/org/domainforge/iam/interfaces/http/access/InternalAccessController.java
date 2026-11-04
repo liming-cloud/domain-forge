@@ -57,8 +57,8 @@ public final class InternalAccessController {
     public ApiResponse<Map<String, CurrentScope>> scopes(@RequestParam("permission") List<String> permissions) {
         Map<String, CurrentScope> result = new TreeMap<>();
         scopes.scopes(identity.current().tokenDigest(), permissions)
-                .forEach((code, scope) ->
-                        result.put(code, new CurrentScope(scope.all(), scope.self(), scope.unitIds())));
+                .forEach((code, scope) -> result.put(code,
+                        new CurrentScope(scope.all(), scope.self(), scope.unitIds())));
         return ApiResponse.success(result);
     }
 }

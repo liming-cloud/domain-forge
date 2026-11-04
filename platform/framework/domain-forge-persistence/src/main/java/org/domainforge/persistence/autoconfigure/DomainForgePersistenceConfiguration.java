@@ -46,7 +46,7 @@ public class DomainForgePersistenceConfiguration {
         Duration timeout = properties.getDefaultTimeout();
         if (timeout != null
                 && (timeout.compareTo(Duration.ofSeconds(1)) < 0
-                || timeout.compareTo(Duration.ofSeconds(300)) > 0)) {
+                        || timeout.compareTo(Duration.ofSeconds(300)) > 0)) {
             throw new IllegalArgumentException("spring.transaction.default-timeout须在1至300秒之间");
         }
         if (transaction.getDefaultTimeout() == TransactionDefinition.TIMEOUT_DEFAULT) {

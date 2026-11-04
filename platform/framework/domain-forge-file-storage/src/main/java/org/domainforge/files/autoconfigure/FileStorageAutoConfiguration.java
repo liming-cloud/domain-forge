@@ -31,7 +31,7 @@ public class FileStorageAutoConfiguration {
      */
     @Bean(destroyMethod = "close")
     FileStorageAssembly fileStorageAssembly(Environment environment, FileMapper files,
-                                            ObjectProvider<MeterRegistry> metrics) {
+            ObjectProvider<MeterRegistry> metrics) {
         return FileStorageAssembly.create(environment, files, metrics.getIfAvailable(SimpleMeterRegistry::new));
     }
 

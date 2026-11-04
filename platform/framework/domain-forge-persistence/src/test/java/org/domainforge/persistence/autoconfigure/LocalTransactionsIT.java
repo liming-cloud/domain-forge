@@ -134,12 +134,11 @@ class LocalTransactionsIT {
         assertEquals(1, rows.count());
         assertThrows(
                 IllegalStateException.class,
-                () ->
-                        transaction.executeWithoutResult(
-                                status -> {
-                                    rows.insert("short-rollback");
-                                    throw new IllegalStateException("rollback");
-                                }));
+                () -> transaction.executeWithoutResult(
+                        status -> {
+                            rows.insert("short-rollback");
+                            throw new IllegalStateException("rollback");
+                        }));
         assertEquals(1, rows.count());
     }
 

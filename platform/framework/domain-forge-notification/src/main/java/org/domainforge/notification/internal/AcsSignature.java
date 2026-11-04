@@ -32,10 +32,10 @@ final class AcsSignature {
      * @return 十六进制小写签名
      */
     static String sign(String method, Map<String, String> query, SortedMap<String, String> headers, String body,
-                       String secret) {
+            String secret) {
         String canonical = method + "\n/\n" + canonicalQuery(query) + "\n"
                 + headers.entrySet().stream().map(header -> header.getKey() + ":" + header.getValue().strip() + "\n")
-                .collect(Collectors.joining())
+                        .collect(Collectors.joining())
                 + "\n" + signedHeaders(headers) + "\n" + sha256Hex(body);
         return HexFormat.of().formatHex(hmac(secret, ALGORITHM + "\n" + sha256Hex(canonical)));
     }

@@ -47,8 +47,8 @@ public final class EventConsumers implements SmartLifecycle {
      * @param maxAttempts 服务端消费组的最大投递次数（重试次数加 1），用于识别最后一次投递
      */
     public EventConsumers(List<EventHandler> handlers, ClientConfiguration client, InboxMapper inbox,
-                          TransactionOperations transactions, int maxAttempts, MeterRegistry metrics,
-                          TraceContexts traces) {
+            TransactionOperations transactions, int maxAttempts, MeterRegistry metrics,
+            TraceContexts traces) {
         this.handlers = List.copyOf(handlers);
         this.client = client;
         this.inbox = inbox;
