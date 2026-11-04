@@ -3,13 +3,15 @@
 带示例时向网关配置种子追加示例接口的路由。--call-example 生成以当前用户身份调用另一服务便笺查询的示例，
 --consume-example 生成消费另一服务便笺事件的示例。
 
-生成结果继承内部 parent，自动执行架构规则与质量门禁；生成后代码归该服务维护，模板升级不覆盖已有服务。
+生成结果继承内部 parent，自动执行架构规则与质量门禁；命令行生成后对新模块执行 spotless:apply，使代码一开始就符合
+格式门禁（import 顺序取决于包名，模板无法预先排好）。生成后代码归该服务维护，模板升级不覆盖已有服务。
 """
 
 import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 TEMPLATE = Path(__file__).resolve().parent
@@ -160,6 +162,13 @@ def generate(root, name, package, namespace=None, with_example=False, call_peer=
             'example': with_example, 'call_example': call_peer, 'consume_example': source, 'files': len(created)}
 
 
+def format_module(root, name):
+    """对新服务模块执行 spotless:apply；返回进程退出码。"""
+    command = [str(root / 'platform' / 'mvnw'), '-q', '-f', str(root / 'platform' / 'pom.xml'),
+               '-pl', 'services/' + name, 'spotless:apply']
+    return subprocess.run(command, check=False).returncode
+
+
 def main():
     """暴露有限生成参数；失败返回非零。"""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -172,12 +181,17 @@ def main():
     parser.add_argument('--consume-example', metavar='SERVICE',
                         help='附带消息消费示例：订阅该服务（以 --with-example 生成）的 NoteCreated 事件并维护便笺统计')
     parser.add_argument('--root', default=str(TEMPLATE.parents[2]), help='仓库根目录，默认为本模板所在仓库')
+    parser.add_argument('--no-format', action='store_true', help='生成后不执行 spotless:apply（之后须手动执行）')
     args = parser.parse_args()
+    root = Path(args.root).resolve()
     try:
-        result = generate(Path(args.root).resolve(), args.name, args.package, args.permission_namespace,
+        result = generate(root, args.name, args.package, args.permission_namespace,
                           args.with_example, args.call_example, args.consume_example)
     except (ValueError, OSError, KeyError) as failure:
         parser.exit(2, str(failure) + '\n')
+    if not args.no_format and format_module(root, args.name) != 0:
+        parser.exit(3, '服务已生成，但整理格式失败；请执行 platform/mvnw -f platform/pom.xml -pl services/'
+                    + args.name + ' spotless:apply\n')
     print(json.dumps(result, ensure_ascii=False))
 
 

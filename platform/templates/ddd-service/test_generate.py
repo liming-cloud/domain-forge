@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 import generate
 
@@ -150,6 +151,30 @@ class GenerateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             generate.generate(self.root, 'order', 'com.company.order')
         self.assertEqual(before, (self.root / 'platform' / 'services' / 'pom.xml').read_text(encoding='utf-8'))
+
+    def run_main(self, returncode, *extra):
+        argv = ['generate.py', '--root', str(self.root), '--name', 'order-service', '--package', 'com.company.order']
+        with mock.patch('sys.argv', argv + list(extra)), \
+                mock.patch('generate.subprocess.run', return_value=mock.Mock(returncode=returncode)) as run:
+            generate.main()
+        return run
+
+    def test_command_line_formats_generated_module(self):
+        with mock.patch('builtins.print'):
+            run = self.run_main(0)
+        command = run.call_args.args[0]
+        self.assertEqual(['-pl', 'services/order-service', 'spotless:apply'], command[-3:])
+
+    def test_format_failure_keeps_service_and_exits_nonzero(self):
+        with self.assertRaises(SystemExit) as exited, mock.patch('sys.stderr'):
+            self.run_main(1)
+        self.assertEqual(3, exited.exception.code)
+        self.assertTrue((self.root / 'platform' / 'services' / 'order-service' / 'pom.xml').is_file())
+
+    def test_no_format_skips_formatting(self):
+        with mock.patch('builtins.print'):
+            run = self.run_main(0, '--no-format')
+        run.assert_not_called()
 
     def test_manifest_matches_assets(self):
         manifest = json.loads((generate.TEMPLATE / 'template.json').read_text(encoding='utf-8'))

@@ -1,5 +1,6 @@
-# 仓库统一的编辑器与 IntelliJ 代码风格。IntelliJ 会读取 ij_ 开头的设置，
-# 保证不同机器上"Reformat Code"的结果一致；Checkstyle 的格式规则与此对应。
+# 仓库统一的编辑器设置。Java 代码格式以 Spotless（Eclipse 格式化器）为准，由 mvn verify 检查；
+# IntelliJ 用 Eclipse Code Formatter 插件加载同一份配置，见 docs/standards/04-源码质量.md 的 C-03。
+# 下面的 ij_ 设置只影响 IntelliJ 自带的格式化，不与 Spotless 冲突。
 root = true
 
 [*]
@@ -16,8 +17,6 @@ ij_continuation_indent_size = 8
 ij_java_class_count_to_use_import_on_demand = 5
 ij_java_names_count_to_use_import_on_demand = 3
 ij_java_imports_layout = *,|,javax.**,java.**,|,$*
-# 多行 try-with-resources 的后续资源对齐到第一个资源（与现有代码一致）
-ij_java_align_multiline_resources = true
 ij_java_keep_simple_blocks_in_one_line = false
 ij_java_doc_do_not_wrap_if_one_line = false
 
