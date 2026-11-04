@@ -68,3 +68,36 @@ initialize_admin() {
         2> "$work/init.log") || { cat "$work/init.log"; fail "管理员初始化"; }
     grep -q administrator_initialized <<< "$output" || fail "管理员初始化未确认"
 }
+
+# check_json_logs <服务> [traceId]：服务的容器日志逐行为 ECS JSON 对象，带固定字段（时间、级别、日志器、服务名、消息），
+# 给出 traceId 时还须在日志中找到它（网关访问日志的 traceId 在消息的 trace_id= 中）。输出 ok 或问题描述。
+check_json_logs() {
+    compose logs --no-color --no-log-prefix "$1" | python3 -I -c "$json_log_check" "$1" "${2:-}"
+}
+json_log_check='import json, sys
+service, trace = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else ""
+bad, missing, found, records = [], set(), False, 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        record = json.loads(line)
+    except ValueError:
+        record = None
+    if not isinstance(record, dict):
+        bad.append(line[:200])
+        continue
+    records += 1
+    for path in ("@timestamp", "log.level", "log.logger", "service.name", "message"):
+        value = record
+        for key in path.split("."):
+            value = value.get(key) if isinstance(value, dict) else None
+        if value is None:
+            missing.add(path)
+    if record.get("service", {}).get("name") != service:
+        missing.add("service.name=" + service)
+    found = found or record.get("traceId") == trace or ("trace_id=" + trace) in str(record.get("message"))
+problems = ([] if records else ["没有日志"]) + (["非 JSON 对象的行 %d 条，如 %s" % (len(bad), " ／ ".join(sorted(set(bad))[:3]))] if bad else []) \
+    + (["缺少字段 " + ",".join(sorted(missing))] if missing else []) + ([] if found or not trace else ["未找到 traceId"])
+print("; ".join(problems) or "ok")'

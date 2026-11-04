@@ -187,36 +187,9 @@ step "日志：各服务逐行输出 ECS JSON，同一请求的 traceId 在 gate
 log_trace=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $alice_token" "$base/api/notes" \
     | tr -d '\r' | sed -n 's/^[Xx]-[Tt]race-[Ii]d: //p')
 [[ "$log_trace" =~ ^[0-9a-f]{32}$ ]] || fail "响应应带 traceId：$log_trace"
-# 输出 ok，或不能按 JSON 解析的行、缺失的固定字段、未找到 traceId。网关访问日志的 traceId 在消息的 trace_id= 中。
-log_check='import json, sys
-service, trace = sys.argv[1], sys.argv[2]
-bad, missing, found = [], set(), False
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        record = json.loads(line)
-    except ValueError:
-        record = None
-    if not isinstance(record, dict):
-        bad.append(line[:200])
-        continue
-    for path in ("@timestamp", "log.level", "log.logger", "service.name", "message"):
-        value = record
-        for key in path.split("."):
-            value = value.get(key) if isinstance(value, dict) else None
-        if value is None:
-            missing.add(path)
-    if record.get("service", {}).get("name") != service:
-        missing.add("service.name=" + service)
-    found = found or record.get("traceId") == trace or ("trace_id=" + trace) in str(record.get("message"))
-problems = (["非 JSON 对象的行 %d 条，如 %s" % (len(bad), " ／ ".join(sorted(set(bad))[:3]))] if bad else []) \
-    + (["缺少字段 " + ",".join(sorted(missing))] if missing else []) + ([] if found else ["未找到 traceId"])
-print("; ".join(problems) or "ok")'
 for service in gateway note-service iam; do
     for attempt in $(seq 1 10); do
-        result=$(compose logs --no-color --no-log-prefix "$service" | python3 -I -c "$log_check" "$service" "$log_trace")
+        result=$(check_json_logs "$service" "$log_trace")
         [ "$result" = "ok" ] && break
         sleep 1
     done
