@@ -20,6 +20,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.build.outputTimestamp>2026-10-15T00:00:00Z</project.build.outputTimestamp>
+        <!-- 测试开关的默认值，命令行 -D 可覆盖。 -->
+        <skipTests>false</skipTests>
+        <surefire.failIfNoTests>true</surefire.failIfNoTests>
         <spring-boot.version>4.1.2</spring-boot.version>
         <redisson.version>4.8.0</redisson.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
@@ -121,7 +124,9 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.6</version>
                     <configuration>
-                        <failIfNoTests>true</failIfNoTests>
+                        <!-- 每个模块都要有测试；命令行可用 -Dsurefire.failIfNoTests=false 覆盖（如 -Dtest 配合 -am 时）。
+                             不用 failIfNoTests 属性：failsafe 也读取它，会使没有集成测试的模块失败。 -->
+                        <failIfNoTests>${surefire.failIfNoTests}</failIfNoTests>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -146,6 +151,8 @@
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${failsafe.version}</version>
                     <configuration>
+                        <!-- failsafe 3.6 起 skipTests 不再绑定同名用户属性；显式绑定，使 -DskipTests 照常同时跳过集成测试。 -->
+                        <skipTests>${skipTests}</skipTests>
                         <!-- Boot repackage 后的 JAR 不能直接作类路径，使用编译输出目录。 -->
                         <classesDirectory>${project.build.outputDirectory}</classesDirectory>
                         <!-- 固定顺序：默认按文件系统顺序，macOS 与 CI 的 Linux 不同，曾掩盖进程级单例导致的顺序依赖。 -->

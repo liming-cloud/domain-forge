@@ -32,6 +32,29 @@ python3 scripts/check_doc_links.py                                        # 文�
 
 提交前 `mvn verify` 必须通过。不要为了通过而关闭检查、加例外或删除测试；确实需要例外时，在 PR 里说明理由，由人工决定。
 
+### 快速反馈
+
+完整门禁约 25 分钟，闭环验证约 12 分钟。开发中先用下面的命令缩小范围，提交前再跑完整门禁。`<模块>` 写相对 `platform/` 的路径，如 `framework/domain-forge-cache`、`services/iam`。
+
+```bash
+M="platform/mvnw -f platform/pom.xml"
+$M -q -pl <模块> -am compile                                     # 编译（含上游模块）
+$M -pl <模块> -am verify -DskipITs -Ddocker.skip=true             # 单模块门禁：单元测试与静态检查，不起容器
+$M -pl <模块> -am verify -Dtest=<测试类> -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dsurefire.failIfNoTests=false -DskipITs -Ddocker.skip=true             # 单个单元测试类
+$M -pl <模块> verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dsurefire.failIfNoTests=false -Dit.test=<集成测试类>                    # 单个集成测试类（会起该模块需要的容器）
+$M -q -pl services/<服务> -am package -DskipTests -Ddocker.skip=true  # 只构建服务的可执行 jar
+scripts/smoke_service.sh <服务>                                   # 单服务冒烟，约 1 分钟
+```
+
+- 单服务冒烟按部署参考（`config-center` profile）启动一个服务及其依赖，核对健康检查与标准输出逐行为 JSON。确认启动、配置、依赖打包或日志格式时用它，不要为此跑完整闭环；接口行为、跨服务、消息、备份恢复仍以 `scripts/verify_closure.sh`、`scripts/verify_deploy.sh` 为准。
+- 不带 `-am` 时，上游模块取自本地 Maven 仓库中上次安装的版本：改了组件后要么带 `-am`，要么先 `install` 该组件。
+- `-DskipTests` 同时跳过单元测试与集成测试，`-DskipITs` 只跳过集成测试。
+- `-Dtest` 配合 `-am` 时必须带上 `-Dsurefire.failIfNoSpecifiedTests=false -Dsurefire.failIfNoTests=false`，否则没有该测试类的上游模块会失败。
+- `-q` 会吞掉 `dependency:tree` 等插件的输出，查看这类输出时不要加。
+- 文件名含中文：用 `git ls-files -z` 配合 `read -d ''` 处理，不按行分割。
+
 ## 会被自动拦下的硬规则
 
 - 业务服务的类必须位于 `bootstrap`、`interfaces`、`application`、`domain`、`infrastructure` 五个职责包之一。

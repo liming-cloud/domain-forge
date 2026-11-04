@@ -10,6 +10,7 @@
     <version>0.1.0</version>
 
     <properties>
+        <surefire.failIfNoTests>true</surefire.failIfNoTests>
         <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -63,7 +64,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.6</version>
                 <configuration>
-                    <failIfNoTests>true</failIfNoTests>
+                    <!-- 与 platform parent 一致：默认要求有测试，命令行可用 -Dsurefire.failIfNoTests=false 覆盖（不用 failIfNoTests：failsafe 也读取该属性）。 -->
+                    <failIfNoTests>${surefire.failIfNoTests}</failIfNoTests>
                 </configuration>
             </plugin>
             <plugin>
