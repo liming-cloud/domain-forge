@@ -13,6 +13,7 @@
 |---|---|
 | 新增或修改业务用例、领域模型 | [需求与领域建模](docs/standards/01-需求与领域建模.md)、[系统设计](docs/standards/02-系统设计.md) |
 | 写 Java 代码（任何改动） | [源码质量](docs/standards/04-源码质量.md) |
+| 模块与组件边界、扩展点、失败处理 | [质量模型与原则](docs/standards/00-质量模型与原则.md)：原则、判据与检查方式的总纲 |
 | SQL、Mapper、迁移、事务 | [持久化](docs/standards/05-持久化.md) |
 | HTTP 接口、错误码 | [接口与错误](docs/standards/06-接口与错误.md)、[Web 组件](docs/architecture/03-Web组件.md) |
 | 登录、权限、凭据、审计 | [安全与访问控制](docs/standards/07-安全与访问控制.md)、[身份权限设计](docs/architecture/04-身份权限.md) |
