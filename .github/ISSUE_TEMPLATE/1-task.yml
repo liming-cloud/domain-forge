@@ -1,0 +1,41 @@
+name: 任务
+description: 一项完整、可验证的工作，一个 issue 对应一个 PR；描述是唯一事实来源
+title: "[任务] "
+labels: ["kind/slice", "status/needs-decision"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: 对应产品定义中的哪条验收场景（或哪项杂务），为什么现在做
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: 已确认的决定
+      description: 已由人答复的决定，链接设计文档的“决定”小节
+  - type: textarea
+    id: questions
+    attributes:
+      label: 未决问题
+      description: 需要人决定的问题（见开发流程“需要人工决定的事项”），附建议；全部答复后把标签改为 status/ready
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: 验收场景
+      description: 每条写明验证它的测试、脚本或可观察结果（以命令或测试名表述）
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: 改动范围
+      description: 涉及的模块与入口（组件、模板、部署、验证脚本、文档），以及不能碰的部分
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与风险
+      description: 依赖的其他任务（同时用 issue 的 blocked by 标注）、已知风险
