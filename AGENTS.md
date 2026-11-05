@@ -4,8 +4,8 @@
 
 ## 开工前
 
-0. 任务来自 GitHub「首版」里程碑中 `status/ready` 的切片 issue（流程见[开发流程](docs/workflow/01-开发流程.md#任务与-issue)）。没有就绪的切片时，先把未决问题写进跟踪 issue，不凭路线图自行开工。
-1. 读[产品定义](docs/product/01-产品定义.md)中与任务相关的小节，以及任务对应的跟踪 issue（入口见[路线图](docs/product/02-路线图.md#首版跟踪)），确认任务在范围内。
+0. 任务来自 GitHub「首版」里程碑中 `status/ready`、且依赖（blocked by）已全部关闭的任务 issue，编号小的优先（流程见[开发流程](docs/workflow/01-开发流程.md#任务与-issue)）。issue 描述是唯一依据。没有就绪的任务时，先把未决问题写进对应 issue，不凭路线图自行开工。
+1. 读[产品定义](docs/product/01-产品定义.md)中与任务相关的小节（任务与验收场景的对应见[路线图](docs/product/02-路线图.md#首版跟踪)），确认任务在范围内。
 2. 读[总体架构](docs/architecture/01-总体架构.md)：模块划分、依赖方向、DDD 分层和查询短路径。
 3. 按任务类型读规范（每份都是规则卡，可以只读相关小节）：
 
