@@ -25,7 +25,7 @@ public class IdempotencyAutoConfiguration {
      */
     @Bean
     FilterRegistrationBean<IdempotencyFilter> idempotencyFilter(Environment environment, RedissonClient redis,
-                                                                List<RequestMappingHandlerMapping> mappings) {
+            List<RequestMappingHandlerMapping> mappings) {
         var registration = new FilterRegistrationBean<>(IdempotencyAssembly.filter(environment, redis, mappings));
         registration.setOrder(Ordered.LOWEST_PRECEDENCE - 100);
         return registration;

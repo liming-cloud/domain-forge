@@ -2,10 +2,10 @@ package org.domainforge.iam.bootstrap;
 
 import cn.dev33.satoken.stp.StpLogic;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.domainforge.iam.application.port.authentication.NativeSessions;
-import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.config.api.DynamicSettingsBinder;
+import org.domainforge.iam.application.port.authentication.NativeSessions;
+import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
 import org.domainforge.iam.infrastructure.configuration.PasswordHashingSettings;
 import org.domainforge.iam.infrastructure.security.ArgonPasswords;

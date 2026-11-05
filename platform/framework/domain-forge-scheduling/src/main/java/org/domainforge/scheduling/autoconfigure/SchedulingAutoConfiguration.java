@@ -35,8 +35,8 @@ public class SchedulingAutoConfiguration {
          */
         @Bean(TaskDispatcher.BEAN)
         TaskDispatcher domainforgeTaskDispatcher(ObjectProvider<ScheduledTask> tasks,
-                                                 ObjectProvider<MeterRegistry> metrics,
-                                                 ObjectProvider<Tracer> tracer) {
+                ObjectProvider<MeterRegistry> metrics,
+                ObjectProvider<Tracer> tracer) {
             return new TaskDispatcher(tasks.orderedStream().toList(), metrics.getIfAvailable(SimpleMeterRegistry::new),
                     tracer.getIfAvailable(() -> Tracer.NOOP));
         }

@@ -16,8 +16,7 @@ class IamRequestFilterTest {
     // Jackson接受vendor JSON，因此不能仅拦截application/json；未知类型也不能无限读取。
     @Test
     void boundsEveryMediaTypeBeforeController() throws Exception {
-        for (String media :
-                new String[]{"application/json", "application/vnd.test+json", "text/plain", ""}) {
+        for (String media : new String[]{"application/json", "application/vnd.test+json", "text/plain", ""}) {
             var request = new MockHttpServletRequest("POST", "/api/auth/login");
             request.setContentType(media);
             request.setContent(new byte[16385]);

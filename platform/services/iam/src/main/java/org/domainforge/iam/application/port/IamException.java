@@ -21,7 +21,8 @@ public final class IamException extends RuntimeException {
         super(message);
         if (failure == IamFailure.RATE_LIMITED
                 ? retryAfterSeconds < 1 || retryAfterSeconds > 3600
-                : retryAfterSeconds != 0) throw new IllegalArgumentException("重试秒数不符合失败分类");
+                : retryAfterSeconds != 0)
+            throw new IllegalArgumentException("重试秒数不符合失败分类");
         this.failure = failure;
         this.retryAfterSeconds = retryAfterSeconds;
     }

@@ -27,19 +27,18 @@ class CacheSubscriptionTest {
         var node =
                 proxy(
                         RedisMaster.class,
-                        (object, method, arguments) ->
-                                Map.of("notify-keyspace-events", "E$gx", "maxmemory-policy", "noeviction"));
+                        (object, method, arguments) -> Map.of("notify-keyspace-events", "E$gx", "maxmemory-policy",
+                                "noeviction"));
         var single = proxy(RedisSingle.class, (object, method, arguments) -> node);
         var client =
                 proxy(
                         RedissonClient.class,
-                        (object, method, arguments) ->
-                                switch (method.getName()) {
-                                    case "getConfig" -> config;
-                                    case "getRedisNodes" -> single;
-                                    case "getPatternTopic" -> topic;
-                                    default -> throw new UnsupportedOperationException(method.getName());
-                                });
+                        (object, method, arguments) -> switch (method.getName()) {
+                            case "getConfig" -> config;
+                            case "getRedisNodes" -> single;
+                            case "getPatternTopic" -> topic;
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        });
         return new RedisCacheRegions(
                 client,
                 List.of(

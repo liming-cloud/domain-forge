@@ -19,7 +19,7 @@ import java.util.Set;
  * @param limits    可选的接口限流规则，按顺序取第一条命中的
  */
 public record RouteSettings(String id, String service, List<String> paths, List<String> anonymous,
-                            List<RouteLimit> limits) {
+        List<RouteLimit> limits) {
     private static final String NAME = "[a-z][a-z0-9-]{0,62}";
     private static final Set<String> METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
@@ -70,7 +70,8 @@ public record RouteSettings(String id, String service, List<String> paths, List<
      */
     static PathPattern pattern(String path) {
         if (path == null || !path.startsWith("/api/") || path.contains("..") || path.contains("//")
-                || (path + "/").contains("/internal/")) throw invalid("路径不合法: " + path);
+                || (path + "/").contains("/internal/"))
+            throw invalid("路径不合法: " + path);
         try {
             return PathPatternParser.defaultInstance.parse(path);
         } catch (RuntimeException syntax) {

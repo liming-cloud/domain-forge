@@ -64,7 +64,7 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     EventPublisher eventPublisher(Environment environment, OutboxMapper outbox, ObjectProvider<OutboxRelay> relay,
-                                  TraceContexts traces) {
+            TraceContexts traces) {
         if (!flag(environment, "domainforge.messaging.outbox.enabled", false))
             return event -> {
                 throw new IllegalStateException("未启用 Outbox（domainforge.messaging.outbox.enabled）");
@@ -77,14 +77,14 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     OutboxRelay outboxRelay(Environment environment, MessagingClient client, OutboxMapper outbox, InboxMapper inbox,
-                            TransactionOperations transactions, ObjectProvider<EventHandler> handlers,
-                            ObjectProvider<MeterRegistry> metrics, TraceContexts traces) throws ClientException {
+            TransactionOperations transactions, ObjectProvider<EventHandler> handlers,
+            ObjectProvider<MeterRegistry> metrics, TraceContexts traces) throws ClientException {
         boolean publishing = flag(environment, "domainforge.messaging.outbox.enabled", false)
                 && flag(environment, "domainforge.messaging.relay.enabled", true);
         boolean consuming = handlers.stream().findAny().isPresent();
         Producer producer = publishing
                 ? ClientServiceProvider.loadService().newProducerBuilder()
-                .setClientConfiguration(client.require()).build()
+                        .setClientConfiguration(client.require()).build()
                 : null;
         var settings = new OutboxRelay.Settings(
                 duration(environment, "domainforge.messaging.relay.interval", Duration.ofSeconds(1)),
@@ -100,9 +100,9 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     EventConsumers eventConsumers(Environment environment, MessagingClient client,
-                                  ObjectProvider<EventHandler> handlers, InboxMapper inbox,
-                                  TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics,
-                                  TraceContexts traces) {
+            ObjectProvider<EventHandler> handlers, InboxMapper inbox,
+            TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics,
+            TraceContexts traces) {
         List<EventHandler> all = flag(environment, "domainforge.messaging.consumer.enabled", true)
                 ? handlers.orderedStream().toList() : List.of();
         return new EventConsumers(all, all.isEmpty() ? null : client.require(), inbox, transactions,

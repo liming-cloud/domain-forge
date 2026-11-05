@@ -36,7 +36,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
     private final Settings settings;
 
     IdempotencyFilter(IdempotentEndpoints endpoints, IdempotencyRecords records, Supplier<Object> accounts,
-                      Settings settings) {
+            Settings settings) {
         this.endpoints = endpoints;
         this.records = records;
         this.accounts = accounts;
@@ -99,7 +99,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
     }
 
     private void handle(HttpServletRequest request, HttpServletResponse response, FilterChain chain, String record,
-                        String fingerprint) throws ServletException, IOException {
+            String fingerprint) throws ServletException, IOException {
         IdempotencyRecords.Outcome outcome;
         try {
             outcome = records.begin(record, fingerprint, settings.lease());
@@ -117,7 +117,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
     }
 
     private void first(HttpServletRequest request, HttpServletResponse response, FilterChain chain, String record,
-                       String fingerprint) throws ServletException, IOException {
+            String fingerprint) throws ServletException, IOException {
         var captured = new ContentCachingResponseWrapper(response);
         try {
             chain.doFilter(request, captured);

@@ -28,7 +28,7 @@ public final class DynamicRatioSampler implements Sampler {
 
     @Override
     public SamplingResult shouldSample(Context parentContext, String traceId, String name, SpanKind spanKind,
-                                       Attributes attributes, List<LinkData> parentLinks) {
+            Attributes attributes, List<LinkData> parentLinks) {
         return delegate().shouldSample(parentContext, traceId, name, spanKind, attributes, parentLinks);
     }
 

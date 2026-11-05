@@ -42,16 +42,15 @@ class FailureDiagnosticsTest {
 
     // 只替代 Servlet 响应是否已提交的边界，真实 HTTP 与日志接收另由两消费者验证。
     private static HttpServletResponse response(boolean committed) {
-        return (HttpServletResponse)
-                Proxy.newProxyInstance(
-                        HttpServletResponse.class.getClassLoader(),
-                        new Class<?>[]{HttpServletResponse.class},
-                        (proxy, method, args) -> {
-                            if (method.getName().equals("isCommitted")) {
-                                return committed;
-                            }
-                            throw new UnsupportedOperationException(method.getName());
-                        });
+        return (HttpServletResponse) Proxy.newProxyInstance(
+                HttpServletResponse.class.getClassLoader(),
+                new Class<?>[]{HttpServletResponse.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("isCommitted")) {
+                        return committed;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                });
     }
 
     @BeforeEach

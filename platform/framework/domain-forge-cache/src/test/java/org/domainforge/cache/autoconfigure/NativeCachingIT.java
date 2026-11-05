@@ -61,13 +61,13 @@ class NativeCachingIT {
     @Test
     void nativeBootClientCoversOverrideInvalidationExpiryAndOptionalL1() throws Exception {
         try (var context =
-                     new SpringApplicationBuilder(Application.class)
-                             .web(WebApplicationType.NONE)
-                             .run(
-                                     "--spring.data.redis.port=" + required("REDIS_PORT"),
-                                     "--spring.data.redis.password=" + required("REDIS_PASSWORD"),
-                                     "--spring.main.banner-mode=off",
-                                     "--logging.level.root=WARN")) {
+                new SpringApplicationBuilder(Application.class)
+                        .web(WebApplicationType.NONE)
+                        .run(
+                                "--spring.data.redis.port=" + required("REDIS_PORT"),
+                                "--spring.data.redis.password=" + required("REDIS_PASSWORD"),
+                                "--spring.main.banner-mode=off",
+                                "--logging.level.root=WARN")) {
             assertEquals(1, context.getBeansOfType(RedissonClient.class).size());
             var client = context.getBean(RedissonClient.class);
             assertEquals(Protocol.RESP3, client.getConfig().getProtocol());

@@ -26,7 +26,7 @@
 ```bash
 platform/mvnw -f platform/pom.xml verify                                  # 完整门禁
 platform/mvnw -f platform/pom.xml verify -DskipITs -Ddocker.skip=true     # 无 Docker 时
-platform/mvnw -f platform/pom.xml spotless:apply -DspotlessFiles=<路径正则>  # 只整理自己改动的文件
+platform/mvnw -f platform/pom.xml spotless:apply                         # 整理格式（结果确定，可对整个仓库执行）
 python3 scripts/check_doc_links.py                                        # 文档链接
 ```
 
@@ -63,7 +63,7 @@ scripts/smoke_service.sh <服务>                                   # 单服务�
 - 不访问其他组件的 `internal` 包；跨上下文只引用对方的 `application.contract`。
 - SQL 只写在 Mapper XML 或合法的 MyBatis-Plus 链式条件里；禁止 `@Select` 等 SQL 注解、`apply/last` 等原始 SQL 拼接，以及 Java 中的 SQL 字符串。
 - 生产代码的每个类型都要有中文说明；方法圈复杂度不超过 10，可执行语句不超过 30。
-- 代码直接用到的依赖必须在 POM 中显式声明；格式遵循 `.editorconfig` 中的 IntelliJ 风格（4 空格缩进、续行 8、行宽 120，见[源码质量 C-03](docs/standards/04-源码质量.md#c-03-统一-intellij-代码风格)）。
+- 代码直接用到的依赖必须在 POM 中显式声明；格式以 Spotless 的输出为准（4 空格缩进、续行 8、行宽 120，由 `spotless:check` 检查，见[源码质量 C-03](docs/standards/04-源码质量.md#c-03-统一代码格式)）。
 
 规则的实现在 `platform/domain-forge-build-rules/`。规则漏判或误判时修改规则并补正反例，不要绕过。
 

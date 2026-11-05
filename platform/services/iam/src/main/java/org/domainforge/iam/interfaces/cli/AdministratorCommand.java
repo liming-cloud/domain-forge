@@ -59,8 +59,8 @@ public final class AdministratorCommand {
                     || Files.isSymbolicLink(file)
                     || permissions.stream().anyMatch(p -> !p.name().startsWith("OWNER_"))
                     || !Files.getOwner(file, LinkOption.NOFOLLOW_LINKS)
-                    .getName()
-                    .equals(System.getProperty("user.name"))) {
+                            .getName()
+                            .equals(System.getProperty("user.name"))) {
                 throw new IllegalArgumentException("密码文件必须仅当前用户可访问");
             }
             try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {

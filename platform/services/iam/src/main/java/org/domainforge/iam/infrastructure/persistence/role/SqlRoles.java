@@ -41,8 +41,8 @@ public class SqlRoles implements RoleRepository {
             if (grant.unitId() != null) set.add(grant.unitId());
         }
         Set<PermissionGrant> grants = new HashSet<>();
-        scopes.forEach((code, scope) ->
-                grants.add(new PermissionGrant(code, DataScope.valueOf(scope), units.get(code))));
+        scopes.forEach(
+                (code, scope) -> grants.add(new PermissionGrant(code, DataScope.valueOf(scope), units.get(code))));
         return new Role(row.id(), row.code(), row.name(), row.enabled(), row.system(), row.version(), grants);
     }
 

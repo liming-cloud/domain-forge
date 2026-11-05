@@ -58,14 +58,14 @@ public final class OutboxRelay implements SmartLifecycle {
      * @param consuming      本服务消费事件（有 Inbox 表）：启用去重记录清理
      */
     public record Settings(Duration interval, int batchSize, long retentionHours, boolean publishing,
-                           boolean consuming) {
+            boolean consuming) {
     }
 
     /**
      * 生产者由组件装配，只消费的服务为空；关闭顺序由 Spring 生命周期保证（先停中继再关客户端）。
      */
     public OutboxRelay(OutboxMapper outbox, InboxMapper inbox, TransactionOperations transactions, Producer producer,
-                       Settings settings, MeterRegistry metrics, TraceContexts traces) {
+            Settings settings, MeterRegistry metrics, TraceContexts traces) {
         this.outbox = outbox;
         this.inbox = inbox;
         this.transactions = transactions;

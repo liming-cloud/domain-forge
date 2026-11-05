@@ -48,7 +48,7 @@ public final class RedisVerificationCodes implements VerificationCodes {
     private final SecureRandom random = new SecureRandom();
 
     RedisVerificationCodes(RedissonClient redis, SmsSender sms, Map<String, Policy> policies, byte[] key,
-                           Clock clock) {
+            Clock clock) {
         this.redis = redis;
         this.sms = sms;
         this.policies = Map.copyOf(policies);
@@ -169,7 +169,7 @@ public final class RedisVerificationCodes implements VerificationCodes {
      * @param dailyLimit     同一号码每天最多发送次数（默认 10）
      */
     record Policy(String template, String parameter, int length, Duration ttl, int maxAttempts,
-                  Duration resendInterval, int dailyLimit) {
+            Duration resendInterval, int dailyLimit) {
         Policy {
             if (template == null || template.isBlank()) throw new IllegalArgumentException("验证码用途须指定短信模板");
             if (length < 4 || length > 8 || maxAttempts < 1 || dailyLimit < 1 || ttl.isNegative() || ttl.isZero()

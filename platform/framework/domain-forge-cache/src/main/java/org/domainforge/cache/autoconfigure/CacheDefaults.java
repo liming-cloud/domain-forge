@@ -21,8 +21,7 @@ public final class CacheDefaults implements EnvironmentPostProcessor, Ordered {
             ConfigurableEnvironment environment, SpringApplication application) {
         try {
             var resource = new ClassPathResource("META-INF/domain-forge/cache-defaults.yml");
-            for (var source :
-                    new YamlPropertySourceLoader().load("domain-forge-cache-defaults", resource)) {
+            for (var source : new YamlPropertySourceLoader().load("domain-forge-cache-defaults", resource)) {
                 environment.getPropertySources().addLast(source);
             }
         } catch (IOException error) {

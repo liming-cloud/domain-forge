@@ -41,14 +41,13 @@ class PersistenceConfigurationTest {
         context.registerBean(
                 "sqlSessionFactory",
                 SqlSessionFactory.class,
-                () ->
-                        new org.apache.ibatis.session.SqlSessionFactoryBuilder()
-                                .build(
-                                        new org.apache.ibatis.session.Configuration(
-                                                new org.apache.ibatis.mapping.Environment(
-                                                        "verification",
-                                                        new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(),
-                                                        source))));
+                () -> new org.apache.ibatis.session.SqlSessionFactoryBuilder()
+                        .build(
+                                new org.apache.ibatis.session.Configuration(
+                                        new org.apache.ibatis.mapping.Environment(
+                                                "verification",
+                                                new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(),
+                                                source))));
         context.registerBean(
                 "flyway", Flyway.class, () -> Flyway.configure().dataSource(source).load());
         if (hostConfigurations.length > 0) {
@@ -200,8 +199,8 @@ class PersistenceConfigurationTest {
     void nativeTimeoutConfiguresHostBeanManager() {
         for (int seconds : List.of(1, 30, 300)) {
             try (var context =
-                         nativeContext(
-                                 Map.of("spring.transaction.default-timeout", seconds + "s"), HostManager.class)) {
+                    nativeContext(
+                            Map.of("spring.transaction.default-timeout", seconds + "s"), HostManager.class)) {
                 assertEquals(
                         seconds, context.getBean(DataSourceTransactionManager.class).getDefaultTimeout());
             }
@@ -216,18 +215,16 @@ class PersistenceConfigurationTest {
         for (String timeout : List.of("-1s", "0s", "500ms", "301s")) {
             assertThrows(
                     BeanCreationException.class,
-                    () ->
-                            nativeContext(
-                                    Map.of("spring.transaction.default-timeout", timeout), HostManager.class),
+                    () -> nativeContext(
+                            Map.of("spring.transaction.default-timeout", timeout), HostManager.class),
                     timeout);
         }
         var error =
                 assertThrows(
                         BeanCreationException.class,
-                        () ->
-                                nativeContext(
-                                        Map.of("domainforge.persistence.transaction-timeout-seconds", "10"),
-                                        HostManager.class));
+                        () -> nativeContext(
+                                Map.of("domainforge.persistence.transaction-timeout-seconds", "10"),
+                                HostManager.class));
         assertTrue(
                 error.getMostSpecificCause().getMessage().contains("spring.transaction.default-timeout"));
     }
@@ -255,7 +252,7 @@ class PersistenceConfigurationTest {
         }
         for (int seconds : List.of(1, 300)) {
             try (var context =
-                         nativeContext(Map.of("spring.transaction.default-timeout", seconds + "s"))) {
+                    nativeContext(Map.of("spring.transaction.default-timeout", seconds + "s"))) {
                 assertEquals(
                         seconds, context.getBean(DataSourceTransactionManager.class).getDefaultTimeout());
             }
@@ -267,14 +264,13 @@ class PersistenceConfigurationTest {
      */
     @Test
     void legacyTimeoutKeyIsRejectedWithMigrationHint() {
-        for (var values :
-                List.of(
-                        Map.<String, Object>of("domainforge.persistence.transaction-timeout-seconds", "10"),
-                        Map.<String, Object>of(
-                                "domainforge.persistence.transaction-timeout-seconds",
-                                "10",
-                                "spring.transaction.default-timeout",
-                                "30s"))) {
+        for (var values : List.of(
+                Map.<String, Object>of("domainforge.persistence.transaction-timeout-seconds", "10"),
+                Map.<String, Object>of(
+                        "domainforge.persistence.transaction-timeout-seconds",
+                        "10",
+                        "spring.transaction.default-timeout",
+                        "30s"))) {
             var error = assertThrows(BeanCreationException.class, () -> nativeContext(values));
             assertTrue(
                     error.getMostSpecificCause().getMessage().contains("spring.transaction.default-timeout"));

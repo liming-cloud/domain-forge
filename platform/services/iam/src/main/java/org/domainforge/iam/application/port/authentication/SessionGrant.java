@@ -16,7 +16,8 @@ public record SessionGrant(String tokenDigest, long accountId, long credentialVe
                 || !tokenDigest.matches("[a-f0-9]{64}")
                 || accountId <= 0
                 || credentialVersion < 1
-                || expiresAt == null) throw new IllegalArgumentException("会话许可无效");
+                || expiresAt == null)
+            throw new IllegalArgumentException("会话许可无效");
     }
 
     /**

@@ -81,14 +81,14 @@ class IdempotencyIT {
     }
 
     private static HttpResponse<String> post(ConfigurableApplicationContext context, String path, String token,
-                                             String key, String body) throws Exception {
+            String key, String body) throws Exception {
         return post(context, path, token, key, body, SameTokens.current());
     }
 
     private static HttpResponse<String> post(ConfigurableApplicationContext context, String path, String token,
-                                             String key, String body, String sameToken) throws Exception {
+            String key, String body, String sameToken) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:"
-                        + context.getBean(Environment.class).getProperty("local.server.port") + path))
+                + context.getBean(Environment.class).getProperty("local.server.port") + path))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .header("Content-Type", "application/json")
                 .header(SameTokens.HEADER, sameToken);

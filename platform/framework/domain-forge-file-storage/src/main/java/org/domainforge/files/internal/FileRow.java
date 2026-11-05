@@ -8,7 +8,7 @@ import java.time.OffsetDateTime;
  * {@code domainforge_file} 的一行。
  */
 public record FileRow(String id, String storageKey, String name, String contentType, long size, String sha256,
-               Long uploadedBy, OffsetDateTime uploadedAt) {
+        Long uploadedBy, OffsetDateTime uploadedAt) {
     /**
      * 公开的文件信息，不含存储键。
      */

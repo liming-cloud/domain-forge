@@ -1,11 +1,11 @@
 package org.domainforge.iam.infrastructure.security;
 
+import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.application.port.authentication.LoginReservation;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
-import org.domainforge.config.api.DynamicSettings;
-import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisCallback;
@@ -111,6 +111,7 @@ public final class RedisLoginProtection implements LoginProtection {
                 (RedisCallback<Properties>) connection -> connection.serverCommands().getConfig("maxmemory*"));
         if (config == null
                 || !"noeviction".equals(config.getProperty("maxmemory-policy"))
-                || Long.parseLong(config.getProperty("maxmemory", "0")) <= 0) throw unavailable();
+                || Long.parseLong(config.getProperty("maxmemory", "0")) <= 0)
+            throw unavailable();
     }
 }

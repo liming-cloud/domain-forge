@@ -26,9 +26,9 @@ final class RedisCacheRegion<T> {
                 definition.capacity() == 0
                         ? null
                         : Caffeine.newBuilder()
-                        .maximumSize(definition.capacity())
-                        .expireAfterWrite(definition.localTtl())
-                        .build();
+                                .maximumSize(definition.capacity())
+                                .expireAfterWrite(definition.localTtl())
+                                .build();
     }
 
     /**

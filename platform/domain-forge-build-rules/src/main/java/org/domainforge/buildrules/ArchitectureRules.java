@@ -188,8 +188,8 @@ public final class ArchitectureRules {
             case "application" -> domainAllowed(targetPackage)
                     || componentApi(targetPackage)
                     || APPLICATION_SPRING_TYPES.contains(name)
-                    ? null
-                    : "应用层只能依赖 JDK、shared、组件 api 包及允许的 Spring 装配／事务类型";
+                            ? null
+                            : "应用层只能依赖 JDK、shared、组件 api 包及允许的 Spring 装配／事务类型";
             case "interfaces" -> startsWithAny(targetPackage, INTERFACES_FORBIDDEN)
                     ? "入口层不得直接使用 SQL／Mapper／Redis 客户端"
                     : null;

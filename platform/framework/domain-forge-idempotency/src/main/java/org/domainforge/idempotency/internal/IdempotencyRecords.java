@@ -77,6 +77,8 @@ class IdempotencyRecords {
         /**
          * 记录状态。
          */
-        enum State { NEW, MISMATCH, PROCESSING, DONE }
+        enum State {
+            NEW, MISMATCH, PROCESSING, DONE
+        }
     }
 }
