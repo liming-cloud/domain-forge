@@ -26,7 +26,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: 构建与验证
-        run: platform/mvnw -f platform/pom.xml -B -ntp verify 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        run: platform/mvnw -f platform/pom.xml -B -ntp -T 1C verify 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
       - name: 失败摘要
         if: failure()
         run: scripts/report_failures.sh platform build.log
@@ -78,7 +78,16 @@ jobs:
         with:
           python-version: '3.12'
       - name: 在独立 Compose 项目中验证部署、重启、备份与恢复
+        env:
+          DIAGNOSTICS_DIR: ${{ github.workspace }}/diagnostics
         run: scripts/verify_deploy.sh
+      - name: 保存容器日志
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: deploy-diagnostics
+          path: diagnostics/
+          retention-days: 7
 
   closure:
     name: MVP 闭环（模板服务接入 IAM 并部署）
@@ -95,7 +104,16 @@ jobs:
         with:
           python-version: '3.12'
       - name: 生成服务、与 IAM 一起部署并走完授权链路
+        env:
+          DIAGNOSTICS_DIR: ${{ github.workspace }}/diagnostics
         run: scripts/verify_closure.sh
+      - name: 保存容器日志
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: closure-diagnostics
+          path: diagnostics/
+          retention-days: 7
 
   docs:
     name: 文档链接

@@ -186,7 +186,9 @@ class SchedulingIT {
         await("失败被记录", Duration.ofSeconds(30),
                 () -> instance(failed).getStatus() == InstanceStatus.FAILED.getV());
         assertTrue(instance(failed).getResult().contains("IllegalStateException"), instance(failed).getResult());
-        Thread.sleep(5000);
+        var job = client.fetchJob(IDS.get("it-fail")).getData();
+        assertEquals(0, job.getInstanceRetryNum(), "任务不应配置实例重试");
+        assertEquals(0, job.getTaskRetryNum(), "任务不应配置子任务重试");
         assertEquals(1, FAILURES.get(), "失败不应被自动重试");
         assertEquals(1, counter("it-fail", "failure"));
     }
@@ -197,10 +199,9 @@ class SchedulingIT {
     void overlappingTriggersAreSkipped() throws Exception {
         long started = System.nanoTime();
         int before = SLOW_RUNS.get();
-        Thread.sleep(40_000);
+        await("至少执行 3 次", Duration.ofSeconds(90), () -> SLOW_RUNS.get() - before >= 3);
         int runs = SLOW_RUNS.get() - before;
         long triggers = Duration.ofNanos(System.nanoTime() - started).toSeconds() / 2;
-        assertTrue(runs >= 2, "应继续执行：" + runs);
         assertTrue(runs < triggers / 2, "未结束时的触发应被跳过：执行 " + runs + " 次，触发约 " + triggers + " 次");
         assertEquals(1, SLOW_MAX.get(), "同一任务不应并发执行");
     }
@@ -211,9 +212,9 @@ class SchedulingIT {
     void pauseResumeAndConsoleChangesAreKept() throws Exception {
         long tick = IDS.get("it-tick");
         client.disableJob(tick);
-        Thread.sleep(4000);
+        Thread.sleep(1500);
         int paused = TICKS.get();
-        Thread.sleep(8000);
+        Thread.sleep(4000);
         assertEquals(paused, TICKS.get(), "暂停后不应再执行");
         // 模拟控制台编辑：以完整字段保存，改周期并恢复启用。
         var changed = TaskRegistrar.request(application.getBean("tick", ScheduledTask.class));

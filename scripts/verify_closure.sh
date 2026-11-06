@@ -28,6 +28,7 @@ env_file="$work/df.env"
 tag="closure$$"
 compose() { docker compose --env-file "$env_file" "$@"; }
 cleanup() {
+    [ $? -eq 0 ] || dump_diagnostics
     compose down -v --remove-orphans > /dev/null 2>&1 || true
     docker image rm -f "domain-forge/iam:$tag" "domain-forge/note-service:$tag" "domain-forge/gateway:$tag" \
         "domain-forge/board-service:$tag" > /dev/null 2>&1 || true
@@ -55,7 +56,7 @@ step "启动整套服务"
 service_db_pw=$(secret)
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "NOTE_SERVICE_IMAGE_TAG=$tag" \
     "NOTE_SERVICE_DB_PASSWORD=$service_db_pw" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
-compose up -d --build --wait --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+compose up -d --build --wait --wait-timeout 300 --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
 # 服务以 config-center 启动：能通过健康检查即说明已从 Nacos 读到带来源标记的 note-service.yaml。
@@ -122,15 +123,20 @@ grep -qi '^idempotent-replayed: true' "$work/headers" || fail "重复提交的�
 get /api/notes "$bob_token" > /dev/null
 expect 403 "未分配角色的账号读取便笺"
 
-# tally_is <期望值>：等 board-service 的便笺统计（事件累加，最终一致）达到期望值
+# tally_is <期望值> [stable]：等 board-service 的便笺统计（事件累加，最终一致）达到期望值；
+# 带 stable 时再观察 5 秒，期间不得变化（迟到的重复投递会让统计超过期望值）
 tally_is() {
     local attempt value
     for attempt in $(seq 1 60); do
         value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"])')
-        [ "$value" = "$1" ] && return
+        [ "$value" = "$1" ] && break
         sleep 1
     done
-    fail "便笺统计应为 $1，实际 $value"
+    [ "$value" = "$1" ] || fail "便笺统计应为 $1，实际 $value"
+    [ "${2:-}" = "stable" ] || return 0
+    sleep 5
+    value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"])')
+    [ "$value" = "$1" ] || fail "便笺统计应稳定在 $1（疑有重复投递），5 秒后为 $value"
 }
 
 step "集成事件：note-service 发布 NoteCreated，board-service 累加统计"
@@ -176,11 +182,20 @@ for attempt in $(seq 1 30); do
     sleep 2
 done
 [ "$up" = "4" ] || fail "Prometheus 应能抓取 gateway、iam、note-service、board-service 四个目标：$(promql 'up' | tr '\n' ' ')"
+# metric_present <查询> <instance>：抓取周期为秒级，轮询到该实例的结果出现
+metric_present() {
+    local attempt
+    for attempt in $(seq 1 30); do
+        promql "$1" | grep -q "^$2=" && return 0
+        sleep 2
+    done
+    return 1
+}
 for target in gateway:9093 iam:9091 note-service:9092; do
-    promql 'sum by (instance) (http_server_requests_seconds_count)' | grep -q "^$target=" \
+    metric_present 'sum by (instance) (http_server_requests_seconds_count)' "$target" \
         || fail "$target 的 HTTP 请求指标应可查询"
 done
-promql 'domainforge_messaging_outbox_pending' | grep -q '^note-service:9092=' \
+metric_present 'domainforge_messaging_outbox_pending' note-service:9092 \
     || fail "note-service 的 Outbox 积压指标应可查询"
 
 step "日志：各服务逐行输出 ECS JSON，同一请求的 traceId 在 gateway、note-service、IAM 的日志中都能找到"
@@ -208,7 +223,7 @@ expect 401 "无令牌访问调用方"
 compose stop note-service > /dev/null 2>&1
 get /api/board/note-digest "$alice_token" > /dev/null
 expect 503 "被调方停机时调用方返回不可用"
-compose up -d --wait note-service > /dev/null 2>&1 || fail "note-service 重新启动未健康"
+compose up -d --wait --wait-timeout 300 note-service > /dev/null 2>&1 || fail "note-service 重新启动未健康"
 for attempt in $(seq 1 30); do
     [ "$(get_status /api/board/note-digest "$alice_token")" = "200" ] && break
     [ "$attempt" = "30" ] && fail "被调方恢复后调用方应恢复正常"
@@ -312,7 +327,7 @@ alice_token=$(token alice "$alice_pw")
 [ "$(sha256 "$work/download")" = "$(sha256 "$work/before.pdf")" ] || fail "恢复后附件内容与上传不一致"
 post /api/notes '{"title":"恢复后","content":""}' "$alice_token" > /dev/null
 expect 200 "恢复后业务服务仍可写入自己的 schema"
-tally_is 2
+tally_is 2 stable
 
 step "集成事件：RocketMQ 停机期间提交的事件在恢复后继续发送"
 compose stop rocketmq-broker > /dev/null 2>&1
@@ -320,7 +335,7 @@ post /api/notes '{"title":"消息中断期间","content":""}' "$alice_token" > /
 expect 200 "RocketMQ 停机时业务提交不受影响"
 [ "$(sql "select count(*) from note_service.domainforge_outbox where sent_at is null")" -ge 1 ] \
     || fail "停机期间的事件应留在 Outbox 等待发送"
-compose up -d --wait rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
+compose up -d --wait --wait-timeout 300 rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
 tally_is 3
 
 step "撤销角色后立即生效"

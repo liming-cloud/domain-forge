@@ -41,7 +41,7 @@ if [ "${SKIP_BUILD:-}" != "1" ]; then
 fi
 
 step "启动 $service 及其依赖（config-center profile）"
-compose up -d --build --wait --quiet-pull "$service" > "$work/up.log" 2>&1 \
+compose up -d --build --wait --wait-timeout 300 --quiet-pull "$service" > "$work/up.log" 2>&1 \
     || { cat "$work/up.log"; compose ps -a; compose logs --tail 60 "$service"; fail "$service 未通过健康检查"; }
 
 step "标准输出逐行为 ECS JSON"
