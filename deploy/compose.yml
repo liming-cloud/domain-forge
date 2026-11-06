@@ -40,7 +40,7 @@ services:
       timeout: 2s
       retries: 30
   nacos:
-    # 只用作服务注册与发现；单机模式，内置存储持久化到卷，开启鉴权。
+    # 服务注册与发现，以及运行配置中心（配置种子见 nacos/config/）；单机模式，内置存储持久化到卷，开启鉴权。
     image: nacos/nacos-server:v3.1.1@sha256:13e74786507abbacebe080fae2fc9c05aa2591eb99c97a0a78ff0e72beb21b13
     restart: unless-stopped
     logging: *logging

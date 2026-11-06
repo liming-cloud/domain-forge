@@ -133,7 +133,7 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 - 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
 - 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
 - **恢复前先停止业务写入**，确认 `domainforge.messaging.outbox.pending` 为 0、消费组没有积压，再执行 `restore.sh`。RocketMQ 中的消费进度不随恢复回退：恢复时仍在途的事件会在恢复后被消费方处理，而发布方的数据已回到备份时刻，结果不一致（如统计多计一次，见 [#61](https://github.com/liming-cloud/domain-forge/issues/61)）。
-- RocketMQ 不开启鉴权，只在内部网络可达，网段内的容器可以发布或消费任意主题（见[路线图已知风险](../docs/product/02-路线图.md#已知风险)）。
+- RocketMQ 不开启鉴权，只在内部网络可达，网段内的容器可以发布或消费任意主题（见路线图已知风险（平台仓库 `docs/platform/路线图.md`））。
 
 ## 文件存储
 

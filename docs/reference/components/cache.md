@@ -1,6 +1,6 @@
 # 缓存组件（domain-forge-cache）
 
-`domain-forge-cache` 提供 `CacheOperations`、`RedisScriptOperations`、`LockOperations` 三类小接口，底层复用 Redisson 社区版。事务与一致性规则见[事务与一致性](../../rules/02-系统设计.md#事务与一致性)，产品范围见[产品定义](../../product/01-产品定义.md#缓存与额外通用能力)。
+`domain-forge-cache` 提供 `CacheOperations`、`RedisScriptOperations`、`LockOperations` 三类小接口，底层复用 Redisson 社区版。事务与一致性规则见[事务与一致性](../../rules/02-系统设计.md#事务与一致性)，产品范围见产品定义（平台仓库 `docs/platform/产品定义.md`）。
 
 ## 使用合同
 

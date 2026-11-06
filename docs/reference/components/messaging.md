@@ -1,6 +1,6 @@
 # 消息与 Outbox
 
-服务之间的异步集成事件统一经 `domain-forge-messaging` 组件：发布用同事务 Outbox＋中继，消费用本地事务内的去重，传输为 RocketMQ 5。产品要求见[异步消息功能边界](../../product/01-产品定义.md#异步消息功能边界)，领域事件与集成事件的区分见[总体架构](../../explanation/总体架构.md#领域事件与集成事件)，规则卡见[S-23](../../rules/02-系统设计.md#s-23-集成事件经同事务-outbox-发布)。
+服务之间的异步集成事件统一经 `domain-forge-messaging` 组件：发布用同事务 Outbox＋中继，消费用本地事务内的去重，传输为 RocketMQ 5。产品要求见异步消息功能边界（平台仓库 `docs/platform/产品定义.md`），领域事件与集成事件的区分见[总体架构](../../explanation/总体架构.md#领域事件与集成事件)，规则卡见[S-23](../../rules/02-系统设计.md#s-23-集成事件经同事务-outbox-发布)。
 
 决定记录：[ADR 0014](../../decisions/0014-消息与Outbox的取舍.md)。
 
