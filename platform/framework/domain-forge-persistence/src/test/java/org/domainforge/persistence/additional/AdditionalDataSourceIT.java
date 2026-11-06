@@ -123,7 +123,7 @@ class AdditionalDataSourceIT {
         assertEquals(0, application.getBean(PrimaryRowMapper.class).count(inExtra));
     }
 
-    // 跨数据源没有原子性：附加库已提交后主库失败，附加库的结果保留；业务须按可重复执行设计（P-14）。
+    // 跨数据源没有原子性：附加库已提交后主库失败，附加库的结果保留；业务须按可重复执行设计（S-12）。
     @Test
     void crossResourceIsNotAtomic() {
         String value = value();

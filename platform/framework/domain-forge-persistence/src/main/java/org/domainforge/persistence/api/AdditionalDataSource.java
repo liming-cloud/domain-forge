@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * {@code classpath*:mapper-<名称>/**}{@code /*.xml}（与主数据源的 {@code mapper/} 目录分开）。创建时即执行迁移，失败则启动失败。
  *
  * <p>服务在 bootstrap 中把事务管理器与会话工厂声明为 {@code @Bean(defaultCandidate = false)}，主数据源的自动装配不受影响；
- * 用例以 {@code @Transactional("<名称>TransactionManager")} 选择事务。不提供跨数据源事务（P-14），
+ * 用例以 {@code @Transactional("<名称>TransactionManager")} 选择事务。不提供跨数据源事务（S-12），
  * 在一个数据源的事务里访问另一个数据源的 Mapper 会被拒绝。
  */
 public final class AdditionalDataSource implements AutoCloseable {
