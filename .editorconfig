@@ -1,5 +1,5 @@
 # 仓库统一的编辑器设置。Java 代码格式以 Spotless（Eclipse 格式化器）为准，由 mvn verify 检查；
-# IntelliJ 用 Eclipse Code Formatter 插件加载同一份配置，见 docs/standards/04-源码质量.md 的 C-03。
+# IntelliJ 用 Eclipse Code Formatter 插件加载同一份配置，见 docs/rules/04-源码质量.md 的 C-03。
 # 下面的 ij_ 设置只影响 IntelliJ 自带的格式化，不与 Spotless 冲突。
 root = true
 

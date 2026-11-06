@@ -31,7 +31,7 @@ public final class ArchitectureRules {
                     "org.springframework.transaction.annotation.Transactional",
                     "org.springframework.transaction.annotation.Propagation",
                     "org.springframework.transaction.annotation.Isolation",
-                    // 编程式短事务（慢操作放在事务外时使用），见持久化规范 P-11
+                    // 编程式短事务（慢操作放在事务外时使用），见系统设计规范 S-20
                     "org.springframework.transaction.support.TransactionOperations",
                     "org.springframework.transaction.support.TransactionCallback",
                     "org.springframework.transaction.TransactionStatus");

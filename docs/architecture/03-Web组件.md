@@ -1,6 +1,6 @@
 # Web 组件（domain-forge-web-support）
 
-统一 JSON 响应外壳和错误转换。外壳格式规则见[接口与错误规范](../standards/06-接口与错误.md)。
+统一 JSON 响应外壳和错误转换。外壳格式规则见[接口与错误规范](../rules/06-接口与错误.md)。
 
 ## 接入
 

@@ -1,6 +1,6 @@
 # API 网关
 
-新增服务 `gateway`，位于 Nginx 与各后端服务之间，负责路由、登录前置校验、限流，并作为链路追踪的起点。后端仍各自认证和授权（[O-08](../standards/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)），网关不替代 IAM 的当前授权判断。验收跟踪见[路线图](../product/02-路线图.md#首版跟踪)，部署与运维见[部署参考](../../deploy/README.md)。
+新增服务 `gateway`，位于 Nginx 与各后端服务之间，负责路由、登录前置校验、限流，并作为链路追踪的起点。后端仍各自认证和授权（[O-08](../rules/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)），网关不替代 IAM 的当前授权判断。验收跟踪见[路线图](../product/02-路线图.md#首版跟踪)，部署与运维见[部署参考](../../deploy/README.md)。
 
 ## 已确认的决定（2026-10-27）
 
@@ -48,7 +48,7 @@
 
 ### 路由配置
 
-路由是网关 dataId `gateway.yaml` 中的动态配置组 `gateway.routing`，用 `DynamicSettingsBinder` 整组绑定（不直接用 `gateway` 作前缀：部署环境变量 `GATEWAY_*` 按宽松绑定映射到 `gateway.*`，会被整组绑定当作未知键；见[配置中心](05-配置中心.md#接入方式)）：发布值无法应用时保持当前路由并计 `rejected`，修正后生效。不直接使用 Spring Cloud Gateway 的 `spring.cloud.gateway.server.webflux.routes`：那里允许任意谓词和过滤器，非法定义只丢弃单条路由，与“整组不应用”的规则（[O-09](../standards/08-配置与运行.md#o-09-nacos-发布内容是权威)）不一致。
+路由是网关 dataId `gateway.yaml` 中的动态配置组 `gateway.routing`，用 `DynamicSettingsBinder` 整组绑定（不直接用 `gateway` 作前缀：部署环境变量 `GATEWAY_*` 按宽松绑定映射到 `gateway.*`，会被整组绑定当作未知键；见[配置中心](05-配置中心.md#接入方式)）：发布值无法应用时保持当前路由并计 `rejected`，修正后生效。不直接使用 Spring Cloud Gateway 的 `spring.cloud.gateway.server.webflux.routes`：那里允许任意谓词和过滤器，非法定义只丢弃单条路由，与“整组不应用”的规则（[O-09](../rules/08-配置与运行.md#o-09-nacos-发布内容是权威)）不一致。
 
 ```yaml
 gateway:
@@ -75,7 +75,7 @@ gateway:
 - 校验（启动时阻止启动，运行时按无法应用处理）：`id` 唯一；`service` 为小写服务名；路径以 `/api/` 开头，不含 `internal` 段、`..` 或空段，且是合法的路径模式；同一路径不能出现在两条路由；匿名项为“方法 确切路径”，方法限 GET、POST、PUT、PATCH、DELETE，路径必须落在本路由的路径内；限流项的方法同上、路径模式落在本路由的路径内、维度为 `account` 或 `client`、速率与容量有界；`rate-limit` 有界。
 - 匹配：每个路径单独生成一条路由，按第一个通配或变量之前的字面前缀长度排序，越具体越先匹配（业务服务的前缀优先于 IAM 的 `/api/**`）。按“路由”整体排序会让包含多个路径的路由抢先匹配，因此按路径拆开。
 - 不在路由中的路径一律 404；路径必须以 `/api/` 开头，因此 `/internal/**`、`/actuator/**` 不可能被路由。
-- 生效：配置组重新绑定后，Spring Cloud 的刷新事件触发网关重新读取路由；`GatewayIT` 以“发布后请求实际转到新服务”判定，不以收到通知为准（[O-10](../standards/08-配置与运行.md#o-10-收到通知不等于已生效)）。
+- 生效：配置组重新绑定后，Spring Cloud 的刷新事件触发网关重新读取路由；`GatewayIT` 以“发布后请求实际转到新服务”判定，不以收到通知为准（[O-10](../rules/08-配置与运行.md#o-10-收到通知不等于已生效)）。
 - 种子 `deploy/nacos/config/gateway.yaml`：模板以 `--with-example` 生成服务时追加示例接口的路由。种子只在 dataId 不存在时发布（[配置中心](05-配置中心.md#已确认的决定2026-10-27)），已部署环境新增服务时需要在 Nacos 控制台补上路由。
 
 ### 路径检查
@@ -86,8 +86,8 @@ gateway:
 
 - 按 Sa-Token 官方[网关统一鉴权](https://sa-token.cc/doc.html#/micro/gateway-auth)用法注册 `SaReactorFilter`：`setAuth` 中以 `SaRouter.match(不在任一路由的匿名清单中).check(StpUtil.checkLogin())` 校验，`setError` 返回平台外壳。缺少令牌或会话不存在返回 401（未路由的路径对未登录请求同样是 401）。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
 - 原生过滤器在事件循环线程上同步读取 Redis（Sa-Token 响应式集成的既定方式），等待由 Redis 命令超时（300 毫秒）限定；建立连接的超时为 2 秒，只在启动与重连时生效（CI 上多个服务同时启动时，300 毫秒内曾建不起初始连接池，网关反复重启）。
-- 令牌只从 `Authorization` 头读取（[A-04](../standards/07-安全与访问控制.md#a-04-令牌只从-authorization-头读取)），原样转发，不改写、不记录。
-- Redis 不可用时返回 503，不放行（[A-03](../standards/07-安全与访问控制.md#a-03-依赖故障时拒绝不降级放行)）。
+- 令牌只从 `Authorization` 头读取（[A-04](../rules/07-安全与访问控制.md#a-04-令牌只从-authorization-头读取)），原样转发，不改写、不记录。
+- Redis 不可用时返回 503，不放行（[A-03](../rules/07-安全与访问控制.md#a-03-依赖故障时拒绝不降级放行)）。
 
 ### Same-Token
 

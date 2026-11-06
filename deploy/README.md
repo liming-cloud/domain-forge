@@ -1,6 +1,6 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/standards/08-配置与运行.md#部署与传输)。启用 HTTPS 见 [HTTPS](#https)。
+单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/rules/08-配置与运行.md#部署与传输)。启用 HTTPS 见 [HTTPS](#https)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
@@ -64,11 +64,11 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 - **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/architecture/06-API网关.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
 - **限流**：网关按客户端地址限流（默认每秒 20 个、突发 40 个，超出 429），阈值在 Nacos 的 `gateway.yaml` 中调整、立即生效。前面再加负载均衡或客户端经同一 NAT 出口时，需要相应调高。
 - **链路标识**：Nginx 删除客户端带来的 `traceparent`、`tracestate`、`baggage`，链路从网关开始；响应头 `X-Trace-Id` 即 traceId，网关访问日志（`gateway_access trace_id=…`）与各服务日志都带上它，排查时按它关联。
-- **日志**：各服务向标准输出逐行写 ECS JSON（`docker compose logs` 或业务项目的采集端读取），每个请求一条访问日志；字段见[故障与可观测性 F-10](../docs/standards/09-故障与可观测性.md#f-10-采集存储看板告警由业务项目提供)。
+- **日志**：各服务向标准输出逐行写 ECS JSON（`docker compose logs` 或业务项目的采集端读取），每个请求一条访问日志；字段见[观测数据参考](../docs/reference/观测数据.md#日志)。
 - **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
-- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）只在内部网络可达，不发布到主机、不经 Nginx；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[故障与可观测性 F-10](../docs/standards/09-故障与可观测性.md#f-10-采集存储看板告警由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
+- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）只在内部网络可达，不发布到主机、不经 Nginx；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[O-07](../docs/rules/08-配置与运行.md#o-07-管理端点不公开观测环境由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
 - **请求体上限**：Nginx 对普通接口限制请求体为 64k；只有路径以 `/files` 结尾的上传接口放宽到 21m（`nginx/locations.inc`），与服务的 multipart 上限 20MB 一致。
 
 ## 停止与数据
@@ -189,7 +189,7 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 
 ## HTTPS
 
-`compose.https.yml` 覆盖文件让 Nginx 在 443 终止 TLS，80 端口只做 301 跳转（健康检查 `/healthz` 除外）；后端仍是 HTTP，网关与后端的鉴权不变（[O-08](../docs/standards/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)）。证书由运维提供，任何 CA 签发的都可以（包括在主机上自行运行的 ACME 工具），本参考不负责签发。
+`compose.https.yml` 覆盖文件让 Nginx 在 443 终止 TLS，80 端口只做 301 跳转（健康检查 `/healthz` 除外）；后端仍是 HTTP，网关与后端的鉴权不变（[O-08](../docs/rules/08-配置与运行.md#o-08-tls-在入口终止后端独立鉴权)）。证书由运维提供，任何 CA 签发的都可以（包括在主机上自行运行的 ACME 工具），本参考不负责签发。
 
 ```bash
 # 1. 证书目录：fullchain.pem（服务器证书在前、中间证书在后）与 privkey.pem；私钥只允许运维用户读取
