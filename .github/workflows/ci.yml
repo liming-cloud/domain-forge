@@ -108,3 +108,5 @@ jobs:
           python-version: '3.12'
       - name: 检查相对链接与锚点
         run: python3 scripts/check_doc_links.py
+      - name: 删除平台专有资产后的引用与链接（起步清单演练）
+        run: scripts/verify_starter.sh --docs-only

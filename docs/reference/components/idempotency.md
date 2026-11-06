@@ -1,6 +1,6 @@
 # 请求幂等
 
-业务命令的重复提交（客户端超时重试、用户重复点击、网关重试）统一经 `domain-forge-idempotency` 组件处理：入口方法标 `@Idempotent`，客户端在请求头 `Idempotency-Key` 中给出唯一键，同一键的请求只执行一次。产品要求见[缓存与额外通用能力](../../product/01-产品定义.md#缓存与额外通用能力)，决定与验收跟踪见 [#37](https://github.com/liming-cloud/domain-forge/issues/37)。
+业务命令的重复提交（客户端超时重试、用户重复点击、网关重试）统一经 `domain-forge-idempotency` 组件处理：入口方法标 `@Idempotent`，客户端在请求头 `Idempotency-Key` 中给出唯一键，同一键的请求只执行一次。产品要求见缓存与额外通用能力（平台仓库 `docs/platform/产品定义.md`），决定与验收跟踪见 [#37](https://github.com/liming-cloud/domain-forge/issues/37)。
 
 决定记录：[ADR 0020](../../decisions/0020-请求幂等的取舍.md)。
 
