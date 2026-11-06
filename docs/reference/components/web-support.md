@@ -1,6 +1,6 @@
 # Web 组件（domain-forge-web-support）
 
-统一 JSON 响应外壳和错误转换。外壳格式规则见[接口与错误规范](../rules/06-接口与错误.md)。
+统一 JSON 响应外壳和错误转换。外壳格式规则见[接口与错误规范](../../rules/06-接口与错误.md)。
 
 ## 接入
 
@@ -24,20 +24,7 @@
 
 ## 结果映射
 
-| 场景 | HTTP 状态 | `code` |
-|---|---|---|
-| 成功（含查询无结果） | 200 | `SUCCESS` |
-| 已受理、尚未完成 | 202 | `ACCEPTED` |
-| 已判定的业务拒绝 | 200 | 业务自定义的稳定代码，`data` 为 `null` |
-| 请求体或参数解析失败 | 400 | `INVALID_REQUEST` |
-| 请求体超过上限（上传超过 multipart 上限，由文件存储组件映射） | 413 | `PAYLOAD_TOO_LARGE` |
-| 幂等请求：首次仍在处理、同一键用于不同请求（由幂等组件返回，见[请求幂等](13-请求幂等.md)） | 409 / 422 | `IDEMPOTENCY_IN_PROGRESS` / `IDEMPOTENCY_KEY_REUSED` |
-| 未认证 / 无权限 | 401 / 403 | `UNAUTHENTICATED` / `FORBIDDEN` |
-| 依赖不可用 | 503 | `SERVICE_UNAVAILABLE` |
-| 未知异常、映射失败 | 500 | `INTERNAL_ERROR`，固定安全提示 |
-| 路由不存在、方法不允许 | 保持框架默认（404 / 405） | 不改写 |
-
-`SUCCESS`、`ACCEPTED`、上述平台失败代码（含 `PAYLOAD_TOO_LARGE` 与两个幂等代码），以及网关使用的 `RATE_LIMITED`（429）、`GATEWAY_TIMEOUT`（504）（见[API 网关](06-API网关.md#错误响应)）是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
+状态码与 `code` 的完整清单见[错误码](../错误码.md)；`SUCCESS`、`ACCEPTED`、平台失败代码以及网关、幂等、文件、短信带来的代码都是保留代码，业务拒绝不能使用。二进制、流式响应和 Actuator 端点不包装。
 
 ## 业务拒绝映射
 

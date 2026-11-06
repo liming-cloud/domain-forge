@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * 手动真实发送：只在设置了 {@code ALIYUN_SMS_LIVE_PHONE} 时运行（CI 不设置），用运维提供的账号、签名与模板
- * 向指定号码发送一条短信，确认签名、参数与应答解析在真实服务上可用。用法见 docs/architecture/12-短信与验证码.md。
+ * 向指定号码发送一条短信，确认签名、参数与应答解析在真实服务上可用。用法见 docs/reference/components/notification.md。
  */
 @EnabledIfEnvironmentVariable(named = "ALIYUN_SMS_LIVE_PHONE", matches = ".+")
 class AliyunSmsLiveIT {

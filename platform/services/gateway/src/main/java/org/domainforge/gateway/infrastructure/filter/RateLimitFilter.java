@@ -24,7 +24,7 @@ import java.util.List;
  * 按客户端地址的 Redis 令牌桶，超限返回 429；对全部请求生效，先于登录校验，避免未登录请求的洪泛压到会话查询。
  *
  * <p>这是过载保护，不是安全边界：Redis 不可用时放行，记录错误日志与计数器
- * {@code domainforge.gateway.rate-limit.unavailable} 供告警（设计见 docs/architecture/06-API网关.md#限流）。
+ * {@code domainforge.gateway.rate-limit.unavailable} 供告警（设计见 docs/reference/components/gateway.md#限流）。
  */
 @Component
 public class RateLimitFilter implements WebFilter, Ordered {

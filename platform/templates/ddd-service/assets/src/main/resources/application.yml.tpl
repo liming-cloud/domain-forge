@@ -65,7 +65,7 @@ spring:
 # 消息组件连接 RocketMQ Proxy 的地址；只有发布或消费事件时才连接，部署时为 rocketmq-broker:8081。
 # 定时任务（PowerJob）：实现 ScheduledTask 的 Bean 由调度组件登记；部署时启用，本地与测试默认不启用。
 # 文件存储（启用后）：默认本地目录，部署时为容器内挂载的命名卷；改用 S3 兼容存储时设置 @@ENV@@_FILES_STORAGE=s3
-# 与 @@ENV@@_FILES_S3_* （桶由运维事先创建，密钥只来自环境变量），见 docs/architecture/11-文件存储.md。
+# 与 @@ENV@@_FILES_S3_* （桶由运维事先创建，密钥只来自环境变量），见 docs/reference/components/file-storage.md。
 domainforge:
   files:
     storage: ${@@ENV@@_FILES_STORAGE:local}
@@ -134,7 +134,7 @@ management:
 
 ---
 # 配置中心：部署时以 SPRING_PROFILES_ACTIVE=config-center 启用。Nacos 不可达或 dataId 未发布时启动失败。
-# 需要不重启生效的配置组用 domain-forge-config 的 DynamicSettingsBinder 声明，见 docs/architecture/05-配置中心.md。
+# 需要不重启生效的配置组用 domain-forge-config 的 DynamicSettingsBinder 声明，见 docs/reference/components/config.md。
 spring:
   config:
     activate:

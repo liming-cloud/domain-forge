@@ -1,5 +1,5 @@
 # 网关的 Nacos 配置种子：dataId 不存在时由 nacos-init 发布一次，之后以 Nacos 中的内容为准，重新部署不覆盖。
-# 路由与限流是动态配置组，发布后立即生效；无法应用的发布整组不生效、保持当前路由。规则见 docs/architecture/06-API网关.md。
+# 路由与限流是动态配置组，发布后立即生效；无法应用的发布整组不生效、保持当前路由。规则见 docs/reference/components/gateway.md。
 # 已部署的环境新增服务时，在 Nacos 控制台给 gateway.yaml 补上该服务的路由（修改这里不会再次发布）。
 domainforge:
   config:
