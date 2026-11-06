@@ -26,6 +26,7 @@ tag_v3="verify$$-v3"
 tag_gateway="verify$$-gateway"
 compose() { docker compose -f "$repo/deploy/compose.yml" --env-file "$env_file" "$@"; }
 cleanup() {
+    [ $? -eq 0 ] || dump_diagnostics
     compose down -v --remove-orphans > /dev/null 2>&1 || true
     docker image rm -f "domain-forge/iam:$tag_v3" "domain-forge/iam:$tag_v2" "domain-forge/iam:$tag_v1" \
         "domain-forge/gateway:$tag_gateway" > /dev/null 2>&1 || true
@@ -53,7 +54,7 @@ fi
 
 step "首次部署"
 started=$(date +%s)
-compose up -d --build --wait --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "首次部署未全部健康"; }
+up_wait --build --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "首次部署未全部健康"; }
 first_start=$(($(date +%s) - started))
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
@@ -80,7 +81,12 @@ trace_id=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $admin_token" \
     | tr -d '\r' | sed -n 's/^[Xx]-[Tt]race-[Ii]d: //p')
 [[ "$trace_id" =~ ^[0-9a-f]{32}$ ]] || fail "响应应只带一个 traceId：$(tr '\n' ' ' <<< "$trace_id")"
 [ "$trace_id" != "0af7651916cd43dd8448eb211c80319c" ] || fail "入口应丢弃客户端带来的追踪上下文"
-compose logs gateway | grep -q "trace_id=$trace_id" || fail "网关访问日志应带同一 traceId"
+# 访问日志异步写出，重试；用 <<< 而不是管道，避免 grep -q 提前退出让上游收到 SIGPIPE 而在 pipefail 下返回非零
+for attempt in $(seq 1 20); do
+    grep -q "trace_id=$trace_id" <<< "$(compose logs gateway)" && break
+    [ "$attempt" = "20" ] && fail "网关访问日志应带同一 traceId"
+    sleep 0.5
+done
 direct() { compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $admin_token" "$@"; }
 [ "$(direct http://iam:8080/api/me)" = "401" ] || fail "网段内直连 IAM（无 Same-Token）应被拒"
 [ "$(direct -H 'SA-SAME-TOKEN: forged' http://iam:8080/internal/access/current)" = "401" ] \
@@ -88,8 +94,13 @@ direct() { compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Au
 
 step "网关：限流与动态调整"
 configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
-burst_codes=$(seq 80 | xargs -P 16 -I{} curl -s -o /dev/null -w '%{http_code}\n' "$base/api/me")
-grep -qx 429 <<< "$burst_codes" || fail "同一客户端地址的突发请求应被网关限流"
+# 令牌桶（突发 40、每秒补 20）能否耗尽取决于机器速度：慢机器上一轮 80 个请求可能被补充追上，连续发 5 轮仍无 429 才算失败
+limited=0
+for round in $(seq 1 5); do
+    burst_codes=$(seq 80 | xargs -P 16 -I{} curl -s -o /dev/null -w '%{http_code}\n' "$base/api/me")
+    grep -qx 429 <<< "$burst_codes" && { limited=1; break; }
+done
+[ "$limited" = "1" ] || fail "同一客户端地址的突发请求应被网关限流"
 # 之后的验证全部来自同一地址：经配置中心调高阈值（同时验证限流参数动态生效）。
 python3 -I -c 'import json, sys; text = open(sys.argv[1]).read()
 text = text.replace("replenish-per-second: 20", "replenish-per-second: 1000").replace("burst: 40", "burst: 2000")
@@ -146,8 +157,8 @@ scheduling_check
 
 step "普通重启保留数据"
 compose down > /dev/null 2>&1
-compose up -d --wait > /dev/null 2>&1 || fail "重启未全部健康"
-[ "$(login alice "$alice_pw")" = "200" ] || fail "重启后 alice 登录"
+up_wait > /dev/null 2>&1 || fail "重启未全部健康"
+login_is alice "$alice_pw" 200 "重启后 alice 登录"
 grep -q 'powerjob app kept: iam' <<< "$(compose logs powerjob-init)" || fail "重新部署时应保留已注册的应用"
 scheduling_check
 admin_token=$(token admin "$admin_pw")
@@ -169,7 +180,7 @@ stale_token=$(token admin "$admin_pw")
 step "删除数据库卷模拟数据丢失"
 compose down > /dev/null 2>&1
 docker volume rm "${COMPOSE_PROJECT_NAME}_postgres-data" > /dev/null
-compose up -d --wait > /dev/null 2>&1 || fail "空库启动未全部健康"
+up_wait > /dev/null 2>&1 || fail "空库启动未全部健康"
 [ "$(login admin "$admin_pw")" = "401" ] || fail "空库中不应存在管理员"
 
 step "恢复"
@@ -222,7 +233,7 @@ await_limited 3
 
 step "配置中心：重新部署不覆盖控制台修改"
 compose down > /dev/null 2>&1
-compose up -d --wait > /dev/null 2>&1 || fail "重新部署未全部健康"
+up_wait > /dev/null 2>&1 || fail "重新部署未全部健康"
 grep -q 'nacos config kept: iam.yaml' <<< "$(compose logs nacos-init)" || fail "重新部署时应保留已有配置"
 await_limited 3
 
@@ -235,12 +246,12 @@ publish_attempts 4
 await_limited 5
 compose down > /dev/null 2>&1
 docker volume rm "${COMPOSE_PROJECT_NAME}_postgres-data" "${COMPOSE_PROJECT_NAME}_nacos-data" > /dev/null
-compose up -d --wait > /dev/null 2>&1 || fail "空卷启动未全部健康"
+up_wait > /dev/null 2>&1 || fail "空卷启动未全部健康"
 grep -q 'nacos config seeded: iam.yaml' <<< "$(compose logs nacos-init)" || fail "空 Nacos 应重新发布种子"
 "$repo/deploy/restore.sh" "$env_file" "$config_dump" --yes > /dev/null 2> "$work/config-restore.log" \
     || { cat "$work/config-restore.log"; fail "恢复脚本"; }
 await_limited 3
-[ "$(login alice "$alice_pw")" = "200" ] || fail "连同配置恢复后 alice 登录"
+login_is alice "$alice_pw" 200 "连同配置恢复后 alice 登录"
 
 step "构建模拟新版本镜像"
 mkdir -p "$work/v2" "$work/v3"
@@ -273,13 +284,12 @@ pre_upgrade_dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' "$work/upgrade.out")
 [ -s "$pre_upgrade_dump" ] || fail "升级前应自动备份"
 [ "$(sql "select count(*) from flyway_schema_history where version = '9000' and success")" = "1" ] \
     || fail "新版本迁移应已执行"
-post /api/auth/login "{\"loginName\":\"alice\",\"password\":\"$alice_pw\"}" > /dev/null
-expect 200 "升级后 alice 登录（网关应立即转到重建后的 IAM 实例）"
+login_is alice "$alice_pw" 200 "升级后 alice 登录（网关应转到重建后的 IAM 实例）"
 
 step "应用回退（保留新增迁移）"
 set_tag "$tag_v1"
-compose up -d --no-build --wait iam nginx > /dev/null 2>&1 || fail "应用回退后未健康"
-[ "$(login alice "$alice_pw")" = "200" ] || fail "应用回退后 alice 登录"
+up_wait --no-build iam nginx > /dev/null 2>&1 || fail "应用回退后未健康"
+login_is alice "$alice_pw" 200 "应用回退后 alice 登录"
 [ "$(sql "select to_regclass('deploy_upgrade_probe') is not null")" = "t" ] || fail "应用回退不应改动数据库"
 
 step "迁移失败的升级"
@@ -292,8 +302,8 @@ failed_upgrade=$(($(date +%s) - started))
 [ "$(sql "select count(*) from flyway_schema_history where version = '9001'")" = "0" ] || fail "失败迁移不应留下记录"
 [ "$(sql "select to_regclass('deploy_upgrade_broken') is null")" = "t" ] || fail "失败迁移应整体回滚"
 set_tag "$tag_v2"
-compose up -d --no-build --wait iam nginx > /dev/null 2>&1 || fail "失败后回到上一版本未健康"
-[ "$(login alice "$alice_pw")" = "200" ] || fail "失败后回到上一版本 alice 登录"
+up_wait --no-build iam nginx > /dev/null 2>&1 || fail "失败后回到上一版本未健康"
+login_is alice "$alice_pw" 200 "失败后回到上一版本 alice 登录"
 
 step "数据回退：恢复升级前备份并回到旧版本"
 set_tag "$tag_v1"
@@ -301,7 +311,7 @@ rollback_line=$("$repo/deploy/restore.sh" "$env_file" "$pre_upgrade_dump" --yes 
     || { cat "$work/rollback.log"; fail "数据回退"; }
 [ "$(sql "select count(*) from flyway_schema_history where version = '9000'")" = "0" ] || fail "数据回退后不应有新版本迁移"
 [ "$(sql "select to_regclass('deploy_upgrade_probe') is null")" = "t" ] || fail "数据回退后不应有新版本的表"
-[ "$(login alice "$alice_pw")" = "200" ] || fail "数据回退后 alice 登录"
+login_is alice "$alice_pw" 200 "数据回退后 alice 登录"
 
 step "HTTPS：覆盖文件启用 TLS 与跳转"
 tls="$work/tls"
@@ -321,7 +331,7 @@ https_port=$(free_port)
 printf 'NGINX_TLS_DIR=%s\nNGINX_HTTPS_BIND=127.0.0.1\nNGINX_HTTPS_PORT=%s\n' "$tls/live" "$https_port" >> "$env_file"
 https_files="$repo/deploy/compose.yml:$repo/deploy/compose.https.yml"
 https_compose() { COMPOSE_FILE="$https_files" docker compose --env-file "$env_file" "$@"; }
-https_compose up -d --no-build --wait nginx > /dev/null 2>&1 || { https_compose logs --tail 40 nginx; fail "HTTPS 入口未健康"; }
+https_compose up -d --no-build --wait --wait-timeout 300 nginx > /dev/null 2>&1 || { https_compose logs --tail 40 nginx; fail "HTTPS 入口未健康"; }
 secure="https://localhost:$https_port"
 status=$(curl -sS --cacert "$tls/ca.crt" -o /dev/null -w '%{http_code}' -X POST "$secure/api/auth/login" \
     -H 'Content-Type: application/json' -d "{\"loginName\":\"alice\",\"password\":\"$alice_pw\"}")
@@ -366,7 +376,7 @@ cp "$tls/issued-1002.key" "$tls/live/privkey.pem"
 
 step "HTTPS：可选 HSTS"
 printf 'NGINX_HSTS=max-age=300\n' >> "$env_file"
-https_compose up -d --no-build --wait nginx > /dev/null 2>&1 || fail "开启 HSTS 后入口未健康"
+https_compose up -d --no-build --wait --wait-timeout 300 nginx > /dev/null 2>&1 || fail "开启 HSTS 后入口未健康"
 curl -sS --cacert "$tls/ca.crt" -I "$secure/healthz" | grep -qi '^strict-transport-security: max-age=300' \
     || fail "开启后应发送 HSTS"
 

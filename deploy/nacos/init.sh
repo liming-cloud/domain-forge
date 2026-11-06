@@ -11,7 +11,12 @@ base="$server/auth"
 namespace="${NACOS_NAMESPACE:-public}"
 role=domainforge-service
 
-admin=$(curl -sS -X POST "$base/user/admin" --data-urlencode "password=$NACOS_ADMIN_PASSWORD")
+# Nacos 健康检查通过后接口仍可能短暂拒绝连接：连接失败时重试，最多约 60 秒
+admin=""
+for attempt in $(seq 1 30); do
+    admin=$(curl -sS -X POST "$base/user/admin" --data-urlencode "password=$NACOS_ADMIN_PASSWORD") && break
+    sleep 2
+done
 case "$admin" in
     *'"code":0'*) echo "nacos admin password initialized" ;;
     *'"code":409'*) echo "nacos admin already initialized" ;;

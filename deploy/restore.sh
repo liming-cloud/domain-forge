@@ -56,7 +56,7 @@ started=$(date +%s)
 services=$(compose config --services)
 # shellcheck disable=SC2046 # 服务名不含空白，按词拆分
 compose stop $(grep -v -x -e postgres -e redis -e nacos -e nacos-init <<< "$services")
-compose up -d --wait postgres redis
+compose up -d --wait --wait-timeout 300 postgres redis
 compose exec -T postgres pg_restore --list < "$dump" > /dev/null
 # 业务服务的数据库账号是实例级对象，不在备份中；先建好，导入时才能还原其 schema 的属主。
 for init in $(grep -e '-db-init$' <<< "$services" || true); do
@@ -86,11 +86,11 @@ for service in $(file_services); do
         'find /var/lib/domain-forge/files -mindepth 1 -delete && tar -C /var/lib/domain-forge/files -xf -' < "$files"
 done
 # 重建而不是原地重启：较新的 Docker 重启时沿用原地址，恢复期间该地址可能已被一次性容器占用。
-compose up -d --no-deps --force-recreate --wait redis
+compose up -d --no-deps --force-recreate --wait --wait-timeout 300 redis
 if [ -f "$configs" ]; then
-    compose up -d --wait nacos
+    compose up -d --wait --wait-timeout 300 nacos
     python3 -I "$deploy/nacos/configs.py" import "$env_file" "$configs" > /dev/null
 fi
-compose up -d --wait
+compose up -d --wait --wait-timeout 300
 
 echo "restored=$dump seconds=$(($(date +%s) - started))"
