@@ -1,5 +1,5 @@
 name: 任务
-description: 一项完整、可验证的工作，一个 issue 对应一个 PR；描述是唯一事实来源
+description: 一项完整、可验证的工作；通常一个 PR 完成，需要多个 PR 时由最后一个关闭；描述是唯一事实来源
 title: "[任务] "
 labels: ["kind/slice", "status/needs-decision"]
 body:
