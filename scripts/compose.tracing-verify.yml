@@ -1,5 +1,5 @@
 # 仅供 scripts/verify_closure.sh 使用：临时加入 Jaeger 作为 OTLP 采集端，各服务导出全部链路，用于核对跨服务的完整链路。
-# 部署参考不内置采集端（采集、存储与查询由业务项目提供，见 docs/architecture/10-链路追踪.md）。
+# 部署参考不内置采集端（采集、存储与查询由业务项目提供，见 docs/reference/components/tracing.md）。
 x-tracing: &tracing
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_SCHEDULE_DELAY: 1s

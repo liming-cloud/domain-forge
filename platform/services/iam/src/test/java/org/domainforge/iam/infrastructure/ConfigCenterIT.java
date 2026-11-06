@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * 在开启鉴权的真实 Nacos 上验证配置中心合同（设计见 docs/architecture/05-配置中心.md）：
+ * 在开启鉴权的真实 Nacos 上验证配置中心合同（设计见 docs/reference/components/config.md）：
  * 启动读取、动态生效、无法应用的值保持当前值、运行中断开与恢复、启动时不可达或 dataId 缺失即失败。
  * 生效以登录防护的实际行为判定，不以收到通知为准。
  */

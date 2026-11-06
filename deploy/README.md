@@ -1,17 +1,17 @@
 # 部署参考（Linux 主机＋Docker Compose）
 
-单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/architecture/01-总体架构.md#身份权限部署与调用方案)，配置规则见[配置与运行](../docs/rules/08-配置与运行.md#部署与传输)。启用 HTTPS 见 [HTTPS](#https)。
+单机基线：Nginx、API 网关、IAM、PostgreSQL、Redis、Nacos（服务注册与发现、配置中心），以及模板生成的业务服务（见[接入业务服务](#接入业务服务)）。设计取舍见[总体架构](../docs/explanation/总体架构.md#部署与调用方案)，配置规则见[配置与运行](../docs/rules/08-配置与运行.md#部署与传输)。启用 HTTPS 见 [HTTPS](#https)。
 
 | 服务 | 作用 | 对外端口 | 持久化 |
 |---|---|---|---|
 | nginx | 唯一公开入口：`/api/` 全部转发到网关，删除客户端带来的追踪头 | `NGINX_HTTP_BIND:NGINX_HTTP_PORT` | 无 |
-| gateway | API 网关：按 Nacos 中 `gateway.yaml` 的路由分发到各服务，登录前置校验、限流，写入 Same-Token（见[API 网关](../docs/architecture/06-API网关.md)） | 无 | 无（路由在 Nacos） |
+| gateway | API 网关：按 Nacos 中 `gateway.yaml` 的路由分发到各服务，登录前置校验、限流，写入 Same-Token（见[API 网关](../docs/reference/components/gateway.md)） | 无 | 无（路由在 Nacos） |
 | iam | 身份权限服务，启动后注册到 Nacos | 无 | 无（数据在 PostgreSQL） |
 | postgres | 库 `domainforge`：IAM 在 `public`，每个业务服务一个同名 schema | 无 | 卷 `postgres-data` |
 | redis | 会话、登录防护计数、缓存 | 无 | 不持久化，重启后所有用户需重新登录 |
 | nacos | 服务注册与发现、配置中心，开启鉴权 | 无 | 卷 `nacos-data`（账号与权限、配置；实例信息可重建） |
 | nacos-init | 一次性任务：设置管理员密码、创建服务专用账号、发布配置种子 | 无 | 无 |
-| rocketmq-namesrv、rocketmq-broker | 集成事件的传输：broker 内置 proxy，服务经 `rocketmq-broker:8081` 连接（见[消息与 Outbox](../docs/architecture/08-消息与Outbox.md#部署)） | 无 | 卷 `rocketmq-store`（不进入备份，Outbox 在 PostgreSQL 中） |
+| rocketmq-namesrv、rocketmq-broker | 集成事件的传输：broker 内置 proxy，服务经 `rocketmq-broker:8081` 连接（见[消息](#消息)） | 无 | 卷 `rocketmq-store`（不进入备份，Outbox 在 PostgreSQL 中） |
 | powerjob-server | 定时任务调度与控制台（见[定时任务](#定时任务)） | 无（控制台经 `compose.console.yml` 在回环地址发布） | 无（表在 PostgreSQL 的 `powerjob` schema） |
 | powerjob-db-init、powerjob-init | 一次性任务：PowerJob 数据库账号与 schema；命名空间与各服务的应用注册（`powerjob/apps.conf`） | 无 | 无 |
 | rocketmq-store-init、rocketmq-init | 一次性任务：修正存储卷属主；按 `rocketmq/topics.conf` 创建主题与消费组 | 无 | 无 |
@@ -58,17 +58,23 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: applicati
 
 `/internal/`、管理端点和其他路径经入口一律返回 404；可能被后端规范化成其他路径的写法（如 `%2e%2e`、`..;`）在网关返回 400。
 
+## API 网关
+
+- Compose 服务 `gateway`：固定地址 `172.31.250.11`，无主机端口，依赖 Redis 与 `nacos-init`，注册到 Nacos，以 `config-center` profile 读取 `gateway.yaml`（路由与限流见[API 网关](../docs/reference/components/gateway.md#路由配置)）；Nginx 把整个 `/api/` 转发到网关，并依赖网关健康。
+- 后端服务（IAM 与模板生成的服务）的可信代理为网关地址，Same-Token 校验开启。
+- 网关无持久数据，不进入备份范围；路由随 Nacos 配置备份恢复。`restore.sh` 停止与启动全部应用服务，网关包含在内。
+
 ## 安全要点
 
 - **客户端地址**：Nginx 用 `$remote_addr` 覆盖 `X-Forwarded-For`；网关只信任 Nginx 固定地址给出的该头，转发时再以确定的客户端地址覆盖；IAM 只信任网关固定地址给出的该头。登录防护与网关限流都按真实客户端地址计数，客户端伪造的头无效。前面再加一层负载均衡时，需要把它的地址加入 Nginx 的 `set_real_ip_from`，否则所有请求都会被算成同一个地址。
-- **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/architecture/06-API网关.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
+- **直连后端**：后端只在内部网络可达，并校验网关与服务间调用携带的 Same-Token（见[API 网关](../docs/reference/components/gateway.md#same-token)），网段内其他容器绕过网关直连返回 401。部署环境（`config-center` profile）不能关闭该校验，关闭即启动失败。
 - **限流**：网关按客户端地址限流（默认每秒 20 个、突发 40 个，超出 429），阈值在 Nacos 的 `gateway.yaml` 中调整、立即生效。前面再加负载均衡或客户端经同一 NAT 出口时，需要相应调高。
 - **链路标识**：Nginx 删除客户端带来的 `traceparent`、`tracestate`、`baggage`，链路从网关开始；响应头 `X-Trace-Id` 即 traceId，网关访问日志（`gateway_access trace_id=…`）与各服务日志都带上它，排查时按它关联。
 - **日志**：各服务向标准输出逐行写 ECS JSON（`docker compose logs` 或业务项目的采集端读取），每个请求一条访问日志；字段见[观测数据参考](../docs/reference/观测数据.md#日志)。
-- **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/architecture/10-链路追踪.md)。
+- **链路导出**：默认不导出。业务项目提供 OTLP 采集端后，用自己的 Compose 覆盖文件为各服务设置环境变量 `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`（如 `http://collector:4318/v1/traces`，写法可参照 `scripts/compose.tracing-verify.yml`）；新链路采样率在 Nacos 配置组 `domainforge.tracing` 的 `sampling-probability` 调整（默认 0.1），见[链路追踪](../docs/reference/components/tracing.md)。
 - **Nacos 鉴权**：管理员密码只在首次启动时由 `nacos-init` 设置，在此之前 Nacos 的初始化接口对网络内可见，因此 8848／9848／8080 不能发布到公网。服务只用 `NACOS_SERVICE_USERNAME` 账号，权限仅为指定命名空间的服务注册与发现读写。
 - **改密**：`nacos-init` 不会修改已存在账号的密码。修改 Nacos 管理员或服务账号密码时，先在 Nacos 控制台修改，再同步环境文件。
-- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）只在内部网络可达，不发布到主机、不经 Nginx；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[O-07](../docs/rules/08-配置与运行.md#o-07-管理端点不公开观测环境由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
+- **管理端口**：各服务的管理端口（IAM 9091、网关 9093、业务服务 9092）在部署环境监听 `0.0.0.0` 但不发布到主机、不经 Nginx，只在内部网络可达（本地开发默认只监听回环地址）；只开放健康检查与 `/actuator/prometheus`。业务项目的 Prometheus 接入同一网络（`backend`）后按 `<服务名>:<管理端口>` 抓取，规则见[O-07](../docs/rules/08-配置与运行.md#o-07-管理端点不公开观测环境由业务项目提供)。网段内的其他容器同样可以读取指标与健康状态。
 - **请求体上限**：Nginx 对普通接口限制请求体为 64k；只有路径以 `/files` 结尾的上传接口放宽到 21m（`nginx/locations.inc`），与服务的 multipart 上限 20MB 一致。
 
 ## 停止与数据
@@ -88,7 +94,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
 | 其他业务数据库（服务的附加数据源，如归档库 `<schema>_archive`） | `backup.sh` 逐个导出为同名 `.db.<库名>.dump` | `restore.sh` 按备份重建（保留属主，账号与库由服务的 db-init 先建好）；备份中没有的库保持不变 |
 | 业务服务的文件（命名卷 `<服务名>-files`） | `backup.sh` 在导出数据库之后打包为同名 `.files.<服务名>.tar` | `restore.sh` 用备份替换卷中的内容；备份时刻之后上传的文件消失，多出的对象由清理任务删除。备份中没有该文件（功能上线前的备份）时保留现有文件并提示 |
-| RocketMQ 中的消息 | 不备份，消费进度不随恢复回退 | 恢复前须停止写入并等事件消费完毕（见[消息](#消息)）；否则恢复时仍在途的事件会在恢复后被处理，与已回滚的发布方不一致 |
+| RocketMQ 中的消息 | 不备份，消费进度不随恢复回退 | 恢复前须停止写入并等事件消费完毕（见[消息](#消息)） |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
 | Nacos 账号、权限与实例 | 不备份 | 账号与权限由 `nacos-init` 按环境文件重建，服务启动后重新注册；在控制台做过的账号修改需手工重做 |
@@ -109,27 +115,31 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 ## 定时任务
 
-服务实现 `ScheduledTask` 的任务由 PowerJob 调度（设计与执行语义见[定时任务](../docs/architecture/09-定时任务.md)）：同一任务同一时刻只在一个实例上执行，停机期间错过的触发不补跑，失败不自动重试。
+服务实现 `ScheduledTask` 的任务由 PowerJob 调度（合同与执行语义见[定时任务](../docs/reference/components/scheduling.md)）：同一任务同一时刻只在一个实例上执行，停机期间错过的触发不补跑，失败不自动重试。
 
+- **服务**：`powerjob-db-init`（一次性：在 `domainforge` 库建立 `powerjob` 账号与同名 schema）；`powerjob-server`（固定地址 `172.31.250.30`，对外声明给 worker；PostgreSQL 必须使用 `AdpPostgreSQLDialect`，默认方言把大字段建成 `oid`，调度时报 `Unable to access lob stream`）；`powerjob-init`（一次性：创建命名空间 `domainforge`，按 `powerjob/apps.conf` 注册应用，已存在的保持不变）。
 - **控制台**：`COMPOSE_FILE=deploy/compose.yml:deploy/compose.console.yml docker compose --env-file <环境文件> up -d powerjob-server` 后，经 SSH 隧道访问 `http://127.0.0.1:${POWERJOB_CONSOLE_PORT:-7700}`，以 `ADMIN`／`POWERJOB_ADMIN_PASSWORD` 登录。在控制台修改周期、暂停或恢复、手动触发并查看执行记录；修改立即生效，重新部署不会覆盖（服务启动时只登记不存在的任务）。
-- **应用**：每个服务一个应用，名称与服务名相同，在 `powerjob/apps.conf` 登记，`powerjob-init` 在每次部署时注册尚不存在的应用；所有服务共用 `POWERJOB_APP_PASSWORD`。
+- **应用**：每个服务一个应用，名称与服务名相同，在 `powerjob/apps.conf` 登记（模板生成服务时自动追加），`powerjob-init` 在每次部署时注册尚不存在的应用（应用注册不在 PowerJob OpenAPI 中，由 `powerjob-init` 以控制台管理员身份调用控制台接口完成；任务登记用 OpenAPI，应用名＋应用密码）；所有服务共用 `POWERJOB_APP_PASSWORD`。已部署的环境新增服务时重新运行 `up -d` 即可。
 - **备份**：PowerJob 的表在 `domainforge` 库的 `powerjob` schema 中，任务定义（含控制台修改）与执行记录随 `backup.sh` 备份、`restore.sh` 恢复。执行记录保留 30 天。
 - **改密**：`POWERJOB_ADMIN_PASSWORD` 只在首次启动时生效，之后在控制台修改并同步环境文件；应用密码同理。
 
 ## 消息
 
-服务间的集成事件经 RocketMQ 传输，发布方以同事务 Outbox 保证“业务提交即事件不丢”（设计见[消息与 Outbox](../docs/architecture/08-消息与Outbox.md)）：
+服务间的集成事件经 RocketMQ 传输，发布方以同事务 Outbox 保证“业务提交即事件不丢”（合同见[消息与 Outbox](../docs/reference/components/messaging.md)）：
 
+- 相关服务：`rocketmq-namesrv`（名称服务）；`rocketmq-broker`（内置 proxy，local 模式，固定地址 `172.31.250.20`，与 `broker.conf` 的 `brokerIP1` 一致，proxy 把它作为路由地址返回给客户端）；`rocketmq-store-init`（一次性：镜像以 uid 3000 运行且没有预建存储目录，先把命名卷属主改为 3000）；`rocketmq-init`（一次性：等 broker 注册，按 `topics.conf` 创建主题与消费组，最大重试 4 次，等路由可见后退出）。
 - 主题与消费组在 `rocketmq/topics.conf` 登记，`rocketmq-init` 每次部署按它创建（已存在的更新）；关闭了自动创建，拼错名字会报错而不是静默新建。主题类型创建后不改。
 - RocketMQ 停机时业务照常提交，事件留在各服务的 `domainforge_outbox` 表中，恢复后继续发送；积压看指标 `domainforge.messaging.outbox.pending`。
 - 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
 - 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
-- 恢复前先停止业务写入，确认 `domainforge.messaging.outbox.pending` 为 0、消费组没有积压，再执行 `restore.sh`。
+- **恢复前先停止业务写入**，确认 `domainforge.messaging.outbox.pending` 为 0、消费组没有积压，再执行 `restore.sh`。RocketMQ 中的消费进度不随恢复回退：恢复时仍在途的事件会在恢复后被消费方处理，而发布方的数据已回到备份时刻，结果不一致（如统计多计一次，见 [#61](https://github.com/liming-cloud/domain-forge/issues/61)）。
+- RocketMQ 不开启鉴权，只在内部网络可达，网段内的容器可以发布或消费任意主题（见[路线图已知风险](../docs/product/02-路线图.md#已知风险)）。
 
 ## 文件存储
 
-业务服务的文件默认保存在服务自己的命名卷 `<服务名>-files`（容器内 `/var/lib/domain-forge/files`），设计与合同见[文件存储](../docs/architecture/11-文件存储.md)：
+业务服务的文件默认保存在服务自己的命名卷 `<服务名>-files`（容器内 `/var/lib/domain-forge/files`），合同见[文件存储](../docs/reference/components/file-storage.md)：
 
+- **挂载**：服务的覆盖文件挂载命名卷 `<服务名>-files` 到 `/var/lib/domain-forge/files`；镜像预先建好该目录并归服务用户所有，空卷首次挂载时继承属主。`backup.sh` 用服务镜像起临时容器打包每个文件卷（不需要服务在运行），`restore.sh` 导入数据库后用备份替换卷中的内容；按挂载点识别使用文件存储的服务。
 - **授权**：上传与下载都经业务服务自己的接口，先按权限与数据范围判断；文件卷和存储不对外暴露。
 - **删除与清理**：删除只做标记，24 小时后由定时任务 `file-storage-cleanup`（PowerJob 控制台中各服务的应用下）删除对象；该任务同时删除没有记录的孤儿对象。恢复较早的备份后，可在控制台手动触发并填写参数 `days=N`（检查最近 N 天的目录）。
 - **备份**：`backup.sh` 须在 24 小时内完成，否则备份期间被删除的文件可能已不在卷中。
@@ -137,12 +147,14 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 ## 配置中心
 
-服务的非敏感运行参数由 Nacos 管理（设计、动态项与取值范围见[配置中心](../docs/architecture/05-配置中心.md)）。每个服务一个 dataId `<服务名>.yaml`，种子在 `nacos/config/`：
+服务的非敏感运行参数由 Nacos 管理（动态项与取值范围见[配置中心](../docs/reference/components/config.md)）。每个服务一个 dataId `<服务名>.yaml`，种子在 `nacos/config/`：
 
 - `nacos-init` 只在 dataId 不存在时发布种子，之后以 Nacos 中的内容为准，重新部署不覆盖；修改种子不会影响已部署的环境。
 - 修改配置：在 Nacos 控制台（本地调试时 `compose.local.yml` 在回环地址发布）以管理员发布。动态项立即生效，其余项重启服务后生效；无法应用的值（越界、类型错误）不生效，服务继续使用当前值并记录 `config_rejected` 日志与 `domainforge.config.refresh{result=rejected}` 指标。
 - 服务账号对配置只读；Nacos 中不放凭据与密钥，它们只来自环境文件。
 - 服务启动时连不上 Nacos 或 dataId 未发布即启动失败，由 Compose 重启策略重试。
+- `nacos-init` 为服务账号授予命名空间内的配置只读权限，再对 `nacos/config/` 中每个种子在 dataId 不存在时发布，并等到客户端读取路径能读到再退出（发布后约数百毫秒内读取仍返回不存在，否则紧随其后启动的服务会因缺少来源标记而失败）；服务的 `depends_on` 包含 `nacos-init` 完成。
+- 备份：`backup.sh` 经管理接口导出全部配置（含控制台修改），`restore.sh` 一并恢复，见[备份与恢复](#备份与恢复)。
 - IAM 的登录防护阈值由 Nacos 管理，环境变量 `IAM_LOGIN_*_ATTEMPTS`／`_WINDOW_SECONDS` 只在未启用配置中心的本地开发中生效。
 
 ## 升级与回退
@@ -170,22 +182,7 @@ deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 
 ## 部署场景验证
 
-`scripts/verify_deploy.sh`（CI 每次执行）在独立 Compose 项目中按接口行为核对，不以容器启动或备份文件存在代替：
-
-| 场景 | 核对 |
-|---|---|
-| 首次部署、管理员初始化、普通重启 | 全部 healthy，仅 nginx 有主机端口；`/internal/`、管理端点经入口为 404，歧义路径不转发；重启后账号仍可登录 |
-| 网关 | 响应带 traceId（不沿用客户端的追踪头）且见于网关访问日志；网段内直连 IAM（含伪造 Same-Token 访问 `/internal/`）401；同一地址的突发请求被限流，经配置中心调高阈值后实际生效 |
-| 备份、备份后继续变更、删除数据库卷、恢复 | 备份前的账号和密码可用，备份后注册的账号与改密不存在，恢复前的会话被拒绝，审计可查询 |
-| 升级到带新增迁移的版本 | 自动生成升级前备份，迁移已执行，账号可登录 |
-| 应用回退 | 旧版本在新结构上正常运行，新增的表保留 |
-| 迁移失败的升级 | 脚本非零退出；失败迁移没有历史记录、没有残留表；回到上一版本后正常 |
-| 数据回退 | 用升级前备份恢复到旧版本后，新版本的迁移与表都不存在，账号可登录 |
-| 配置中心 | 种子首次发布且 IAM 读取；运行中发布的阈值经入口登录实际生效；重新部署不覆盖；删除 PostgreSQL 与 Nacos 卷后种子重新发布，恢复后配置回到备份时的值 |
-
-新版本由验证脚本在当前镜像上叠加验证专用迁移来模拟，不修改源码。
-
-2026-10-26 本机实测（Apple Silicon，Docker 29.2，初始数据量）：首次启动 21—73 秒（含构建镜像时较长）；备份 1 秒内、约 33 KB；恢复（含 IAM 重启）15—20 秒；升级 9 秒；迁移失败的升级 7 秒内报告失败；数据回退 15 秒。耗时随数据量增长，生产数据量下需在部署环境实测。
+`scripts/verify_deploy.sh` 在 CI 中每次执行，场景与核对项见[验证索引](../docs/reference/验证索引.md#部署与闭环)。
 
 ## HTTPS
 
@@ -210,7 +207,7 @@ docker compose --env-file /etc/domain-forge/df.env up -d --wait
 
 **更换证书**：把新的 `fullchain.pem` 与 `privkey.pem` 放入证书目录后执行 `deploy/tls-reload.sh /etc/domain-forge/df.env`。脚本先检查（文件齐全、私钥与证书匹配、证书未过期，30 天内到期时警告），通过后让 Nginx 平滑重载，不断开现有连接；任何一项不通过都不重载，继续使用当前证书。`deploy/tls-reload.sh <环境文件> --check` 只做检查，可用于定时的到期巡检。
 
-**验证**：`scripts/verify_deploy.sh` 最后用测试 CA 签发证书启用覆盖文件，核对：经 HTTPS 登录；HTTP 301 跳转且健康检查不跳转；接受 TLS 1.2、拒绝 TLS 1.1；默认不发送 HSTS，开启后发送；换证书后实际提供新证书且 Nginx 未重启；私钥与证书不匹配时拒绝重载并继续使用当前证书。
+**验证**：见[验证索引](../docs/reference/验证索引.md#部署与闭环)。
 
 ## 本地调试
 
@@ -248,4 +245,4 @@ docker compose --env-file /etc/domain-forge/df.env up -d --build --wait
 
 `restore.sh` 会先运行各服务的 `db-init` 建好账号再导入，因此在新主机或丢失数据卷后也能还原业务表的属主。`upgrade.sh` 只升级 IAM；业务服务按同样方式改 `<ENV>_IMAGE_TAG` 后执行 `docker compose ... up -d --no-build --wait <服务名>`，升级前先运行 `backup.sh`。
 
-**验证**：`scripts/verify_closure.sh`（CI 每次执行）在仓库干净副本中生成带示例的 `note-service` 与以 `--call-example note-service --consume-example note-service` 调用它、消费其事件的 `board-service`，与 IAM 一起按本节启动，经 Nginx 与网关核对：board-service 以同一用户身份读取 note-service 的便笺并受其范围限制、note-service 的无权限判定原样到达、note-service 停机时 503 并在恢复后正常；note-service 创建便笺后 board-service 的便笺统计随事件增加，RocketMQ 停机期间提交的事件留在 Outbox、恢复后继续发送并被消费，备份恢复后统计与便笺一致；临时 Jaeger 中能查到一条贯穿 gateway、note-service、IAM 与 board-service（消息消费）的链路；生成的路由写入网关种子并生效；绕过网关直连业务服务 401；无令牌 401；只需登录的查询共用会话即可通过；未授权的命令 403；安装权限目录、建角色授予（本人范围）并分配后命令成功、范围查询只返回本人数据，未分配角色的账号 403；业务服务数据库账号读 IAM 的表被拒、业务表属于服务账号；经 Nginx 与网关上传 2MB 附件并下载核对摘要、无权限账号下载 403、普通接口仍限 64k；便笺归档写入独立的归档库（属于服务账号、主库中无该表）；备份（含文件卷与归档库）→ 继续写入、上传与重新归档 → 恢复后只剩备份前的数据、附件与归档快照（两个库一致）且服务仍可写入；撤销角色后同一会话立即 403。服务的 IAM 地址留空，以上结果同时证明其经 Nacos 发现了 IAM。
+**验证**：`scripts/verify_closure.sh`（CI 每次执行），核对项见[验证索引](../docs/reference/验证索引.md#部署与闭环)。

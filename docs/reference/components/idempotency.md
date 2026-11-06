@@ -1,14 +1,8 @@
 # 请求幂等
 
-业务命令的重复提交（客户端超时重试、用户重复点击、网关重试）统一经 `domain-forge-idempotency` 组件处理：入口方法标 `@Idempotent`，客户端在请求头 `Idempotency-Key` 中给出唯一键，同一键的请求只执行一次。产品要求见[缓存与额外通用能力](../product/01-产品定义.md#缓存与额外通用能力)，决定与验收跟踪见 [#37](https://github.com/liming-cloud/domain-forge/issues/37)。
+业务命令的重复提交（客户端超时重试、用户重复点击、网关重试）统一经 `domain-forge-idempotency` 组件处理：入口方法标 `@Idempotent`，客户端在请求头 `Idempotency-Key` 中给出唯一键，同一键的请求只执行一次。产品要求见[缓存与额外通用能力](../../product/01-产品定义.md#缓存与额外通用能力)，决定与验收跟踪见 [#37](https://github.com/liming-cloud/domain-forge/issues/37)。
 
-## 已确认的决定（2026-10-29）
-
-| 问题 | 决定 |
-|---|---|
-| 合同 | `Idempotency-Key` 请求头（与 IETF Idempotency-Key 草案一致），重复请求原样返回首次结果 |
-| 范围 | 键与账号、接口绑定，保存 24 小时；处理中的并发重复 409，同一键但请求不同 422 |
-| 验证用例 | 模板便笺示例的创建接口 |
+决定记录：[ADR 0020](../../decisions/0020-请求幂等的取舍.md)。
 
 ## 合同
 
@@ -28,7 +22,7 @@
 
 - 业务拒绝（HTTP 200＋稳定代码）与 4xx 也是“首次结果”，重复请求得到同样的拒绝。
 - 处理租期 60 秒：首次请求在租期内没有结束（如进程中断），记录过期后同一键可以重试。租期须长于入口的最长处理时间。
-- `IDEMPOTENCY_IN_PROGRESS`、`IDEMPOTENCY_KEY_REUSED` 是平台保留代码，业务拒绝不能使用（见 [Web 组件](03-Web组件.md#结果映射)）。
+- `IDEMPOTENCY_IN_PROGRESS`、`IDEMPOTENCY_KEY_REUSED` 是平台保留代码，业务拒绝不能使用（见 [Web 组件](web-support.md#结果映射)）。
 
 ## 组件
 
@@ -52,12 +46,3 @@ public ApiResponse<NoteChangeResponse> create(@RequestBody CreateNoteRequest inp
 - 只给“重复执行会产生重复效果”的命令加（创建、支付、发送）；查询与天然幂等的修改（按版本更新）不需要。
 - 客户端为每次用户操作生成一个新键（如 UUID），重试时沿用同一个键。
 - 组件只保证同一键不重复执行；业务本身仍需对并发与重复的业务含义负责（如唯一约束）。
-
-## 验证
-
-| 场景 | 方式 |
-|---|---|
-| 两个应用实例之间：重复返回首次结果、请求体不同 422、处理中 409、5xx 不保存可重试、账号与接口隔离、无键与非幂等入口照常执行、键格式与未登录 | 组件 `IdempotencyIT`（真实 Redis） |
-| 记录存储故障时 503 且不执行业务、键格式 400、请求体超限 413 | 组件 `IdempotencyFilterTest` |
-| 便笺创建：重复提交只有一条便笺与一个事件，换了内容 422 | 模板 `NoteServiceIT` |
-| 经 Nginx 与网关重复提交返回首次结果并标记重放，之后的便笺数与便笺统计均为 1 | `scripts/verify_closure.sh` |

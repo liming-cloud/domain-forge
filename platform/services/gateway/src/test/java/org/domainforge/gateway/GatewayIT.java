@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 真实 Redis 与开启鉴权的 Nacos 上验证网关合同（设计见 docs/architecture/06-API网关.md）：转发与身份头、
+ * 真实 Redis 与开启鉴权的 Nacos 上验证网关合同（设计见 docs/reference/components/gateway.md）：转发与身份头、
  * 登录前置、禁止路径、限流、下游故障、路由动态更新、Same-Token 轮换与 Redis 中断。
  *
  * <p>后端用本地 HTTP 替身记录收到的请求；服务实例经简单发现给出，路由与限流从 Nacos 的 gateway.yaml 读取。

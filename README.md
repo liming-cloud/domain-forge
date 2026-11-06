@@ -4,7 +4,7 @@
 
 - 产品目标与范围：[产品定义](docs/product/01-产品定义.md)
 - 当前进度：[路线图](docs/product/02-路线图.md)与 GitHub 里程碑「首版」
-- 架构与模块：[总体架构](docs/architecture/01-总体架构.md)
+- 架构与模块：[总体架构](docs/explanation/总体架构.md)
 - 怎么开发、怎么提 PR：[开发流程](docs/workflow/01-开发流程.md)
 - AI 编码工具入口：[AGENTS.md](AGENTS.md)
 - 全部文档：[文档索引](docs/README.md)
@@ -42,4 +42,4 @@ platform/mvnw -f platform/pom.xml spotless:apply
 python3 scripts/check_doc_links.py
 ```
 
-CI（`.github/workflows/ci.yml`）在每个 PR 上执行同样的 `mvn verify` 和文档链接检查。`mvn verify` 具体检查哪些内容，见[工程与构建](docs/architecture/02-工程与构建.md#质量门禁)。
+CI（`.github/workflows/ci.yml`）在每个 PR 上执行同样的 `mvn verify` 和文档链接检查。`mvn verify` 具体检查哪些内容，见[工程与构建](docs/reference/工程与构建.md#质量门禁)。

@@ -1,22 +1,8 @@
 # 短信与验证码
 
-服务发送短信、使用短信验证码统一经 `domain-forge-notification` 组件：`SmsSender` 同步调用短信服务商，`VerificationCodes` 提供验证码的生成、发送、校验、过期与使用限制。验证码用于什么、校验通过后做什么由业务决定。产品要求见[通知渠道范围](../product/01-产品定义.md#通知渠道范围)与[短信与验证码功能边界](../product/01-产品定义.md#短信与验证码功能边界)，规则卡见[安全 A-16](../rules/07-安全与访问控制.md#a-16-验证码只经通知组件)。
+服务发送短信、使用短信验证码统一经 `domain-forge-notification` 组件：`SmsSender` 同步调用短信服务商，`VerificationCodes` 提供验证码的生成、发送、校验、过期与使用限制。验证码用于什么、校验通过后做什么由业务决定。产品要求见[通知渠道范围](../../product/01-产品定义.md#通知渠道范围)与[短信与验证码功能边界](../../product/01-产品定义.md#短信与验证码功能边界)，规则卡见[安全 A-16](../../rules/07-安全与访问控制.md#a-16-验证码只经通知组件)。
 
-## 已确认的决定（2026-10-29）
-
-| 问题 | 决定 |
-|---|---|
-| 服务商与真实接入 | 本轮只完成代码，不接入真实短信平台（真实发送跟踪见 [#113](https://github.com/liming-cloud/domain-forge/issues/113)）。适配器按阿里云短信 SendSms 的公开 HTTP 接口实现（V3 签名，JDK HttpClient，不引入服务商 SDK），CI 中由协议替身验证；真实发送由手动测试在运维提供账号后执行 |
-| 验证码状态 | 存在服务的会话 Redis 中，只存带密钥的摘要，Lua 原子执行 |
-| 默认限制 | 6 位数字、5 分钟过期、最多校验 5 次、同号 60 秒内不重发、同号每天最多 10 条；按用途可调整 |
-| 发送语义 | 同步发送、不自动重试（避免重复短信与重复扣费）；需要可靠送达的业务通知由业务经 Outbox 发布事件、在消费方调用 `SmsSender`，由消息组件负责重投 |
-
-## 已确认的决定（2026-11-03）
-
-| 问题 | 决定 |
-|---|---|
-| 真实发送 | 移出首版：首版以协议替身验证请求与失败处理；真实发送在提供阿里云账号、已审核的签名与模板后手动执行一次 `AliyunSmsLiveIT`，跟踪见 [#113](https://github.com/liming-cloud/domain-forge/issues/113) |
-| 验证码接入示例 | 不在服务模板中加示例（产品范围不含手机号登录与短信注册，模板没有使用方）；接入方式以下文[服务中的写法](#服务中的写法)的示例代码说明 |
+决定记录：[ADR 0018](../../decisions/0018-短信与验证码的取舍.md)、[ADR 0019](../../decisions/0019-短信真实发送移出首版.md)。
 
 ## 合同
 
@@ -27,14 +13,7 @@
 | `VerificationCodes.verify(purpose, phone, code)` | `VERIFIED`（随即失效）、`MISMATCH`、`EXPIRED`（不存在、过期或已使用）、`LOCKED`（错误次数达到上限，含本次；需要重新获取）。用途之间互不通用 |
 | 不在合同内 | 手机号登录、短信注册、通知中心（产品范围外）；送达回执查询；邮件；人机验证（业务在签发前自行决定是否需要） |
 
-失败映射（组件自带）：
-
-| 情况 | HTTP | `code` |
-|---|---|---|
-| 号码格式无效或服务商判定无效（`isv.MOBILE_NUMBER_ILLEGAL`、`isv.MOBILE_COUNT_OVER_LIMIT`） | 200 | `SMS_INVALID_PHONE` |
-| 服务商频控（`isv.BUSINESS_LIMIT_CONTROL`、`isv.DAY_LIMIT_CONTROL`） | 200 | `SMS_RATE_LIMITED` |
-| 重发间隔内、当天已达上限 | 200 | `VERIFICATION_TOO_FREQUENT`、`VERIFICATION_DAILY_LIMIT` |
-| 服务商不可达、超时（连接 2 秒、请求 5 秒）、5xx，或账号／签名／模板／余额问题；Redis 不可用 | 503 | `SERVICE_UNAVAILABLE` |
+失败映射（组件自带）见[错误码](../错误码.md#组件带来的业务拒绝代码)。
 
 校验结果不是异常：业务按自己的合同把 `MISMATCH`／`EXPIRED`／`LOCKED` 映射为业务拒绝。
 
@@ -108,22 +87,3 @@ public class BindPhone {
 
 - 发送验证码的接口是短信费用与骚扰的入口：除组件的同号限制外，业务还应限制同一账号或客户端地址的请求（网关已按客户端地址限流）。
 - 校验结果不要区分“号码没有收到过验证码”与“验证码错误”以外的信息，避免枚举号码。
-
-## 验证
-
-| 场景 | 方式 |
-|---|---|
-| V3 签名与官方文档示例值一致、查询串编码 | `AcsSignatureTest` |
-| 号码规范化与掩码 | `PhoneNumbersTest` |
-| 发送请求（替身独立验签、参数）、失败分类（号码无效、频控、余额、5xx、超时）、单次有效、用途隔离、错误次数上限、过期、重发间隔与当天上限、短信未发出时撤销签发、Redis 中无明文、Redis 不可用 | `NotificationIT`（真实 Redis＋阿里云协议替身） |
-| 真实发送 | `AliyunSmsLiveIT`，手动执行（见下），首版后执行（[#113](https://github.com/liming-cloud/domain-forge/issues/113)） |
-
-手动真实发送（需要已审核的签名与模板）：
-
-```bash
-ALIYUN_SMS_LIVE_PHONE=<手机号> ALIYUN_SMS_ACCESS_KEY_ID=<ID> ALIYUN_SMS_ACCESS_KEY_SECRET=<Secret> \
-ALIYUN_SMS_SIGN_NAME=<签名> ALIYUN_SMS_TEMPLATE_CODE=<模板编号> \
-platform/mvnw -f platform/pom.xml -pl framework/domain-forge-notification verify -Dit.test=AliyunSmsLiveIT
-```
-
-成功时输出 `aliyun_sms_live=sent biz_id=…` 并收到内容为 `246810` 的短信。
