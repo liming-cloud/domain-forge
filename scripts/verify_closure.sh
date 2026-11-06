@@ -56,7 +56,7 @@ step "启动整套服务"
 service_db_pw=$(secret)
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "NOTE_SERVICE_IMAGE_TAG=$tag" \
     "NOTE_SERVICE_DB_PASSWORD=$service_db_pw" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
-compose up -d --build --wait --wait-timeout 300 --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+up_wait --build --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
 # 服务以 config-center 启动：能通过健康检查即说明已从 Nacos 读到带来源标记的 note-service.yaml。
@@ -223,7 +223,7 @@ expect 401 "无令牌访问调用方"
 compose stop note-service > /dev/null 2>&1
 get /api/board/note-digest "$alice_token" > /dev/null
 expect 503 "被调方停机时调用方返回不可用"
-compose up -d --wait --wait-timeout 300 note-service > /dev/null 2>&1 || fail "note-service 重新启动未健康"
+up_wait note-service > /dev/null 2>&1 || fail "note-service 重新启动未健康"
 for attempt in $(seq 1 30); do
     [ "$(get_status /api/board/note-digest "$alice_token")" = "200" ] && break
     [ "$attempt" = "30" ] && fail "被调方恢复后调用方应恢复正常"
@@ -335,7 +335,7 @@ post /api/notes '{"title":"消息中断期间","content":""}' "$alice_token" > /
 expect 200 "RocketMQ 停机时业务提交不受影响"
 [ "$(sql "select count(*) from note_service.domainforge_outbox where sent_at is null")" -ge 1 ] \
     || fail "停机期间的事件应留在 Outbox 等待发送"
-compose up -d --wait --wait-timeout 300 rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
+up_wait rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
 tally_is 3
 
 step "撤销角色后立即生效"

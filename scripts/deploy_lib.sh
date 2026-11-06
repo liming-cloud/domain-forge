@@ -48,6 +48,15 @@ get() { call GET "$1" "" "${2:-}"; }
 get_status() { get "$1" "$2" > /dev/null; cat "$work/status"; }
 expect() { [ "$(cat "$work/status")" = "$1" ] || fail "$2：期望 $1，实际 $(cat "$work/status") $(cat "$work/body")"; }
 login() { post /api/auth/login "{\"loginName\":\"$1\",\"password\":\"$2\"}" > /dev/null; cat "$work/status"; }
+# up_wait [compose up 参数...]：启动并等待健康（300 秒超时）。资源紧张时某个容器可能在启动阶段超时退出（如 IAM 连接 Redis），
+# 由重启策略拉起后即可恢复，而 --wait 会因容器退出直接失败：失败时输出状态，再等待一次。
+up_wait() {
+    compose up -d --wait --wait-timeout 300 "$@" && return
+    echo "首次等待未全部健康，容器状态如下，重试一次" >&2
+    compose ps -a >&2
+    compose up -d --wait --wait-timeout 300 "$@"
+}
+
 # login_is <登录名> <密码> <期望状态> <失败说明>：重建、回退或恢复后入口与 IAM 需要片刻才能接住请求，在 20 秒内重试到状态一致
 login_is() {
     local attempt

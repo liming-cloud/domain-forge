@@ -54,7 +54,7 @@ fi
 
 step "首次部署"
 started=$(date +%s)
-compose up -d --build --wait --wait-timeout 300 --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "首次部署未全部健康"; }
+up_wait --build --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "首次部署未全部健康"; }
 first_start=$(($(date +%s) - started))
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
@@ -157,7 +157,7 @@ scheduling_check
 
 step "普通重启保留数据"
 compose down > /dev/null 2>&1
-compose up -d --wait --wait-timeout 300 > /dev/null 2>&1 || fail "重启未全部健康"
+up_wait > /dev/null 2>&1 || fail "重启未全部健康"
 login_is alice "$alice_pw" 200 "重启后 alice 登录"
 grep -q 'powerjob app kept: iam' <<< "$(compose logs powerjob-init)" || fail "重新部署时应保留已注册的应用"
 scheduling_check
@@ -180,7 +180,7 @@ stale_token=$(token admin "$admin_pw")
 step "删除数据库卷模拟数据丢失"
 compose down > /dev/null 2>&1
 docker volume rm "${COMPOSE_PROJECT_NAME}_postgres-data" > /dev/null
-compose up -d --wait --wait-timeout 300 > /dev/null 2>&1 || fail "空库启动未全部健康"
+up_wait > /dev/null 2>&1 || fail "空库启动未全部健康"
 [ "$(login admin "$admin_pw")" = "401" ] || fail "空库中不应存在管理员"
 
 step "恢复"
@@ -233,7 +233,7 @@ await_limited 3
 
 step "配置中心：重新部署不覆盖控制台修改"
 compose down > /dev/null 2>&1
-compose up -d --wait --wait-timeout 300 > /dev/null 2>&1 || fail "重新部署未全部健康"
+up_wait > /dev/null 2>&1 || fail "重新部署未全部健康"
 grep -q 'nacos config kept: iam.yaml' <<< "$(compose logs nacos-init)" || fail "重新部署时应保留已有配置"
 await_limited 3
 
@@ -246,7 +246,7 @@ publish_attempts 4
 await_limited 5
 compose down > /dev/null 2>&1
 docker volume rm "${COMPOSE_PROJECT_NAME}_postgres-data" "${COMPOSE_PROJECT_NAME}_nacos-data" > /dev/null
-compose up -d --wait --wait-timeout 300 > /dev/null 2>&1 || fail "空卷启动未全部健康"
+up_wait > /dev/null 2>&1 || fail "空卷启动未全部健康"
 grep -q 'nacos config seeded: iam.yaml' <<< "$(compose logs nacos-init)" || fail "空 Nacos 应重新发布种子"
 "$repo/deploy/restore.sh" "$env_file" "$config_dump" --yes > /dev/null 2> "$work/config-restore.log" \
     || { cat "$work/config-restore.log"; fail "恢复脚本"; }
@@ -288,7 +288,7 @@ login_is alice "$alice_pw" 200 "升级后 alice 登录（网关应转到重建�
 
 step "应用回退（保留新增迁移）"
 set_tag "$tag_v1"
-compose up -d --no-build --wait --wait-timeout 300 iam nginx > /dev/null 2>&1 || fail "应用回退后未健康"
+up_wait --no-build iam nginx > /dev/null 2>&1 || fail "应用回退后未健康"
 login_is alice "$alice_pw" 200 "应用回退后 alice 登录"
 [ "$(sql "select to_regclass('deploy_upgrade_probe') is not null")" = "t" ] || fail "应用回退不应改动数据库"
 
@@ -302,7 +302,7 @@ failed_upgrade=$(($(date +%s) - started))
 [ "$(sql "select count(*) from flyway_schema_history where version = '9001'")" = "0" ] || fail "失败迁移不应留下记录"
 [ "$(sql "select to_regclass('deploy_upgrade_broken') is null")" = "t" ] || fail "失败迁移应整体回滚"
 set_tag "$tag_v2"
-compose up -d --no-build --wait --wait-timeout 300 iam nginx > /dev/null 2>&1 || fail "失败后回到上一版本未健康"
+up_wait --no-build iam nginx > /dev/null 2>&1 || fail "失败后回到上一版本未健康"
 login_is alice "$alice_pw" 200 "失败后回到上一版本 alice 登录"
 
 step "数据回退：恢复升级前备份并回到旧版本"
