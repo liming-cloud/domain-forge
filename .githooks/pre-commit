@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# 拦截在 main 上的直接提交；开工前执行 git config core.hooksPath .githooks 启用。
+branch=$(git symbolic-ref --short -q HEAD)
+if [ "$branch" = "main" ]; then
+  echo "禁止在 main 上直接提交：请先从 main 新建功能分支（WIP 只放功能分支）。" >&2
+  exit 1
+fi
