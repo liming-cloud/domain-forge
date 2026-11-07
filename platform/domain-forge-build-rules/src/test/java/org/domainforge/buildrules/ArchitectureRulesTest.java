@@ -89,4 +89,37 @@ class ArchitectureRulesTest {
     void crossContextInternalsRejected() {
         assertViolation("fixture.bad.cross", "[跨上下文]");
     }
+
+    @Test
+    void componentCycleRejected() {
+        assertViolation("org.domainforge.fixture.cyc", "[组件环]");
+    }
+
+    @Test
+    void dependingOnLessStableComponentRejected() {
+        assertViolation("org.domainforge.fixture.stab", "[稳定依赖]");
+    }
+
+    @Test
+    void stableDependencyAndNoCycleInLegalLayout() {
+        assertTrue(check("fixture.good").stream()
+                .noneMatch(item -> item.startsWith("[稳定依赖]") || item.startsWith("[组件环]")));
+    }
+
+    @Test
+    void apiMustNotHoldImplementation() {
+        assertViolation("org.domainforge.fixture.badapi", "[api 纯净]");
+    }
+
+    @Test
+    void queryMustNotUseDomainRepository() {
+        assertViolation("fixture.bad.query", "[查询短路径]");
+    }
+
+    @Test
+    void metricsReportListsEveryComponent() {
+        String report = ComponentRules.report(new ClassFileImporter().importPackages("org.domainforge.fixture.stab"));
+        assertTrue(report.contains("org.domainforge.fixture.stab:api\t"), report);
+        assertTrue(report.contains("NCCD"), report);
+    }
 }
