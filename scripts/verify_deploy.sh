@@ -8,9 +8,16 @@
 # 新版本镜像在当前镜像上叠加验证专用迁移来模拟，不修改源码。
 # 结果以接口行为判定，不以容器启动或备份文件存在代替；结束时删除本次创建的容器、卷和临时文件。
 #
-# 用法：scripts/verify_deploy.sh            # 先 clean package 构建 IAM 与网关 jar
-#       SKIP_BUILD=1 scripts/verify_deploy.sh  # 复用已构建的 jar
+# 为缩短 CI 墙钟，场景分成两部分，各自从首次部署、管理员初始化和注册 alice 起，可并行执行：
+#   base：网关 → 定时任务 → 普通重启 → 备份 → 数据丢失与恢复
+#   ops ：配置中心 → 升级、应用回退、迁移失败、数据回退 → HTTPS
+#
+# 用法：scripts/verify_deploy.sh [all|base|ops]  # 默认 all；先 clean package 构建 IAM 与网关 jar
+#       SKIP_BUILD=1 scripts/verify_deploy.sh    # 复用已构建的 jar
 set -euo pipefail
+part="${1:-all}"
+case "$part" in all | base | ops) ;; *) echo "用法：$0 [all|base|ops]" >&2; exit 2 ;; esac
+wants() { [ "$part" = all ] || [ "$part" = "$1" ]; }
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
@@ -75,6 +82,8 @@ case "$(get_status /api/%2e%2e/internal/access/current "$admin_token")" in
     *) fail "可能被后端规范化成 /internal/ 的路径不应转发" ;;
 esac
 
+configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
+if wants base; then
 step "网关：traceId 与直连后端被拒"
 trace_id=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $admin_token" \
     -H "traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" "$base/api/me" \
@@ -93,7 +102,6 @@ direct() { compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' -H "Au
     || fail "伪造 Same-Token 直连 /internal/ 应被拒"
 
 step "网关：限流与动态调整"
-configs() { python3 -I "$repo/deploy/nacos/configs.py" "$@"; }
 # 令牌桶（突发 40、每秒补 20）能否耗尽取决于机器速度：慢机器上一轮 80 个请求可能被补充追上，连续发 5 轮仍无 429 才算失败
 limited=0
 for round in $(seq 1 5); do
@@ -196,7 +204,8 @@ step "核对恢复结果"
 admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
 scheduling_check
-
+fi
+if wants ops; then
 step "配置中心：种子已发布并被 IAM 读取"
 configs export "$env_file" "$work/configs.json" > /dev/null
 grep -q 'source: nacos' "$work/configs.json" || fail "iam.yaml 种子未发布"
@@ -379,11 +388,15 @@ printf 'NGINX_HSTS=max-age=300\n' >> "$env_file"
 https_compose up -d --no-build --wait --wait-timeout 300 nginx > /dev/null 2>&1 || fail "开启 HSTS 后入口未健康"
 curl -sS --cacert "$tls/ca.crt" -I "$secure/healthz" | grep -qi '^strict-transport-security: max-age=300' \
     || fail "开启后应发送 HSTS"
-
+fi
 echo "first_start_seconds=$first_start"
-echo "$backup_line" | sed "s#$work/##"
-echo "$restore_line" | sed "s#$work/##"
-grep '^upgrade=' "$work/upgrade.out"
-echo "failed_upgrade_seconds=$failed_upgrade"
-echo "$rollback_line" | sed "s#$work/##; s/^restored=/data_rollback=/"
+if wants base; then
+    echo "$backup_line" | sed "s#$work/##"
+    echo "$restore_line" | sed "s#$work/##"
+fi
+if wants ops; then
+    grep '^upgrade=' "$work/upgrade.out"
+    echo "failed_upgrade_seconds=$failed_upgrade"
+    echo "$rollback_line" | sed "s#$work/##; s/^restored=/data_rollback=/"
+fi
 echo "deploy_check=passed"
