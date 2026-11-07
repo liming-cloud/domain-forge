@@ -1,4 +1,4 @@
-package @@PACKAGE@@.application.query.note;
+package @@PACKAGE@@.application.usecase.note;
 
 import @@PACKAGE@@.application.command.note.NotePermissions;
 import @@PACKAGE@@.application.command.note.NoteRejected;

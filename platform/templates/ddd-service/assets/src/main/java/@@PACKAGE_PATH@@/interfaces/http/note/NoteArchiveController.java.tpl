@@ -3,7 +3,7 @@ package @@PACKAGE@@.interfaces.http.note;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import @@PACKAGE@@.application.command.note.ArchiveNote;
 import @@PACKAGE@@.application.command.note.NotePermissions;
-import @@PACKAGE@@.application.query.note.ReadNoteArchive;
+import @@PACKAGE@@.application.usecase.note.ReadNoteArchive;
 import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
