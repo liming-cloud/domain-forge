@@ -154,3 +154,19 @@ jobs:
         run: python3 scripts/check_doc_links.py
       - name: 删除平台专有资产后的引用与链接（起步清单演练）
         run: scripts/verify_starter.sh --docs-only
+
+  guard:
+    name: 过程守卫（PR 标题前缀、WIP 提交）
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: 检查标题前缀与 WIP 提交
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: scripts/check_pr_guard.sh "$PR_TITLE" "$BASE_SHA" "$HEAD_SHA"
