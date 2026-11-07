@@ -3,7 +3,7 @@ package @@PACKAGE@@.interfaces.http.note;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import @@PACKAGE@@.application.command.note.AttachNoteFile;
 import @@PACKAGE@@.application.command.note.NotePermissions;
-import @@PACKAGE@@.application.query.note.ReadNoteFiles;
+import @@PACKAGE@@.application.usecase.note.ReadNoteFiles;
 import org.domainforge.files.api.FileResponses;
 import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;

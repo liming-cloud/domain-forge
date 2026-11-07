@@ -14,7 +14,7 @@
 
 ## 附加数据源
 
-需要第二个独立数据库时，用 `AdditionalDataSource`：
+需要第二个独立数据库时，用 `AdditionalDataSources.create(名称, environment)`（`autoconfigure` 包）创建 `AdditionalDataSource`：
 
 - 每个附加数据源有自己的名称与配置组 `domainforge.datasources.<名称>.url／username／password`（凭据只来自环境变量），自己的迁移目录 `db/<名称>`、Mapper XML 目录 `mapper-<名称>/`、事务管理器与会话工厂；Mapper 标 `@AdditionalMapper`，以 `@MapperScan(annotationClass = AdditionalMapper.class, sqlSessionFactoryRef = "<名称>SqlSessionFactory")` 扫描各自的包，主数据源按 `@Mapper` 扫描，互不收录。
 - 在 bootstrap 中把事务管理器与会话工厂声明为 `@Bean(defaultCandidate = false)`：否则 Spring Boot 会认为服务自己提供了数据源资源，主数据源的自动装配随之退让。
