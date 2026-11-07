@@ -80,12 +80,38 @@ jobs:
       - name: 在独立 Compose 项目中验证部署、重启、备份与恢复
         env:
           DIAGNOSTICS_DIR: ${{ github.workspace }}/diagnostics
-        run: scripts/verify_deploy.sh
+        run: scripts/verify_deploy.sh base
       - name: 保存容器日志
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: deploy-diagnostics
+          path: diagnostics/
+          retention-days: 7
+
+  deploy-ops:
+    name: 部署参考（配置中心、升级与回退、HTTPS）
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: 在独立 Compose 项目中验证配置中心、升级与回退、HTTPS
+        env:
+          DIAGNOSTICS_DIR: ${{ github.workspace }}/diagnostics
+        run: scripts/verify_deploy.sh ops
+      - name: 保存容器日志
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: deploy-ops-diagnostics
           path: diagnostics/
           retention-days: 7
 
