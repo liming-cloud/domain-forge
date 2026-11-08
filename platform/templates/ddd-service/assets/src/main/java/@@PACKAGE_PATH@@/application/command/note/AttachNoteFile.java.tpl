@@ -1,8 +1,8 @@
 package @@PACKAGE@@.application.command.note;
 
 import @@PACKAGE@@.application.port.access.DataScopes;
+import @@PACKAGE@@.application.port.attachment.NoteAttachments;
 import @@PACKAGE@@.domain.model.note.Note;
-import @@PACKAGE@@.domain.repository.NoteFileRepository;
 import @@PACKAGE@@.domain.repository.NoteRepository;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.files.api.FileStore;
@@ -31,14 +31,14 @@ public class AttachNoteFile {
     private final CurrentAccess access;
     private final DataScopes scopes;
     private final NoteRepository notes;
-    private final NoteFileRepository attachments;
+    private final NoteAttachments attachments;
     private final FileStore files;
 
     /**
      * 只依赖访问组件、文件存储组件的公开接口、本服务端口与仓储。
      */
     public AttachNoteFile(CurrentAccess access, DataScopes scopes, NoteRepository notes,
-                          NoteFileRepository attachments, FileStore files) {
+                          NoteAttachments attachments, FileStore files) {
         this.access = access;
         this.scopes = scopes;
         this.notes = notes;

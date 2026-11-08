@@ -9,6 +9,7 @@ import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.operation.Identifiers;
+import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.role.Role;
 import org.domainforge.iam.domain.repository.OrganizationRepository;
@@ -17,6 +18,8 @@ import org.domainforge.iam.domain.repository.RoleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -91,10 +94,11 @@ public class ManageRole {
      * 整体替换授予：每个权限须在目录中，范围与目录声明一致，自定义范围的组织须存在。
      */
     @Transactional
-    public CommandResult grants(String tokenDigest, long id, long version, Set<PermissionGrant> grants) {
+    public CommandResult grants(String tokenDigest, long id, long version, List<GrantInput> inputs) {
         ExpectedVersion.require(id, version);
-        if (grants == null || grants.size() > PermissionCatalog.MAX_TOTAL)
+        if (inputs == null || inputs.size() > PermissionCatalog.MAX_TOTAL)
             throw new IamException(IamFailure.INVALID_REQUEST, "授予无效");
+        Set<PermissionGrant> grants = toGrants(inputs);
         organizations.lockStructure();
         catalog.lock(false);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
@@ -120,6 +124,15 @@ public class ManageRole {
         if (roles.assignments(id) > 0) throw new IamException(IamFailure.CONFLICT, "角色仍分配给账号，先撤销分配");
         roles.delete(id);
         record(actor, id, "role.delete");
+    }
+
+    private static Set<PermissionGrant> toGrants(List<GrantInput> inputs) {
+        Set<PermissionGrant> grants = new HashSet<>();
+        for (GrantInput input : inputs) {
+            if (input.scope() == null) throw new IllegalArgumentException("缺少数据范围");
+            grants.add(new PermissionGrant(input.permission(), DataScope.valueOf(input.scope()), input.unitIds()));
+        }
+        return grants;
     }
 
     private Role lock(long id, long version) {

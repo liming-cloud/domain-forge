@@ -10,6 +10,7 @@ import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.operation.Identifiers;
 import org.domainforge.iam.domain.model.menu.MenuItem;
+import org.domainforge.iam.domain.model.menu.MenuType;
 import org.domainforge.iam.domain.repository.MenuRepository;
 import org.domainforge.iam.domain.repository.PermissionCatalog;
 import org.springframework.stereotype.Service;
@@ -56,7 +57,8 @@ public class ManageMenu {
         catalog.lock(false);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         MenuItem item = MenuItem.create(
-                identifiers.next(), input.parentId(), input.type(), input.code(), input.name(), input.path(),
+                identifiers.next(), input.parentId(), MenuType.valueOf(input.type()), input.code(), input.name(),
+                input.path(),
                 input.sortOrder(), input.permission());
         requirePermission(item.permission());
         if (menus.codeTaken(item.code())) throw new IamException(IamFailure.CONFLICT, "菜单代码已存在");

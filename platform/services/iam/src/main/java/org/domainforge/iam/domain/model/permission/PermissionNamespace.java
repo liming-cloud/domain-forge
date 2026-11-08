@@ -1,7 +1,8 @@
 package org.domainforge.iam.domain.model.permission;
 
 import org.domainforge.iam.domain.IamRuleViolation;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.Objects;
 import java.util.Set;
@@ -13,7 +14,8 @@ import java.util.stream.Collectors;
  * @param namespace   命名空间
  * @param permissions 该命名空间的全部权限
  */
-public record PermissionNamespace(String namespace, Set<PermissionDefinition> permissions) implements AggregateRoot {
+@AggregateRoot
+public record PermissionNamespace(@Identity String namespace, Set<PermissionDefinition> permissions) {
     /**
      * 单个命名空间最多包含的权限数；整个目录另有总量上限。
      */

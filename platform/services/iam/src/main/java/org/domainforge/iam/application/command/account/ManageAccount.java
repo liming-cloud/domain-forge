@@ -19,6 +19,8 @@ import org.domainforge.iam.domain.repository.RoleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -91,9 +93,10 @@ public class ManageAccount {
      * 整体替换成员归属；存在归属时恰有一个主部门，组织须存在。
      */
     @Transactional
-    public CommandResult memberships(String tokenDigest, long target, long version, Set<Membership> memberships) {
+    public CommandResult memberships(String tokenDigest, long target, long version, List<MembershipInput> inputs) {
         ExpectedVersion.require(target, version);
-        if (memberships == null) throw new IamException(IamFailure.INVALID_REQUEST, "成员归属无效");
+        if (inputs == null) throw new IamException(IamFailure.INVALID_REQUEST, "成员归属无效");
+        Set<Membership> memberships = toMemberships(inputs);
         organizations.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, "iam:member:manage");
         Account current = currentAccount(target, version);
@@ -102,6 +105,15 @@ public class ManageAccount {
         if (organizations.existing(units) != units.size())
             throw new IamException(IamFailure.CONFLICT, "组织不存在");
         return save(current, changed, actor, "account.memberships");
+    }
+
+    private static Set<Membership> toMemberships(List<MembershipInput> inputs) {
+        Set<Membership> values = new HashSet<>();
+        for (MembershipInput input : inputs) {
+            if (!values.add(new Membership(input.unitId(), input.primary())))
+                throw new IllegalArgumentException("成员归属重复");
+        }
+        return values;
     }
 
     /**

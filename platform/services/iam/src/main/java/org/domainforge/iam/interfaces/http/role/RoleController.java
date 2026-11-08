@@ -105,7 +105,7 @@ public final class RoleController {
     @Operation(summary = "替换角色授予")
     public ChangeResponse grants(@PathVariable long id, @RequestBody GrantsRequest input) {
         return ChangeResponse.of(
-                management.grants(digest(), id, input.expectedVersion(), input.toDomain()));
+                management.grants(digest(), id, input.expectedVersion(), input.toInput()));
     }
 
     /**

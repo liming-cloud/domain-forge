@@ -36,6 +36,17 @@
             <artifactId>archunit</artifactId>
             <version>${archunit.version}</version>
         </dependency>
+        <!-- 0.33.0：1.6.0 按 ArchUnit 0.23 编译，运行时 AbstractMethodError，且传递引入 spring-core 5.3。 -->
+        <dependency>
+            <groupId>org.jmolecules.integrations</groupId>
+            <artifactId>jmolecules-archunit</artifactId>
+            <version>0.33.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jmolecules</groupId>
+            <artifactId>jmolecules-ddd</artifactId>
+            <version>1.10.0</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

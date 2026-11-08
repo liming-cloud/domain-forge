@@ -1,11 +1,11 @@
-package @@PACKAGE@@.domain.repository;
+package @@PACKAGE@@.application.port.attachment;
 
 import java.util.List;
 
 /**
  * 便笺与附件文件的关联；文件本身由文件存储组件保存，这里只记录文件 ID。
  */
-public interface NoteFileRepository {
+public interface NoteAttachments {
     /**
      * 便笺当前的附件数。
      */

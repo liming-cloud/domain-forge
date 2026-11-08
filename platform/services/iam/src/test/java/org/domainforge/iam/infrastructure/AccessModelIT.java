@@ -3,13 +3,16 @@ package org.domainforge.iam.infrastructure;
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.account.InitializeAdministrator;
 import org.domainforge.iam.application.command.account.ManageAccount;
+import org.domainforge.iam.application.command.account.MembershipInput;
 import org.domainforge.iam.application.command.authentication.Login;
 import org.domainforge.iam.application.command.catalog.InstallPermissions;
+import org.domainforge.iam.application.command.catalog.PermissionInput;
 import org.domainforge.iam.application.command.menu.ManageMenu;
 import org.domainforge.iam.application.command.menu.MenuInput;
 import org.domainforge.iam.application.command.organization.ManageOrganization;
 import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
+import org.domainforge.iam.application.command.role.GrantInput;
 import org.domainforge.iam.application.command.role.ManageRole;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
@@ -22,13 +25,8 @@ import org.domainforge.iam.application.query.organization.OrganizationQueries;
 import org.domainforge.iam.bootstrap.IamApplication;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
-import org.domainforge.iam.domain.model.account.Membership;
-import org.domainforge.iam.domain.model.menu.MenuType;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
-import org.domainforge.iam.domain.model.permission.PermissionDefinition;
-import org.domainforge.iam.domain.model.permission.PermissionNamespace;
 import org.domainforge.iam.domain.model.role.DataScope;
-import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
@@ -86,9 +84,9 @@ class AccessModelIT {
         bean(StringRedisTemplate.class).execute((RedisCallback<Void>) AccessModelIT::flush);
         bean(InitializeAdministrator.class).execute(ADMIN, PASSWORD);
         admin = digest(ADMIN);
-        bean(InstallPermissions.class).install(admin, new PermissionNamespace("sales", Set.of(
-                new PermissionDefinition(READ, "查询订单", true, false),
-                new PermissionDefinition(EXPORT, "导出订单", false, false))));
+        bean(InstallPermissions.class).install(admin, "sales", List.of(
+                new PermissionInput(READ, "查询订单", true, false),
+                new PermissionInput(EXPORT, "导出订单", false, false)));
     }
 
     private static Void flush(RedisConnection connection) {
@@ -134,9 +132,9 @@ class AccessModelIT {
         return bean(ManageOrganization.class).create(admin, parent, name).targetId();
     }
 
-    private long role(String code, PermissionGrant... grants) {
+    private long role(String code, GrantInput... grants) {
         long id = bean(ManageRole.class).create(admin, code, code).targetId();
-        bean(ManageRole.class).grants(admin, id, 1, Set.of(grants));
+        bean(ManageRole.class).grants(admin, id, 1, List.of(grants));
         return id;
     }
 
@@ -147,14 +145,14 @@ class AccessModelIT {
 
     private void place(String name, long primary, Long... others) {
         Account target = account(name);
-        var memberships = new java.util.HashSet<Membership>();
-        memberships.add(new Membership(primary, true));
-        for (long other : others) memberships.add(new Membership(other, false));
+        var memberships = new java.util.ArrayList<MembershipInput>();
+        memberships.add(new MembershipInput(primary, true));
+        for (long other : others) memberships.add(new MembershipInput(other, false));
         bean(ManageAccount.class).memberships(admin, target.id(), target.version(), memberships);
     }
 
-    private static PermissionGrant grant(String permission, DataScope scope, Long... units) {
-        return new PermissionGrant(permission, scope, Set.of(units));
+    private static GrantInput grant(String permission, DataScope scope, Long... units) {
+        return new GrantInput(permission, scope.name(), Set.of(units));
     }
 
     private static long version(long unitId) {
@@ -180,7 +178,7 @@ class AccessModelIT {
         place("org.member", shanghai);
         assertFailure(IamFailure.CONFLICT, () -> manage.delete(admin, shanghai, version(shanghai)));
         Account placed = account("org.member");
-        bean(ManageAccount.class).memberships(admin, placed.id(), placed.version(), Set.of());
+        bean(ManageAccount.class).memberships(admin, placed.id(), placed.version(), List.of());
         manage.delete(admin, shanghai, version(shanghai));
         manage.delete(admin, east, version(east));
         assertEquals(1, bean(OrganizationQueries.class).tree().size());
@@ -193,17 +191,17 @@ class AccessModelIT {
         var manage = bean(ManageRole.class);
         long id = manage.create(admin, "SALES", "销售").targetId();
         assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
-                Set.of(grant("sales:order:delete", DataScope.ALL))));
+                List.of(grant("sales:order:delete", DataScope.ALL))));
         assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
-                Set.of(grant(READ, DataScope.NOT_APPLICABLE))));
+                List.of(grant(READ, DataScope.NOT_APPLICABLE))));
         assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
-                Set.of(grant(EXPORT, DataScope.ALL))));
+                List.of(grant(EXPORT, DataScope.ALL))));
         assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
-                Set.of(grant("iam:org:manage", DataScope.NOT_APPLICABLE))));
+                List.of(grant("iam:org:manage", DataScope.NOT_APPLICABLE))));
         assertFailure(IamFailure.CONFLICT, () -> manage.grants(admin, id, 1,
-                Set.of(grant(READ, DataScope.CUSTOM_DEPARTMENTS, 999L))));
+                List.of(grant(READ, DataScope.CUSTOM_DEPARTMENTS, 999L))));
         assertFailure(IamFailure.CONFLICT, () -> manage.create(admin, "sales", "重复代码"));
-        assertEquals(2, manage.grants(admin, id, 1, Set.of(grant(READ, DataScope.SELF))).version());
+        assertEquals(2, manage.grants(admin, id, 1, List.of(grant(READ, DataScope.SELF))).version());
     }
 
     // 角色与权限在下一次检查即生效：分配后可见、停用角色后消失，不需要重新登录。
@@ -234,7 +232,7 @@ class AccessModelIT {
         long department = role("DEPT", grant(READ, DataScope.DEPARTMENT));
         assign("scope.member", department);
         assertEquals(Set.of(east), scope("scope.member").unitIds());
-        bean(ManageRole.class).grants(admin, department, 2, Set.of(grant(READ, DataScope.DEPARTMENT_AND_DESCENDANTS)));
+        bean(ManageRole.class).grants(admin, department, 2, List.of(grant(READ, DataScope.DEPARTMENT_AND_DESCENDANTS)));
         long custom = role("CUSTOM", grant(READ, DataScope.CUSTOM_DEPARTMENTS, west));
         assign("scope.member", department, custom);
         assertEquals(Set.of(east, shanghai, west), scope("scope.member").unitIds());
@@ -256,11 +254,11 @@ class AccessModelIT {
     void catalogKeepsReferencedPermissions() {
         role("SALES", grant(READ, DataScope.SELF));
         var install = bean(InstallPermissions.class);
-        var readOnly = new PermissionDefinition(READ, "查询订单", true, false);
-        assertEquals(1, install.install(admin, new PermissionNamespace("sales", Set.of(readOnly))));
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, new PermissionNamespace("sales", Set.of())));
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, new PermissionNamespace("sales",
-                Set.of(new PermissionDefinition(READ, "查询订单", false, false)))));
+        var readOnly = new PermissionInput(READ, "查询订单", true, false);
+        assertEquals(1, install.install(admin, "sales", List.of(readOnly)));
+        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales", List.of()));
+        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales",
+                List.of(new PermissionInput(READ, "查询订单", false, false))));
         assertEquals(1, sql.auditCount("catalog.install") - 1);
     }
 
@@ -268,13 +266,13 @@ class AccessModelIT {
     @Test
     void menuVisibilityFollowsPermissions() {
         var manage = bean(ManageMenu.class);
-        long directory = manage.create(admin, new MenuInput(null, MenuType.DIRECTORY, "sales", "销售", null, 0, null))
+        long directory = manage.create(admin, new MenuInput(null, "DIRECTORY", "sales", "销售", null, 0, null))
                 .targetId();
-        long page = manage.create(admin, new MenuInput(directory, MenuType.PAGE, "sales.orders", "订单", "/orders", 1,
+        long page = manage.create(admin, new MenuInput(directory, "PAGE", "sales.orders", "订单", "/orders", 1,
                 READ)).targetId();
-        manage.create(admin, new MenuInput(page, MenuType.BUTTON, "sales.orders.export", "导出", null, 0, EXPORT));
+        manage.create(admin, new MenuInput(page, "BUTTON", "sales.orders.export", "导出", null, 0, EXPORT));
         assertFailure(IamFailure.CONFLICT, () -> manage.create(admin,
-                new MenuInput(directory, MenuType.BUTTON, "sales.bad", "坏按钮", null, 0, EXPORT)));
+                new MenuInput(directory, "BUTTON", "sales.bad", "坏按钮", null, 0, EXPORT)));
         var queries = bean(MenuQueries.class);
         assertEquals(List.of("sales", "sales.orders"), codes(queries.visible(Set.of(READ))));
         assertEquals(List.of("sales", "sales.orders", "sales.orders.export"),
@@ -283,7 +281,7 @@ class AccessModelIT {
         manage.state(admin, directory, 1, false);
         assertTrue(queries.visible(Set.of(READ, EXPORT)).isEmpty());
         assertFailure(IamFailure.CONFLICT, () -> bean(InstallPermissions.class)
-                .install(admin, new PermissionNamespace("sales", Set.of())));
+                .install(admin, "sales", List.of()));
     }
 
     private static List<String> codes(List<MenuView> views) {

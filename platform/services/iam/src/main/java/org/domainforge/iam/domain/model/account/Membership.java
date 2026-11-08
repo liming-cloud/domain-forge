@@ -1,7 +1,7 @@
 package org.domainforge.iam.domain.model.account;
 
 import org.domainforge.iam.domain.IamRuleViolation;
-import org.domainforge.shared.ValueObject;
+import org.jmolecules.ddd.annotation.ValueObject;
 
 /**
  * 账号对一个组织的成员归属；主部门只作默认展示，不改变数据范围起点。
@@ -9,7 +9,8 @@ import org.domainforge.shared.ValueObject;
  * @param unitId  组织 ID
  * @param primary 是否为主部门
  */
-public record Membership(long unitId, boolean primary) implements ValueObject {
+@ValueObject
+public record Membership(long unitId, boolean primary) {
     /**
      * 组织 ID 必须为正数。
      */

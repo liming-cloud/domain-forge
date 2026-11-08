@@ -26,6 +26,10 @@
             <artifactId>shared</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jmolecules</groupId>
+            <artifactId>jmolecules-ddd</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-web-support</artifactId>
         </dependency>

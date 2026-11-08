@@ -1,7 +1,6 @@
 package org.domainforge.iam.interfaces.http.role;
 
-import org.domainforge.iam.domain.model.role.DataScope;
-import org.domainforge.iam.domain.model.role.PermissionGrant;
+import org.domainforge.iam.application.command.role.GrantInput;
 
 import java.util.HashSet;
 import java.util.List;
@@ -22,12 +21,11 @@ public record GrantBody(String permission, String scope, List<String> unitIds) {
     }
 
     /**
-     * 转为领域值对象；格式与组合在领域规则中校验。
+     * 转为应用输入；范围名称与组合在应用与领域规则中校验。
      */
-    PermissionGrant toDomain() {
-        if (scope == null) throw new IllegalArgumentException("缺少数据范围");
+    GrantInput toInput() {
         var units = new HashSet<Long>();
         for (String unit : unitIds) units.add(Long.parseLong(unit));
-        return new PermissionGrant(permission, DataScope.valueOf(scope), units);
+        return new GrantInput(permission, scope, units);
     }
 }

@@ -18,8 +18,8 @@ public final class ArchitectureRules {
             Map.of(
                     "domain", Set.of("domain"),
                     "application", Set.of("application", "domain"),
-                    "interfaces", Set.of("interfaces", "application", "domain"),
-                    "infrastructure", Set.of("interfaces", "application", "domain", "infrastructure"),
+                    "interfaces", Set.of("interfaces", "application"),
+                    "infrastructure", Set.of("application", "domain", "infrastructure"),
                     "bootstrap", Set.copyOf(LAYERS));
 
     private static final Set<String> APPLICATION_SPRING_TYPES =
@@ -35,6 +35,9 @@ public final class ArchitectureRules {
                     "org.springframework.transaction.support.TransactionOperations",
                     "org.springframework.transaction.support.TransactionCallback",
                     "org.springframework.transaction.TransactionStatus");
+
+    /** 领域层可用的 shared 类型：只有业务规则违反基类，其余 shared 类型带有传输或主体语义。 */
+    private static final Set<String> DOMAIN_ALLOWED_TYPES = Set.of("org.domainforge.shared.BusinessRuleViolation");
 
     private static final List<String> FORBIDDEN_JDK = List.of("java.sql", "java.net.http");
 
@@ -104,6 +107,7 @@ public final class ArchitectureRules {
             checkSqlCalls(type, violations);
         }
         ComponentRules.check(classes, violations);
+        DddRules.check(classes, violations);
         return violations.stream().distinct().sorted().toList();
     }
 
@@ -185,8 +189,10 @@ public final class ArchitectureRules {
         String name = target.getName();
         String targetPackage = target.getPackageName();
         return switch (layer) {
-            case "domain" -> domainAllowed(targetPackage) ? null : "领域只能依赖 JDK 与 org.domainforge.shared";
-            case "application" -> domainAllowed(targetPackage)
+            case "domain" -> domainAllowed(name, targetPackage)
+                    ? null
+                    : "领域只能依赖 JDK、shared.BusinessRuleViolation 与 org.jmolecules.ddd";
+            case "application" -> sharedOrJdk(targetPackage)
                     || componentApi(targetPackage)
                     || APPLICATION_SPRING_TYPES.contains(name)
                             ? null
@@ -198,9 +204,22 @@ public final class ArchitectureRules {
         };
     }
 
-    private static boolean domainAllowed(String targetPackage) {
-        boolean jdk = inside(targetPackage, "java") && !startsWithAny(targetPackage, FORBIDDEN_JDK);
-        return jdk || inside(targetPackage, "org.domainforge.shared");
+    private static boolean domainAllowed(String name, String targetPackage) {
+        return jdk(targetPackage) || DOMAIN_ALLOWED_TYPES.contains(outerName(name))
+                || inside(targetPackage, "org.jmolecules.ddd");
+    }
+
+    private static String outerName(String name) {
+        int nested = name.indexOf('$');
+        return nested < 0 ? name : name.substring(0, nested);
+    }
+
+    private static boolean sharedOrJdk(String targetPackage) {
+        return jdk(targetPackage) || inside(targetPackage, "org.domainforge.shared");
+    }
+
+    private static boolean jdk(String targetPackage) {
+        return inside(targetPackage, "java") && !startsWithAny(targetPackage, FORBIDDEN_JDK);
     }
 
     private static boolean componentApi(String targetPackage) {

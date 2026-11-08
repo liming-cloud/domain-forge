@@ -304,8 +304,8 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteFileRepository.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteFileRepository.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/attachment/NoteAttachments.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/attachment/NoteAttachments.java",
       "example": true
     },
     {

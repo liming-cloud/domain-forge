@@ -2,7 +2,7 @@ package org.domainforge.iam.domain.model.role;
 
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
-import org.domainforge.shared.ValueObject;
+import org.jmolecules.ddd.annotation.ValueObject;
 
 import java.util.Objects;
 import java.util.Set;
@@ -14,7 +14,8 @@ import java.util.Set;
  * @param scope      数据范围
  * @param unitIds    自定义范围的组织 ID，其他范围为空
  */
-public record PermissionGrant(String permission, DataScope scope, Set<Long> unitIds) implements ValueObject {
+@ValueObject
+public record PermissionGrant(String permission, DataScope scope, Set<Long> unitIds) {
     /**
      * 自定义范围一次授予最多列出的组织数。
      */
