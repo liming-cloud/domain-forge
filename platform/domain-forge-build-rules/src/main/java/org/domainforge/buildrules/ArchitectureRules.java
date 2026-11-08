@@ -103,6 +103,7 @@ public final class ArchitectureRules {
             checkSqlAnnotations(type, violations);
             checkSqlCalls(type, violations);
         }
+        ComponentRules.check(classes, violations);
         return violations.stream().distinct().sorted().toList();
     }
 

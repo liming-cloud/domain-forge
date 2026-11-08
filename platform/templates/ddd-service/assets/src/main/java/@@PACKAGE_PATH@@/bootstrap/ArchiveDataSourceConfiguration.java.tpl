@@ -3,6 +3,7 @@ package @@PACKAGE@@.bootstrap;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.domainforge.persistence.api.AdditionalDataSource;
 import org.domainforge.persistence.api.AdditionalMapper;
+import org.domainforge.persistence.autoconfigure.AdditionalDataSources;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,7 +25,7 @@ public class ArchiveDataSourceConfiguration {
      */
     @Bean(destroyMethod = "close")
     AdditionalDataSource archive(Environment environment) {
-        return AdditionalDataSource.create("archive", environment);
+        return AdditionalDataSources.create("archive", environment);
     }
 
     /**
