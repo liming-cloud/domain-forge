@@ -39,7 +39,7 @@ class GenerateTest(unittest.TestCase):
         output = self.root / 'platform' / 'services' / 'order-service'
         self.assertEqual('order', result['namespace'])
         self.assertTrue((output / 'src/main/java/com/company/order/bootstrap/OrderServiceApplication.java').is_file())
-        self.assertFalse(any(output.rglob('Note*.java')))
+        self.assertFalse(any(output.rglob('OrderRepository.java')))
         self.assertIn('<module>order-service</module>', (output.parent / 'pom.xml').read_text(encoding='utf-8'))
         compose = (self.root / 'deploy/services/order-service.compose.yml').read_text(encoding='utf-8')
         self.assertIn('image: postgres:18@sha256:abc', compose)
@@ -52,7 +52,9 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('      - order-service-files:/var/lib/domain-forge/files\n', compose)
         self.assertIn('volumes:\n  order-service-files:\n', compose)
         self.assertFalse((output / 'src/main/resources/file-storage.yml').exists())
-        self.assertFalse((self.root / 'deploy/services/order-service.archive.compose.yml').exists())
+        pom = (output / 'pom.xml').read_text(encoding='utf-8')
+        for optional in ('domain-forge-messaging', 'domain-forge-idempotency', 'domain-forge-file-storage'):
+            self.assertNotIn(optional, pom)
         self.assertEqual('iam\norder-service\n',
                          (self.root / 'deploy/powerjob/apps.conf').read_text(encoding='utf-8'))
         for path in output.rglob('*'):
@@ -66,61 +68,63 @@ class GenerateTest(unittest.TestCase):
         self.assertEqual('retail', permissions['namespace'])
         config = (output / 'src/main/resources/application.yml').read_text(encoding='utf-8')
         self.assertIn('${RETAIL_ORDER_DB_URL}', config)
-        it = next(output.rglob('NoteServiceIT.java')).read_text(encoding='utf-8')
+        it = next(output.rglob('OrderServiceIT.java')).read_text(encoding='utf-8')
         self.assertIn('currentSchema=retail_order', it)
         self.assertIn('enabled: true', (output / 'src/main/resources/file-storage.yml').read_text(encoding='utf-8'))
-        self.assertTrue((output / 'src/main/resources/db/migration/V3__note_file.sql').is_file())
+        self.assertTrue((output / 'src/main/resources/db/migration/V3__order_file.sql').is_file())
         self.assertIn('${RETAIL_ORDER_FILES_ROOT:}', config)
-        archive = (self.root / 'deploy/services/retail-order.archive.compose.yml').read_text(encoding='utf-8')
-        self.assertIn('CREATE DATABASE retail_order_archive OWNER retail_order', archive)
-        self.assertIn('RETAIL_ORDER_ARCHIVE_DB_URL: jdbc:postgresql://postgres:5432/retail_order_archive', archive)
-        # 归档库任务等主 db-init 建好账号，两者不并发建同一账号。
-        self.assertIn('      retail-order-db-init:\n        condition: service_completed_successfully\n', archive)
-        self.assertTrue((output / 'src/main/resources/db/archive/V1__note_archive.sql').is_file())
+        pom = (output / 'pom.xml').read_text(encoding='utf-8')
+        for optional in ('domain-forge-messaging', 'domain-forge-idempotency', 'domain-forge-file-storage'):
+            self.assertIn(optional, pom)
+        self.assertFalse(any(output.rglob('*rchive*')))
+        self.assertFalse((self.root / 'deploy/services/retail-order.archive.compose.yml').exists())
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
         self.assertIn('      - id: iam\n', routes)
         self.assertNotIn('/internal/', routes)
 
     def test_call_example_targets_peer_and_appends_route(self):
-        generate.generate(self.root, 'board-service', 'com.company.board', with_example=True, call_peer='note-service')
+        generate.generate(self.root, 'board-service', 'com.company.board', with_example=True, call_peer='order-service')
         output = self.root / 'platform' / 'services' / 'board-service'
-        client = next(output.rglob('PeerNoteClient.java')).read_text(encoding='utf-8')
-        self.assertIn('name = "note-service"', client)
+        client = next(output.rglob('PeerOrderClient.java')).read_text(encoding='utf-8')
+        self.assertIn('name = "order-service"', client)
         self.assertIn('${BOARD_SERVICE_PEER_URL:}', client)
-        controller = next(output.rglob('NoteDigestController.java')).read_text(encoding='utf-8')
-        self.assertIn('"/api/board/note-digest"', controller)
+        controller = next(output.rglob('OrderDigestController.java')).read_text(encoding='utf-8')
+        self.assertIn('"/api/board/order-digest"', controller)
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('      - id: board-service\n', routes)
-        self.assertIn('      - id: board-service-calls\n        service: board-service\n        paths: [/api/board/note-digest]',
+        self.assertIn('      - id: board-service-calls\n        service: board-service\n        paths: [/api/board/order-digest]',
                       routes)
         topics = (self.root / 'deploy/rocketmq/topics.conf').read_text(encoding='utf-8')
-        self.assertIn('topic board-service-notes NORMAL\n', topics)
+        self.assertIn('topic board-service-orders NORMAL\n', topics)
 
     def test_consume_example_subscribes_to_source(self):
-        generate.generate(self.root, 'board-service', 'com.company.board', call_peer='note-service',
-                          source='note-service')
+        generate.generate(self.root, 'board-service', 'com.company.board', call_peer='order-service',
+                          source='order-service')
         output = self.root / 'platform' / 'services' / 'board-service'
-        handler = next(output.rglob('SourceNoteCreatedHandler.java')).read_text(encoding='utf-8')
-        self.assertIn('return "note-service-notes";', handler)
-        self.assertIn('return "board-service-note-tally";', handler)
-        self.assertTrue(any(output.rglob('V10__note_tally.sql')))
+        handler = next(output.rglob('SourceOrderSubmittedHandler.java')).read_text(encoding='utf-8')
+        self.assertIn('return "order-service-orders";', handler)
+        self.assertIn('return "board-service-order-tally";', handler)
+        self.assertTrue(any(output.rglob('V10__order_tally.sql')))
         self.assertFalse(any(output.rglob('V2__outbox.sql')))
+        pom = (output / 'pom.xml').read_text(encoding='utf-8')
+        self.assertIn('domain-forge-messaging', pom)
+        self.assertNotIn('domain-forge-idempotency', pom)
         topics = (self.root / 'deploy/rocketmq/topics.conf').read_text(encoding='utf-8')
-        self.assertIn('group board-service-note-tally CONCURRENT\n', topics)
+        self.assertIn('group board-service-order-tally CONCURRENT\n', topics)
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
-        self.assertIn('paths: [/api/board/note-tally]', routes)
+        self.assertIn('paths: [/api/board/order-tally]', routes)
 
     def test_call_example_requires_valid_peer(self):
-        for peer in ['Note', 'iam', 'gateway', 'board']:
+        for peer in ['Order', 'iam', 'gateway', 'board']:
             with self.assertRaises(ValueError):
                 generate.generate(self.root, 'board', 'com.company.board', call_peer=peer)
         self.assertFalse((self.root / 'platform/services/board').exists())
         bare = self.root / 'platform' / 'services' / 'plain'
         generate.generate(self.root, 'plain', 'com.company.plain')
-        self.assertFalse(any(bare.rglob('PeerNote*.java')))
+        self.assertFalse(any(bare.rglob('PeerOrder*.java')))
         self.assertFalse(any(bare.rglob('*Tally*.java')))
-        self.assertFalse(any(bare.rglob('NoteCreated.java')))
+        self.assertFalse(any(bare.rglob('OrderSubmitted.java')))
 
     def test_failed_generation_restores_gateway_seed(self):
         seed = self.root / 'deploy/nacos/config/gateway.yaml'
@@ -128,7 +132,7 @@ class GenerateTest(unittest.TestCase):
         (self.root / 'platform/services/pom.xml').write_text('<project/>\n', encoding='utf-8')
         with self.assertRaises(ValueError):
             generate.generate(self.root, 'retail-order', 'com.company.retail', with_example=True,
-                              call_peer='note-service')
+                              call_peer='order-service')
         self.assertEqual(before, seed.read_text(encoding='utf-8'))
 
     def test_existing_deploy_file_is_not_overwritten(self):

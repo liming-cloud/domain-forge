@@ -53,11 +53,11 @@ gateway:
         service: iam               # 转发到 lb://iam（Nacos 发现）
         paths: [/api/**]           # 公开路径模式
         anonymous: [POST /api/auth/login, POST /api/auth/invitations/accept]
-      - id: note-service
-        service: note-service
-        paths: [/api/notes/**, /api/me/notes]
+      - id: order-service
+        service: order-service
+        paths: [/api/orders/**, /api/me/orders]
         limits:                    # 可选：接口限流，按顺序取第一条命中的
-          - endpoint: POST /api/notes/*/files   # “方法 路径模式”，须落在本路由的路径内
+          - endpoint: POST /api/orders/*/files   # “方法 路径模式”，须落在本路由的路径内
             by: account            # account 按账号；client 按客户端地址
             replenish-per-minute: 30   # 1—600000
             burst: 10              # 1—100000

@@ -1,7 +1,7 @@
 {
   "namespace": "@@NAMESPACE@@",
   "permissions": [
-    {"code": "@@NAMESPACE@@:note:read", "name": "查看便笺", "scoped": true, "systemOnly": false},
-    {"code": "@@NAMESPACE@@:note:write", "name": "编写便笺", "scoped": true, "systemOnly": false}
+    {"code": "@@NAMESPACE@@:order:read", "name": "查看订单", "scoped": true, "systemOnly": false},
+    {"code": "@@NAMESPACE@@:order:write", "name": "编写订单", "scoped": true, "systemOnly": false}
   ]
 }

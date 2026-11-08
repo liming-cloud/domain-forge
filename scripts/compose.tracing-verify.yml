@@ -14,7 +14,7 @@ services:
     environment: *tracing
   iam:
     environment: *tracing
-  note-service:
+  order-service:
     environment: *tracing
   board-service:
     environment: *tracing
