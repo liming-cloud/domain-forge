@@ -1,6 +1,7 @@
 package org.domainforge.web.autoconfigure;
 
 import org.domainforge.web.internal.AdviceConflicts;
+import org.domainforge.web.internal.MultipartExceptionAdvice;
 import org.domainforge.web.internal.PlatformExceptionAdvice;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -27,6 +28,16 @@ public class WebSupportAutoConfiguration {
     @Bean
     PlatformExceptionAdvice platformExceptionAdvice() {
         return new PlatformExceptionAdvice();
+    }
+
+    /**
+     * multipart 解析失败发生在选定处理器之前，需要全局接管。
+     *
+     * @return 平台内部 Advice
+     */
+    @Bean
+    MultipartExceptionAdvice multipartExceptionAdvice() {
+        return new MultipartExceptionAdvice();
     }
 
     /**

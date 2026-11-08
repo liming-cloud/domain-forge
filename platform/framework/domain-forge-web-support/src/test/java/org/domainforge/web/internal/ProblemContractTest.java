@@ -71,6 +71,15 @@ class ProblemContractTest {
     }
 
     @Test
+    void multipartFailuresAreHandledGloballyThroughTheDispatchPoint() {
+        var advice = new MultipartExceptionAdvice();
+        var tooLarge = advice.handle(new MaxUploadSizeExceededException(1));
+        assertEquals(413, tooLarge.getStatusCode().value());
+        assertEquals("PAYLOAD_TOO_LARGE", tooLarge.getBody().getProperties().get("code"));
+        assertEquals(400, advice.handle(new MultipartException("x")).getStatusCode().value());
+    }
+
+    @Test
     void filterBodyIsTheSameProblemShape() {
         assertEquals(
                 "{\"type\":\"about:blank\",\"title\":\"Unauthorized\",\"status\":401,"
