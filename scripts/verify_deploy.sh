@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 部署参考的真实场景验证：用独立 Compose 项目和临时密钥启动整套服务，依次验证
-#   首次部署与管理员初始化 → 网关（traceId、直连后端被拒、限流与动态调整）→ 定时任务（IAM 清理任务经 PowerJob 登记并执行）→ 普通重启保留数据 → 备份 → 备份后继续变更 →
+#   首次部署与管理员初始化 → 网关（traceId、直连后端被拒、限流与动态调整）→ 定时任务（IAM 清理任务经 PowerJob 登记并执行）→ 普通重启保留数据 → 备份（含实例中的其他业务数据库）→ 备份后继续变更 →
 #   删除数据库卷模拟数据丢失 → 恢复 → 数据回到备份时刻、旧会话全部失效 →
 #   配置中心（种子首次发布、运行中发布生效、重新部署不覆盖、删除 PostgreSQL 与 Nacos 卷后连同配置恢复）→
 #   升级到带新增迁移的版本 → 应用回退 → 迁移失败的升级及恢复 → 用升级前备份做数据回退 →
@@ -171,7 +171,11 @@ grep -q 'powerjob app kept: iam' <<< "$(compose logs powerjob-init)" || fail "�
 scheduling_check
 admin_token=$(token admin "$admin_pw")
 
-step "备份"
+step "备份（含实例中的其他业务数据库）"
+# 服务的附加数据源在同一实例中是独立的库：备份与恢复须覆盖它们（这里用一个手工建的库代替）。
+extra_sql() { compose exec -T postgres psql -U domainforge -d extra_check -tAc "$1"; }
+sql "CREATE DATABASE extra_check" > /dev/null
+extra_sql "CREATE TABLE marker (v text); INSERT INTO marker VALUES ('before')" > /dev/null
 backup_line=$("$repo/deploy/backup.sh" "$env_file" "$work/backups" 2> "$work/backup.log") \
     || { cat "$work/backup.log"; fail "备份脚本"; }
 dump=$(sed -n 's/^backup=\([^ ]*\) .*/\1/p' <<< "$backup_line")
@@ -184,6 +188,7 @@ post /api/auth/password "{\"oldPassword\":\"$alice_pw\",\"newPassword\":\"$alice
 expect 200 "alice 改密"
 [ "$(login alice "$alice_new_pw")" = "200" ] || fail "alice 新密码登录"
 stale_token=$(token admin "$admin_pw")
+extra_sql "UPDATE marker SET v = 'after'" > /dev/null
 
 step "删除数据库卷模拟数据丢失"
 compose down > /dev/null 2>&1
@@ -203,6 +208,7 @@ step "核对恢复结果"
 [ "$(get_status /api/me "$stale_token")" = "401" ] || fail "恢复前的会话应失效"
 admin_token=$(token admin "$admin_pw")
 [ "$(get_status /api/audit "$admin_token")" = "200" ] || fail "恢复后审计查询"
+[ "$(extra_sql "SELECT v FROM marker")" = "before" ] || fail "恢复后其他业务数据库应回到备份时刻"
 scheduling_check
 fi
 if wants ops; then

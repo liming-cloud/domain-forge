@@ -1,0 +1,5 @@
+        <!-- 文件存储：domainforge.files.enabled=true 时启用（订单示例的凭证附件）。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-file-storage</artifactId>
+        </dependency>

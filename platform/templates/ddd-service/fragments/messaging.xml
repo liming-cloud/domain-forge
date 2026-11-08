@@ -1,0 +1,5 @@
+        <!-- 消息：同事务 Outbox 发布与订阅消费（订单示例的 OrderSubmitted）。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-messaging</artifactId>
+        </dependency>

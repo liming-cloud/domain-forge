@@ -45,7 +45,7 @@
 ## 服务中的写法
 
 ```
-domain/repository/<关联仓储>          业务对象与文件 ID 的关联（如便笺附件）
+domain/repository/<关联仓储>          业务对象与文件 ID 的关联（如订单凭证）
 application/command/<用例>            先核对业务对象的写范围，再 FileStore.store／delete，与关联一起提交
 application/query/<用例>              先核对读范围与关联，再 FileStore.find／open（需要资源授权，不走纯查询短路径）
 interfaces/http/<入口>                multipart 上传、FileResponses.attachment 下载；上传接口路径以 /files 结尾
@@ -55,7 +55,7 @@ interfaces/http/<入口>                multipart 上传、FileResponses.attachm
 - 只在核对完业务对象之后才保存文件，未授权的请求不会写入存储。
 - 上传接口路径以 `/files` 结尾，入口 Nginx 才放宽请求体上限，须与服务的 `spring.servlet.multipart.max-file-size: 20MB` 一致，数值见[部署参考](../../../deploy/README.md#安全要点)。
 
-模板的便笺示例（`--with-example`）提供附件：`POST /api/notes/{id}/files` 上传（字段 `file`，文本、PDF、PNG、JPEG，10MB 以内，每条最多 10 个）、`GET /api/notes/{id}/files` 列出、`GET /api/notes/{id}/files/{fileId}` 下载、`DELETE /api/notes/{id}/files/{fileId}` 删除。
+模板的订单示例（`--with-example`）提供订单凭证：`POST /api/orders/{id}/files` 上传（字段 `file`，文本、PDF、PNG、JPEG，10MB 以内，每张订单最多 10 个）、`GET /api/orders/{id}/files` 列出、`GET /api/orders/{id}/files/{fileId}` 下载、`DELETE /api/orders/{id}/files/{fileId}` 删除；先按订单的数据范围授权，再由组件存取。
 
 ## 部署
 

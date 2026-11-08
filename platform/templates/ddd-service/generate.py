@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """在本仓库 platform/services/<name> 生成一个业务服务，并加入 services 聚合；同时在 deploy/ 写入其部署文件，
-带示例时向网关配置种子追加示例接口的路由。--call-example 生成以当前用户身份调用另一服务便笺查询的示例，
---consume-example 生成消费另一服务便笺事件的示例。
+带示例时向网关配置种子追加示例接口的路由。--call-example 生成以当前用户身份调用另一服务订单摘要的示例，
+--consume-example 生成消费另一服务订单事件的示例。
 
 生成结果继承内部 parent，自动执行架构规则与质量门禁；命令行生成后对新模块执行 spotless:apply，使代码一开始就符合
 格式门禁（import 顺序取决于包名，模板无法预先排好）。生成后代码归该服务维护，模板升级不覆盖已有服务。
@@ -95,6 +95,12 @@ def load_assets(with_example, values, call_peer=None, source=None):
     return manifest['version'], assets
 
 
+def optional_dependencies(with_example, source):
+    """骨架之外的组件依赖按开关追加：示例用到幂等、文件存储与消息；只消费事件时仅需要消息。"""
+    names = (['idempotency', 'file-storage'] if with_example else []) + (['messaging'] if with_example or source else [])
+    return ''.join((TEMPLATE / 'fragments' / (n + '.xml')).read_text(encoding='utf-8') for n in names)
+
+
 def add_module(services_pom, name):
     """把新服务加入 services 聚合；已登记则拒绝。"""
     text = services_pom.read_text(encoding='utf-8')
@@ -124,6 +130,7 @@ def generate(root, name, package, namespace=None, with_example=False, call_peer=
     output = services / name
     require(not output.exists(), '服务目录已存在，禁止覆盖')
     values['POSTGRES_IMAGE'] = postgres_image(root)
+    values['OPTIONAL_DEPENDENCIES'] = optional_dependencies(with_example, source)
     version, assets = load_assets(with_example, values, call_peer, source)
     bases = {'service': output, 'repository': root}
     for kind, relative, text, mode in assets:
@@ -175,11 +182,11 @@ def main():
     parser.add_argument('--name', required=True, help='服务名，即模块目录与 artifactId，例如 order-service')
     parser.add_argument('--package', required=True, help='服务根包，例如 com.company.order')
     parser.add_argument('--permission-namespace', help='IAM 权限命名空间，默认为去掉 -service 的服务名')
-    parser.add_argument('--with-example', action='store_true', help='附带便笺示例：命令、纯查询、编排查询与 IAM 数据范围')
+    parser.add_argument('--with-example', action='store_true', help='附带订单示例：命令、纯查询、编排查询与 IAM 数据范围')
     parser.add_argument('--call-example', metavar='SERVICE',
                         help='附带跨服务调用示例：以当前用户身份读取该服务（以 --with-example 生成）的便笺')
     parser.add_argument('--consume-example', metavar='SERVICE',
-                        help='附带消息消费示例：订阅该服务（以 --with-example 生成）的 NoteCreated 事件并维护便笺统计')
+                        help='附带消息消费示例：订阅该服务（以 --with-example 生成）的 OrderSubmitted 事件并维护订单统计')
     parser.add_argument('--root', default=str(TEMPLATE.parents[2]), help='仓库根目录，默认为本模板所在仓库')
     parser.add_argument('--no-format', action='store_true', help='生成后不执行 spotless:apply（之后须手动执行）')
     args = parser.parse_args()

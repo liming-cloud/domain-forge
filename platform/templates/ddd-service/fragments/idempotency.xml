@@ -1,0 +1,5 @@
+        <!-- 请求幂等：入口方法标 @Idempotent，按 Idempotency-Key 头只执行一次（订单示例的提交）。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-idempotency</artifactId>
+        </dependency>

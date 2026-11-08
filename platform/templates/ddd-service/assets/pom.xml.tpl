@@ -62,27 +62,13 @@
         </dependency>
         <dependency>
             <groupId>org.domainforge</groupId>
-            <artifactId>domain-forge-messaging</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-scheduling</artifactId>
         </dependency>
         <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-tracing</artifactId>
         </dependency>
-        <!-- 请求幂等：入口方法标 @Idempotent，按 Idempotency-Key 头只执行一次（便笺示例的创建）。 -->
-        <dependency>
-            <groupId>org.domainforge</groupId>
-            <artifactId>domain-forge-idempotency</artifactId>
-        </dependency>
-        <!-- 文件存储：domainforge.files.enabled=true 时启用（便笺示例的附件）。 -->
-        <dependency>
-            <groupId>org.domainforge</groupId>
-            <artifactId>domain-forge-file-storage</artifactId>
-        </dependency>
-        <!-- IAM 当前授权：本服务 infrastructure 中的 Feign 客户端，经 Nacos 或固定地址调用。 -->
+@@OPTIONAL_DEPENDENCIES@@        <!-- IAM 当前授权：本服务 infrastructure 中的 Feign 客户端，经 Nacos 或固定地址调用。 -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>

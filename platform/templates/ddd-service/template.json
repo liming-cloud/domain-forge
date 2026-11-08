@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -78,113 +78,108 @@
       "example": false
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteChange.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteChange.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderChange.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderChange.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NotePermissions.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NotePermissions.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderPermissions.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderPermissions.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteRejected.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/NoteRejected.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderRejected.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderRejected.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/WriteNote.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/WriteNote.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/WriteOrder.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/WriteOrder.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ListVisibleNotes.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ListVisibleNotes.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/order/ListVisibleOrders.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/order/ListVisibleOrders.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteFilter.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteFilter.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderFilter.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderFilter.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteQueries.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteQueries.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderQueries.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteView.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/NoteView.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderView.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/order/OrderView.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/note/NoteRuleViolation.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/note/NoteRuleViolation.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderRuleViolation.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderRuleViolation.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/order/Order.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/order/Order.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteRepository.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/domain/repository/NoteRepository.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/repository/OrderRepository.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/repository/OrderRepository.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteMapper.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteMapper.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderMapper.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteRow.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteRow.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderRow.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderRow.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNotes.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNotes.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/SqlOrders.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/SqlOrders.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/NoteQueryMapper.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/NoteQueryMapper.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/order/OrderQueryMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/order/OrderQueryMapper.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/SqlNoteQueries.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/note/SqlNoteQueries.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/query/order/SqlOrderQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/query/order/SqlOrderQueries.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/CreateNoteRequest.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/CreateNoteRequest.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/CreateOrderRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/CreateOrderRequest.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/EditNoteRequest.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/EditNoteRequest.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderChangeResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderChangeResponse.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteChangeResponse.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteChangeResponse.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderController.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderResponse.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteResponse.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteResponse.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/resources/db/migration/V1__note.sql.tpl",
-      "target": "src/main/resources/db/migration/V1__note.sql",
+      "source": "assets/src/main/resources/db/migration/V1__order.sql.tpl",
+      "target": "src/main/resources/db/migration/V1__order.sql",
       "example": true
     },
     {
@@ -193,23 +188,23 @@
       "example": true
     },
     {
-      "source": "assets/src/main/resources/mapper/note/NoteMapper.xml.tpl",
-      "target": "src/main/resources/mapper/note/NoteMapper.xml",
+      "source": "assets/src/main/resources/mapper/order/OrderMapper.xml.tpl",
+      "target": "src/main/resources/mapper/order/OrderMapper.xml",
       "example": true
     },
     {
-      "source": "assets/src/main/resources/mapper/query/note/NoteQueryMapper.xml.tpl",
-      "target": "src/main/resources/mapper/query/note/NoteQueryMapper.xml",
+      "source": "assets/src/main/resources/mapper/query/order/OrderQueryMapper.xml.tpl",
+      "target": "src/main/resources/mapper/query/order/OrderQueryMapper.xml",
       "example": true
     },
     {
-      "source": "assets/src/test/java/@@PACKAGE_PATH@@/domain/model/note/NoteTest.java.tpl",
-      "target": "src/test/java/@@PACKAGE_PATH@@/domain/model/note/NoteTest.java",
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/domain/model/order/OrderTest.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/domain/model/order/OrderTest.java",
       "example": true
     },
     {
-      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java.tpl",
-      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteServiceIT.java",
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/OrderServiceIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/OrderServiceIT.java",
       "example": true
     },
     {
@@ -232,43 +227,43 @@
       "mode": "append"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNote.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNote.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerOrder.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerOrder.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNotes.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerNotes.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerOrders.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/peer/PeerOrders.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigest.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigest.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/OrderDigest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/OrderDigest.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigestQueries.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/NoteDigestQueries.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/digest/OrderDigestQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/digest/OrderDigestQueries.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerNoteClient.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerNoteClient.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerOrderClient.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/PeerOrderClient.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerNotes.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerNotes.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerOrders.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/peer/FeignPeerOrders.java",
       "example": "call"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/NoteDigestController.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/NoteDigestController.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/OrderDigestController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/digest/OrderDigestController.java",
       "example": "call"
     },
     {
-      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteDigestIT.java.tpl",
-      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteDigestIT.java",
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/OrderDigestIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/OrderDigestIT.java",
       "example": "call"
     },
     {
@@ -279,18 +274,18 @@
       "mode": "append"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/contract/event/NoteCreated.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/contract/event/NoteCreated.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/contract/event/OrderSubmitted.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/contract/event/OrderSubmitted.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/event/NoteEvents.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/event/NoteEvents.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/event/OrderEvents.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/event/OrderEvents.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxNoteEvents.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxNoteEvents.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxOrderEvents.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/OutboxOrderEvents.java",
       "example": true
     },
     {
@@ -304,48 +299,103 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/attachment/NoteAttachments.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/attachment/NoteAttachments.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/attachment/OrderAttachments.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/attachment/OrderAttachments.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/AttachNoteFile.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/AttachNoteFile.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/AttachOrderFile.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/AttachOrderFile.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteFiles.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteFiles.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/usecase/order/ReadOrderFiles.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/usecase/order/ReadOrderFiles.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteFileMapper.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/NoteFileMapper.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderFileMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderFileMapper.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNoteFiles.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/note/SqlNoteFiles.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/SqlOrderFiles.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/SqlOrderFiles.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileController.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileController.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderFileController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderFileController.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileResponse.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteFileResponse.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderFileResponse.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderFileResponse.java",
       "example": true
     },
     {
-      "source": "assets/src/main/resources/mapper/note/NoteFileMapper.xml.tpl",
-      "target": "src/main/resources/mapper/note/NoteFileMapper.xml",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/LineInput.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/LineInput.java",
       "example": true
     },
     {
-      "source": "assets/src/main/resources/db/migration/V3__note_file.sql.tpl",
-      "target": "src/main/resources/db/migration/V3__note_file.sql",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderAccess.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderAccess.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycle.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycle.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/event/OrderSubmitted.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/event/OrderSubmitted.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/order/Money.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/order/Money.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderLine.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderLine.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderStatus.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/order/OrderStatus.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderLineRow.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/order/OrderLineRow.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/AddLineRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/AddLineRequest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/LineRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/LineRequest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderVersionRequest.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/order/OrderVersionRequest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/mapper/order/OrderFileMapper.xml.tpl",
+      "target": "src/main/resources/mapper/order/OrderFileMapper.xml",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/resources/db/migration/V3__order_file.sql.tpl",
+      "target": "src/main/resources/db/migration/V3__order_file.sql",
       "example": true
     },
     {
@@ -354,126 +404,60 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/bootstrap/ArchiveDataSourceConfiguration.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/bootstrap/ArchiveDataSourceConfiguration.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/archive/ArchivedNote.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/archive/ArchivedNote.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/archive/NoteArchive.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/archive/NoteArchive.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/note/ArchiveNote.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/note/ArchiveNote.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteArchive.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteArchive.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/NoteArchiveMapper.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/NoteArchiveMapper.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/SqlNoteArchive.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/archive/SqlNoteArchive.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteArchiveController.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteArchiveController.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/ArchivedNoteResponse.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/ArchivedNoteResponse.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/resources/mapper-archive/NoteArchiveMapper.xml.tpl",
-      "target": "src/main/resources/mapper-archive/NoteArchiveMapper.xml",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/resources/db/archive/V1__note_archive.sql.tpl",
-      "target": "src/main/resources/db/archive/V1__note_archive.sql",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/resources/archive-datasource.yml.tpl",
-      "target": "src/main/resources/archive-datasource.yml",
-      "example": true
-    },
-    {
-      "source": "assets/deploy/services/@@ARTIFACT@@.archive.compose.yml.tpl",
-      "target": "deploy/services/@@ARTIFACT@@.archive.compose.yml",
-      "example": true,
-      "root": "repository"
-    },
-    {
-      "source": "assets/deploy/rocketmq/topics-notes.conf.tpl",
+      "source": "assets/deploy/rocketmq/topics-orders.conf.tpl",
       "target": "deploy/rocketmq/topics.conf",
       "example": true,
       "root": "repository",
       "mode": "append"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/tally/NoteTallies.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/tally/NoteTallies.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/port/tally/OrderTallies.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/port/tally/OrderTallies.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordNoteCreated.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordNoteCreated.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordOrderSubmitted.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/tally/RecordOrderSubmitted.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/tally/NoteTallyQueries.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/tally/NoteTallyQueries.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/tally/OrderTallyQueries.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/tally/OrderTallyQueries.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceNoteCreatedHandler.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceNoteCreatedHandler.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceOrderSubmittedHandler.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/messaging/SourceOrderSubmittedHandler.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/NoteTallyMapper.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/NoteTallyMapper.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/OrderTallyMapper.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/OrderTallyMapper.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlNoteTallies.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlNoteTallies.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlOrderTallies.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/persistence/tally/SqlOrderTallies.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/NoteTallyController.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/NoteTallyController.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/OrderTallyController.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/tally/OrderTallyController.java",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/resources/mapper/tally/NoteTallyMapper.xml.tpl",
-      "target": "src/main/resources/mapper/tally/NoteTallyMapper.xml",
+      "source": "assets/src/main/resources/mapper/tally/OrderTallyMapper.xml.tpl",
+      "target": "src/main/resources/mapper/tally/OrderTallyMapper.xml",
       "example": "consume"
     },
     {
-      "source": "assets/src/main/resources/db/migration/V10__note_tally.sql.tpl",
-      "target": "src/main/resources/db/migration/V10__note_tally.sql",
+      "source": "assets/src/main/resources/db/migration/V10__order_tally.sql.tpl",
+      "target": "src/main/resources/db/migration/V10__order_tally.sql",
       "example": "consume"
     },
     {
-      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/NoteTallyIT.java.tpl",
-      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/NoteTallyIT.java",
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/OrderTallyIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/OrderTallyIT.java",
       "example": "consume"
     },
     {

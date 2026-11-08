@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 在仓库的干净副本中生成两个服务并对它们执行完整门禁（含真实 PostgreSQL／Redis 集成测试）：带便笺示例的 template-check，
+# 在仓库的干净副本中生成两个服务并对它们执行完整门禁（含真实 PostgreSQL／Redis 集成测试）：带订单示例的 template-check，
 # 以及以 --call-example 调用它、以 --consume-example 消费其事件的 template-caller。证明模板产出能在本仓库内构建、通过架构规则、接入 IAM 合同，
 # 并按跨服务调用组件的合同调用另一服务。不修改当前工作区。
 #

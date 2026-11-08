@@ -37,10 +37,10 @@
 ## 服务中的写法
 
 ```java
-@SaCheckPermission(NotePermissions.WRITE)
+@SaCheckPermission(OrderPermissions.WRITE)
 @Idempotent
-@PostMapping("/api/notes")
-public NoteChangeResponse create(@RequestBody CreateNoteRequest input) { ... }
+@PostMapping("/api/orders/{id}/submit")
+public OrderChangeResponse submit(@PathVariable long id, @RequestBody OrderVersionRequest input) { ... }
 ```
 
 - 只给“重复执行会产生重复效果”的命令加（创建、支付、发送）；查询与天然幂等的修改（按版本更新）不需要。

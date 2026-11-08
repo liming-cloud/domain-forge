@@ -1,1 +1,1 @@
-group @@ARTIFACT@@-note-tally CONCURRENT
+group @@ARTIFACT@@-order-tally CONCURRENT
