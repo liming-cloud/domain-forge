@@ -1,7 +1,6 @@
 package @@PACKAGE@@.infrastructure.acl.peer;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -18,7 +17,7 @@ public interface PeerNoteClient {
      * 当前用户可见的便笺。
      */
     @GetMapping("/api/notes")
-    ApiResponse<List<Note>> visible();
+    List<Note> visible();
 
     /**
      * 对方便笺表示中本服务用到的字段，其余字段忽略。

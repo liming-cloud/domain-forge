@@ -5,8 +5,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.domainforge.servicecall.api.ServiceCallException;
 import org.domainforge.servicecall.api.ServiceCallFailure;
-import org.domainforge.servicecall.api.ServiceCalls;
-import org.domainforge.shared.ApiResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,7 +80,7 @@ class ServiceCallIntegrationTest {
     }
 
     /**
-     * /status/{code} 按指定状态返回外壳；/slow 超过读取超时才应答；记录每个路径收到的关键请求头与次数。
+     * /status/{code} 按指定状态返回 Problem Details；/slow 超过读取超时才应答；记录每个路径收到的关键请求头与次数。
      */
     private static void answer(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
@@ -95,14 +93,14 @@ class ServiceCallIntegrationTest {
         SEEN.put(path, headers);
         if (path.equals("/slow")) sleep(1500);
         int status = path.startsWith("/status/") ? Integer.parseInt(path.substring("/status/".length())) : 200;
-        String code = switch (status) {
-            case 200 -> path.equals("/rejected") ? "NOTE_CONFLICT" : "SUCCESS";
-            case 409 -> "NOTE_CONFLICT";
-            default -> "X";
-        };
-        byte[] body = ("{\"code\":\"" + code + "\",\"message\":\"对方的提示\",\"data\":\"value\"}")
-                .getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        String code = status == 409 ? "NOTE_CONFLICT" : "X";
+        String json = status == 200
+                ? "value"
+                : "{\"type\":\"about:blank\",\"status\":" + status
+                        + ",\"detail\":\"对方的提示\",\"code\":\"" + code + "\"}";
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type",
+                status == 200 ? "text/plain" : "application/problem+json");
         exchange.sendResponseHeaders(status, body.length);
         exchange.getResponseBody().write(body);
         exchange.close();
@@ -130,7 +128,7 @@ class ServiceCallIntegrationTest {
     @Test
     void propagatesIdentityWithinRequest() {
         inRequest("Bearer user-token");
-        assertEquals("value", ServiceCalls.data(stub.ok("forged")));
+        assertEquals("value", stub.ok("forged"));
         var seen = SEEN.get("/ok");
         assertEquals(SaSameUtil.getToken(), seen.get("SA-SAME-TOKEN"));
         assertEquals("Bearer user-token", seen.get("Authorization"));
@@ -149,7 +147,7 @@ class ServiceCallIntegrationTest {
         assertEquals(SaSameUtil.getToken(), seen.get("SA-SAME-TOKEN"));
     }
 
-    // 401、403 保持语义；4xx 与外壳中的非成功代码为对方的拒绝并带代码；5xx 不可用；504 结果未知。
+    // 401、403 保持语义；4xx 为对方的拒绝并带 Problem Details 中的代码；5xx 不可用；504 结果未知。
     @Test
     void classifiesResponses() {
         assertEquals(ServiceCallFailure.UNAUTHENTICATED, failure(() -> stub.status(401)).failure());
@@ -157,10 +155,7 @@ class ServiceCallIntegrationTest {
         var conflict = failure(() -> stub.status(409));
         assertEquals(ServiceCallFailure.REJECTED, conflict.failure());
         assertEquals("NOTE_CONFLICT", conflict.code());
-        var rejected = failure(() -> ServiceCalls.data(stub.rejected()));
-        assertEquals(ServiceCallFailure.REJECTED, rejected.failure());
-        assertEquals("NOTE_CONFLICT", rejected.code());
-        assertFalse(rejected.getMessage().contains("对方的提示"));
+        assertFalse(conflict.getMessage().contains("对方的提示"));
         assertEquals(ServiceCallFailure.UNAVAILABLE, failure(() -> stub.status(503)).failure());
         assertEquals(ServiceCallFailure.UNKNOWN, failure(() -> stub.status(504)).failure());
     }
@@ -198,22 +193,19 @@ class ServiceCallIntegrationTest {
     @FeignClient(name = "stub", url = "${stub.url}")
     interface StubClient {
         @GetMapping("/ok")
-        ApiResponse<String> ok(@RequestHeader("SA-SAME-TOKEN") String forged);
-
-        @GetMapping("/rejected")
-        ApiResponse<String> rejected();
+        String ok(@RequestHeader("SA-SAME-TOKEN") String forged);
 
         @GetMapping("/explicit")
-        ApiResponse<String> explicit(@RequestHeader("Authorization") String authorization);
+        String explicit(@RequestHeader("Authorization") String authorization);
 
         @GetMapping("/background")
-        ApiResponse<String> background();
+        String background();
 
         @GetMapping("/status/{status}")
-        ApiResponse<String> status(@PathVariable("status") int status);
+        String status(@PathVariable("status") int status);
 
         @GetMapping("/slow")
-        ApiResponse<String> slow();
+        String slow();
     }
 
     /**
@@ -222,7 +214,7 @@ class ServiceCallIntegrationTest {
     @FeignClient(name = "refused", url = "${refused.url}")
     interface RefusedClient {
         @GetMapping("/ok")
-        ApiResponse<String> ok();
+        String ok();
     }
 
     /**
@@ -231,6 +223,6 @@ class ServiceCallIntegrationTest {
     @FeignClient(name = "absent")
     interface AbsentClient {
         @GetMapping("/ok")
-        ApiResponse<String> ok();
+        String ok();
     }
 }

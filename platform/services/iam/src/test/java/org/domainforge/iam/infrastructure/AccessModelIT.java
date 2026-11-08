@@ -20,6 +20,7 @@ import org.domainforge.iam.application.query.menu.MenuQueries;
 import org.domainforge.iam.application.query.menu.MenuView;
 import org.domainforge.iam.application.query.organization.OrganizationQueries;
 import org.domainforge.iam.bootstrap.IamApplication;
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.account.Membership;
 import org.domainforge.iam.domain.model.menu.MenuType;
@@ -28,9 +29,10 @@ import org.domainforge.iam.domain.model.permission.PermissionDefinition;
 import org.domainforge.iam.domain.model.permission.PermissionNamespace;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
+import org.domainforge.shared.BusinessRuleViolation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -107,7 +110,15 @@ class AccessModelIT {
     }
 
     private static void assertFailure(IamFailure expected, Executable command) {
-        assertEquals(expected, assertThrows(IamException.class, command).failure());
+        assertEquals(expected, failureOf(assertThrows(RuntimeException.class, command)));
+    }
+
+    // 应用层拒绝与领域规则违反按同一分类比较：违反的 400／409 类别对应 INVALID_REQUEST／CONFLICT。
+    private static IamFailure failureOf(Exception failure) {
+        if (failure instanceof IamRuleViolation rule)
+            return rule.kind() == BusinessRuleViolation.Kind.CONFLICT ? IamFailure.CONFLICT
+                    : IamFailure.INVALID_REQUEST;
+        return assertInstanceOf(IamException.class, failure).failure();
     }
 
     private static Account account(String name) {
@@ -285,7 +296,7 @@ class AccessModelIT {
         Account system = account(ADMIN);
         var manage = bean(ManageAccount.class);
         assertFailure(IamFailure.CONFLICT, () -> manage.roles(admin, system.id(), system.version(), Set.of()));
-        assertFailure(IamFailure.CONFLICT, () -> bean(ManageRole.class).state(admin, Role.SYSTEM_ADMIN_ID, 1, false));
+        assertFailure(IamFailure.CONFLICT, () -> bean(ManageRole.class).state(admin, SystemRole.ADMIN_ID, 1, false));
         member("reader");
         assign("reader", role("ORG_READER", grant("iam:org:read", DataScope.NOT_APPLICABLE)));
         String reader = digest("reader");

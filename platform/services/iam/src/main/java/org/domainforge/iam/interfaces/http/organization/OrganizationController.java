@@ -8,8 +8,8 @@ import org.domainforge.iam.application.query.organization.OrganizationQueries;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.protocol.RenameRequest;
 import org.domainforge.iam.interfaces.http.protocol.StateRequest;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -47,8 +48,8 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:read")
     @GetMapping("/api/organization-units")
     @Operation(summary = "查询组织树")
-    public ApiResponse<List<OrganizationUnitResponse>> tree() {
-        return ApiResponse.success(queries.tree().stream().map(OrganizationUnitResponse::of).toList());
+    public List<OrganizationUnitResponse> tree() {
+        return queries.tree().stream().map(OrganizationUnitResponse::of).toList();
     }
 
     /**
@@ -57,9 +58,9 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:manage")
     @PostMapping("/api/organization-units")
     @Operation(summary = "创建组织")
-    public ApiResponse<ChangeResponse> create(@RequestBody CreateUnitRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.create(digest(), input.parentId(), input.name())));
+    public ChangeResponse create(@RequestBody CreateUnitRequest input) {
+        return ChangeResponse.of(
+                management.create(digest(), input.parentId(), input.name()));
     }
 
     /**
@@ -68,9 +69,9 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:manage")
     @PutMapping("/api/organization-units/{id}/name")
     @Operation(summary = "修改组织名称")
-    public ApiResponse<ChangeResponse> rename(@PathVariable long id, @RequestBody RenameRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.rename(digest(), id, input.expectedVersion(), input.name())));
+    public ChangeResponse rename(@PathVariable long id, @RequestBody RenameRequest input) {
+        return ChangeResponse.of(
+                management.rename(digest(), id, input.expectedVersion(), input.name()));
     }
 
     /**
@@ -79,10 +80,10 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:manage")
     @PutMapping("/api/organization-units/{id}/parent")
     @Operation(summary = "移动组织")
-    public ApiResponse<ChangeResponse> move(@PathVariable long id, @RequestBody MoveRequest input) {
+    public ChangeResponse move(@PathVariable long id, @RequestBody MoveRequest input) {
         if (input.parentId() == null) throw new IllegalArgumentException("组织必须有父节点");
-        return ApiResponse.success(ChangeResponse.of(
-                management.move(digest(), id, input.expectedVersion(), input.parentId())));
+        return ChangeResponse.of(
+                management.move(digest(), id, input.expectedVersion(), input.parentId()));
     }
 
     /**
@@ -91,9 +92,9 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:manage")
     @PutMapping("/api/organization-units/{id}/state")
     @Operation(summary = "启停组织")
-    public ApiResponse<ChangeResponse> state(@PathVariable long id, @RequestBody StateRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.state(digest(), id, input.expectedVersion(), input.enabled())));
+    public ChangeResponse state(@PathVariable long id, @RequestBody StateRequest input) {
+        return ChangeResponse.of(
+                management.state(digest(), id, input.expectedVersion(), input.enabled()));
     }
 
     /**
@@ -102,9 +103,9 @@ public final class OrganizationController {
     @SaCheckPermission("iam:org:manage")
     @DeleteMapping("/api/organization-units/{id}")
     @Operation(summary = "删除组织")
-    public ApiResponse<Void> delete(@PathVariable long id, @RequestParam long expectedVersion) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id, @RequestParam long expectedVersion) {
         management.delete(digest(), id, expectedVersion);
-        return ApiResponse.success(null);
     }
 
     private String digest() {

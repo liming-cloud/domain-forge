@@ -25,13 +25,13 @@ public final class SameTokens {
      * 读取当前值，尚不存在时由 Sa-Token 生成并保存。
      *
      * @return 当前 Same-Token
-     * @throws AccessException 会话 Redis 不可用时为 UNAVAILABLE，调用方不得省略请求头继续调用
+     * @throws AccessUnavailableException 会话 Redis 不可用时，调用方不得省略请求头继续调用
      */
     public static String current() {
         try {
             return SaSameUtil.getToken();
         } catch (RuntimeException failure) {
-            throw new AccessException(AccessFailure.UNAVAILABLE);
+            throw new AccessUnavailableException();
         }
     }
 }

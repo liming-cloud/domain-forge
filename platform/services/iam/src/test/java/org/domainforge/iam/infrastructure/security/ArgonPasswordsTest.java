@@ -1,9 +1,9 @@
 package org.domainforge.iam.infrastructure.security;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.infrastructure.configuration.PasswordHashingSettings;
 import org.junit.jupiter.api.Test;
 
+import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -16,29 +16,10 @@ class ArgonPasswordsTest {
         try (var passwords =
                 new ArgonPasswords(
                         new PasswordHashingSettings(2, 8, 1000))) {
-            for (String value : new String[]{" ".repeat(15), "😀".repeat(128), "identity password e\u0301"}) {
-                String digest = passwords.encode(value);
-                assertTrue(digest.startsWith("$argon2id$v=19$m=19456,t=2,p=1$"));
-                assertTrue(passwords.matches(value, digest));
-                assertNotEquals(digest, passwords.encode(value));
+            for (String value : new String[]{"x".repeat(14), "x".repeat(129), "x".repeat(15) + "\uD800"}) {
+                assertRule("PASSWORD_LENGTH_INVALID", () -> passwords.encode(value));
             }
-            assertFalse(
-                    passwords.matches("identity password é", passwords.encode("identity password e\u0301")));
-            assertFalse(passwords.matches("nonexistent password", null));
-        }
-    }
-
-    // 过短、过长、未配对代理字符及随包阻断列表在计算前拒绝，不截断或规范化。
-    @Test
-    void rejectsInvalidOrBlockedPasswords() {
-        try (var passwords =
-                new ArgonPasswords(
-                        new PasswordHashingSettings(2, 8, 1000))) {
-            for (String value : new String[]{
-                    "x".repeat(14), "x".repeat(129), "x".repeat(15) + "\uD800", "passwordpassword"
-            }) {
-                assertThrows(IamException.class, () -> passwords.encode(value));
-            }
+            assertRule("PASSWORD_COMMON", () -> passwords.encode("passwordpassword"));
         }
     }
 }

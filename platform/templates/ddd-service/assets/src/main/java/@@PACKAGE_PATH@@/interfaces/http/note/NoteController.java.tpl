@@ -8,7 +8,6 @@ import @@PACKAGE@@.application.query.note.ListVisibleNotes;
 import @@PACKAGE@@.application.query.note.NoteQueries;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.idempotency.api.Idempotent;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,9 +48,9 @@ public class NoteController {
     @SaCheckPermission(NotePermissions.WRITE)
     @Idempotent
     @PostMapping("/api/notes")
-    public ApiResponse<NoteChangeResponse> create(@RequestBody CreateNoteRequest input) {
-        return ApiResponse.success(NoteChangeResponse.of(
-                writes.create(input.unitId(), input.title(), input.content())));
+    public NoteChangeResponse create(@RequestBody CreateNoteRequest input) {
+        return NoteChangeResponse.of(
+                writes.create(input.unitId(), input.title(), input.content()));
     }
 
     /**
@@ -59,9 +58,9 @@ public class NoteController {
      */
     @SaCheckPermission(NotePermissions.WRITE)
     @PutMapping("/api/notes/{id}")
-    public ApiResponse<NoteChangeResponse> edit(@PathVariable long id, @RequestBody EditNoteRequest input) {
-        return ApiResponse.success(NoteChangeResponse.of(
-                writes.edit(id, input.expectedVersion(), input.title(), input.content())));
+    public NoteChangeResponse edit(@PathVariable long id, @RequestBody EditNoteRequest input) {
+        return NoteChangeResponse.of(
+                writes.edit(id, input.expectedVersion(), input.title(), input.content()));
     }
 
     /**
@@ -69,10 +68,10 @@ public class NoteController {
      */
     @SaCheckLogin
     @GetMapping("/api/me/notes")
-    public ApiResponse<List<NoteResponse>> mine(
+    public List<NoteResponse> mine(
             @RequestParam(defaultValue = "0") long after, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(queries.owned(access.current().accountId(), after, limit).stream()
-                .map(NoteResponse::of).toList());
+        return queries.owned(access.current().accountId(), after, limit).stream()
+                .map(NoteResponse::of).toList();
     }
 
     /**
@@ -80,8 +79,8 @@ public class NoteController {
      */
     @SaCheckPermission(NotePermissions.READ)
     @GetMapping("/api/notes")
-    public ApiResponse<List<NoteResponse>> list(
+    public List<NoteResponse> list(
             @RequestParam(defaultValue = "0") long after, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(visible.list(after, limit).stream().map(NoteResponse::of).toList());
+        return visible.list(after, limit).stream().map(NoteResponse::of).toList();
     }
 }

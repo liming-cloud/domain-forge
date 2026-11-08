@@ -24,7 +24,7 @@ public class SqlNoteQueries implements NoteQueries {
 
     @Override
     public List<NoteView> owned(long ownerId, long after, int limit) {
-        if (after < 0 || limit < 1 || limit > 100) throw new NoteRejected("NOTE_INVALID", "分页游标须非负且大小须为1至100");
+        if (after < 0 || limit < 1 || limit > 100) throw NoteRejected.invalid("NOTE_INVALID", "分页游标须非负且大小须为1至100");
         return mapper.owned(ownerId, after, limit);
     }
 

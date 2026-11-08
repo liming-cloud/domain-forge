@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
 import org.domainforge.iam.application.query.access.AccessScopes;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.shared.CurrentScope;
 import org.domainforge.shared.CurrentSubject;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -44,8 +43,8 @@ public final class InternalAccessController {
     @SaCheckLogin
     @GetMapping("/internal/access/current")
     @Operation(summary = "读取当前用户身份与权限", description = "只检查登录与账号有效；业务服务据此做本地授权")
-    public ApiResponse<CurrentSubject> current() {
-        return ApiResponse.success(access.current());
+    public CurrentSubject current() {
+        return access.current();
     }
 
     /**
@@ -54,11 +53,11 @@ public final class InternalAccessController {
     @SaCheckLogin
     @GetMapping("/internal/access/scopes")
     @Operation(summary = "读取当前用户数据范围", description = "无授予返回空范围；业务查询把范围映射为参数绑定的过滤条件")
-    public ApiResponse<Map<String, CurrentScope>> scopes(@RequestParam("permission") List<String> permissions) {
+    public Map<String, CurrentScope> scopes(@RequestParam("permission") List<String> permissions) {
         Map<String, CurrentScope> result = new TreeMap<>();
         scopes.scopes(identity.current().tokenDigest(), permissions)
                 .forEach((code, scope) -> result.put(code,
                         new CurrentScope(scope.all(), scope.self(), scope.unitIds())));
-        return ApiResponse.success(result);
+        return result;
     }
 }

@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.model.invitation;
 
-import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.IamRuleViolation;
+import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.shared.AggregateRoot;
 
 import java.time.Instant;
@@ -27,18 +28,18 @@ public record RegistrationInvitation(
                 || secretDigest == null
                 || !secretDigest.matches("[a-f0-9]{64}")
                 || (consumedBy != null && (consumedBy <= 0 || invalidated))) {
-            throw new IllegalArgumentException("邀请状态无效");
+            throw IamRuleViolation.invalid("INVITATION_STATE_INVALID", "邀请状态无效");
         }
-        loginName = Account.normalizeLoginName(loginName);
+        loginName = new LoginName(loginName).value();
     }
 
     /**
      * 消费后的状态由调用方与新账号在同一事务中保存。
      */
     public RegistrationInvitation consume(long accountId, Instant now) {
-        if (accountId <= 0 || now == null) throw new IllegalArgumentException("消费身份与时间不可为空");
+        if (accountId <= 0 || now == null) throw IamRuleViolation.invalid("INVITATION_CONSUMER_INVALID", "消费身份与时间不可为空");
         if (consumedBy != null || invalidated || !now.isBefore(expiresAt)) {
-            throw new IllegalStateException("邀请已失效或已消费");
+            throw IamRuleViolation.conflict("INVITATION_UNUSABLE", "邀请无效或已失效");
         }
         return new RegistrationInvitation(
                 id, loginName, secretDigest, expiresAt, createdBy, accountId, false);
@@ -48,7 +49,7 @@ public record RegistrationInvitation(
      * 重发前使旧邀请失效；已消费邀请不能用于重置账号。
      */
     public RegistrationInvitation invalidate() {
-        if (consumedBy != null || invalidated) throw new IllegalStateException("邀请已消费或失效");
+        if (consumedBy != null || invalidated) throw IamRuleViolation.conflict("INVITATION_UNUSABLE", "邀请已消费或失效");
         return new RegistrationInvitation(
                 id, loginName, secretDigest, expiresAt, createdBy, null, true);
     }

@@ -7,7 +7,6 @@ import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess
 import org.domainforge.iam.application.query.catalog.PermissionQueries;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
 import org.domainforge.iam.domain.model.permission.PermissionNamespace;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,8 +44,8 @@ public final class PermissionCatalogController {
     @SaCheckPermission("iam:catalog:read")
     @GetMapping("/api/permissions")
     @Operation(summary = "查询权限目录")
-    public ApiResponse<List<PermissionBody>> permissions() {
-        return ApiResponse.success(queries.list().stream().map(PermissionBody::of).toList());
+    public List<PermissionBody> permissions() {
+        return queries.list().stream().map(PermissionBody::of).toList();
     }
 
     /**
@@ -55,10 +54,10 @@ public final class PermissionCatalogController {
     @SaCheckPermission("iam:catalog:manage")
     @PutMapping("/api/permission-namespaces/{namespace}")
     @Operation(summary = "安装权限命名空间")
-    public ApiResponse<Integer> install(@PathVariable String namespace, @RequestBody InstallRequest input) {
+    public Integer install(@PathVariable String namespace, @RequestBody InstallRequest input) {
         Set<PermissionDefinition> definitions = new HashSet<>();
         for (PermissionBody body : input.permissions()) definitions.add(body.toDomain());
-        return ApiResponse.success(installer.install(
-                identity.current().tokenDigest(), new PermissionNamespace(namespace, definitions)));
+        return installer.install(
+                identity.current().tokenDigest(), new PermissionNamespace(namespace, definitions));
     }
 }

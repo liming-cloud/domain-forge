@@ -4,7 +4,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,8 +32,8 @@ public final class InvitationController {
     @SaCheckPermission("iam:invitation:create")
     @PostMapping("/api/invitations")
     @Operation(summary = "创建或重发注册邀请", description = "秘密只返回一次；replacesInvitationId显式使旧邀请失效")
-    public ApiResponse<InvitationResponse> issue(@RequestBody InvitationRequest input) {
-        return ApiResponse.success(InvitationResponse.of(invitations.execute(
-                identity.current().tokenDigest(), input.loginName(), input.replacesInvitationId())));
+    public InvitationResponse issue(@RequestBody InvitationRequest input) {
+        return InvitationResponse.of(invitations.execute(
+                identity.current().tokenDigest(), input.loginName(), input.replacesInvitationId()));
     }
 }

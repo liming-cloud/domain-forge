@@ -3,7 +3,6 @@ package @@PACKAGE@@.interfaces.http.digest;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import @@PACKAGE@@.application.query.digest.NoteDigest;
 import @@PACKAGE@@.application.query.digest.NoteDigestQueries;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,7 +27,7 @@ public class NoteDigestController {
      */
     @SaCheckLogin
     @GetMapping("/api/@@NAMESPACE@@/note-digest")
-    public ApiResponse<NoteDigest> digest() {
-        return ApiResponse.success(digests.digest());
+    public NoteDigest digest() {
+        return digests.digest();
     }
 }

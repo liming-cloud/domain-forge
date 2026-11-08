@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 /**
- * 非 2xx 响应的分类：401、403 保持语义；其他 4xx 为对方的拒绝（附带外壳中的代码）；504 结果未知；其余为不可用。
+ * 非 2xx 响应的分类：401、403 保持语义；其他 4xx 为对方的拒绝（附带 Problem Details 中的 code）；504 结果未知；其余为不可用。
  *
  * <p>只读取响应体前 4 KiB 提取代码，不记录或传递对方的提示文本。
  */

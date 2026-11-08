@@ -39,8 +39,9 @@ class NoteTest {
         assertEquals("标题", note.title());
         assertSame(note, note.edit("标题", "内容"));
         assertEquals(2, note.edit("新标题", "内容").version());
-        assertThrows(IllegalArgumentException.class, () -> note.edit(" ", "内容"));
-        assertThrows(IllegalArgumentException.class, () -> note.edit("标题", "x".repeat(2001)));
+        assertEquals("NOTE_INVALID", assertThrows(NoteRuleViolation.class, () -> note.edit(" ", "内容")).code());
+        assertEquals("NOTE_INVALID",
+                assertThrows(NoteRuleViolation.class, () -> note.edit("标题", "x".repeat(2001))).code());
     }
 
     @Test

@@ -146,8 +146,7 @@ class GatewayIT {
         }
         RECEIVED.put(name, seen);
         if (exchange.getRequestURI().getPath().endsWith("/slow")) sleep(3000);
-        byte[] body = ("{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":\"" + name + "\"}")
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] body = ("{\"name\":\"" + name + "\"}").getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         // 与后端的追踪组件一样回传 traceId，验证网关响应中不会出现两个值。
         String traceparent = headers.getFirst("traceparent");

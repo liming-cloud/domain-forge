@@ -4,9 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 菜单树规则：按钮不能作父节点，页面和按钮须关联权限。
@@ -19,10 +19,10 @@ class MenuItemTest {
 
     @Test
     void pagesAndButtonsNeedPermission() {
-        assertThrows(IllegalArgumentException.class, () -> item(1, MenuType.PAGE, null));
-        assertThrows(IllegalArgumentException.class, () -> item(1, MenuType.BUTTON, null));
+        assertRule("MENU_PERMISSION_REQUIRED", () -> item(1, MenuType.PAGE, null));
+        assertRule("MENU_PERMISSION_REQUIRED", () -> item(1, MenuType.BUTTON, null));
         assertDoesNotThrow(() -> item(1, MenuType.DIRECTORY, null));
-        assertThrows(IllegalArgumentException.class,
+        assertRule("MENU_BUTTON_PATH",
                 () -> MenuItem.create(1, null, MenuType.BUTTON, "b1", "按钮", "/x", 0, "sales:order:read"));
     }
 
@@ -33,15 +33,15 @@ class MenuItemTest {
         MenuItem button = item(3, MenuType.BUTTON, "sales:order:export");
         assertDoesNotThrow(() -> page.requireParent(directory));
         assertDoesNotThrow(() -> button.requireParent(page));
-        assertThrows(IllegalStateException.class, () -> button.requireParent(directory));
-        assertThrows(IllegalStateException.class, () -> button.requireParent(null));
-        assertThrows(IllegalStateException.class, () -> page.requireParent(button));
+        assertRule("MENU_BUTTON_PARENT", () -> button.requireParent(directory));
+        assertRule("MENU_BUTTON_PARENT", () -> button.requireParent(null));
+        assertRule("MENU_PARENT_INVALID", () -> page.requireParent(button));
     }
 
     @Test
     void moveRejectsCycleAndUnchangedUpdateKeepsVersion() {
         MenuItem directory = item(1, MenuType.DIRECTORY, null);
-        assertThrows(IllegalStateException.class, () -> directory.moveTo(5L, List.of(5L, 1L)));
+        assertRule("MENU_MOVE_CYCLE", () -> directory.moveTo(5L, List.of(5L, 1L)));
         assertSame(directory, directory.update("菜单1", "/p1", 0, null));
     }
 }

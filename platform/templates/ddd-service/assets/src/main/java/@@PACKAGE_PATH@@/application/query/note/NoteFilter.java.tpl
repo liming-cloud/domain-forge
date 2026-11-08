@@ -20,6 +20,6 @@ public record NoteFilter(long account, boolean all, boolean self, Set<Long> unit
      */
     public NoteFilter {
         units = Set.copyOf(units);
-        if (after < 0 || limit < 1 || limit > 100) throw new NoteRejected("NOTE_INVALID", "分页游标须非负且大小须为1至100");
+        if (after < 0 || limit < 1 || limit > 100) throw NoteRejected.invalid("NOTE_INVALID", "分页游标须非负且大小须为1至100");
     }
 }

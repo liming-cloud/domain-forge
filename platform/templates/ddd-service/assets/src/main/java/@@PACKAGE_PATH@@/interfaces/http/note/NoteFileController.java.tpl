@@ -5,15 +5,16 @@ import @@PACKAGE@@.application.command.note.AttachNoteFile;
 import @@PACKAGE@@.application.command.note.NotePermissions;
 import @@PACKAGE@@.application.usecase.note.ReadNoteFiles;
 import org.domainforge.files.api.FileResponses;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,11 +46,11 @@ public class NoteFileController {
      */
     @SaCheckPermission(NotePermissions.WRITE)
     @PostMapping("/api/notes/{id}/files")
-    public ApiResponse<NoteFileResponse> upload(@PathVariable long id, @RequestPart("file") MultipartFile file)
+    public NoteFileResponse upload(@PathVariable long id, @RequestPart("file") MultipartFile file)
             throws IOException {
         try (InputStream content = file.getInputStream()) {
-            return ApiResponse.success(NoteFileResponse.of(
-                    writes.attach(id, file.getOriginalFilename(), file.getContentType(), content)));
+            return NoteFileResponse.of(
+                    writes.attach(id, file.getOriginalFilename(), file.getContentType(), content));
         }
     }
 
@@ -58,8 +59,8 @@ public class NoteFileController {
      */
     @SaCheckPermission(NotePermissions.READ)
     @GetMapping("/api/notes/{id}/files")
-    public ApiResponse<List<NoteFileResponse>> list(@PathVariable long id) {
-        return ApiResponse.success(reads.list(id).stream().map(NoteFileResponse::of).toList());
+    public List<NoteFileResponse> list(@PathVariable long id) {
+        return reads.list(id).stream().map(NoteFileResponse::of).toList();
     }
 
     /**
@@ -76,8 +77,8 @@ public class NoteFileController {
      */
     @SaCheckPermission(NotePermissions.WRITE)
     @DeleteMapping("/api/notes/{id}/files/{fileId}")
-    public ApiResponse<Void> delete(@PathVariable long id, @PathVariable String fileId) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id, @PathVariable String fileId) {
         writes.detach(id, fileId);
-        return ApiResponse.success(null);
     }
 }

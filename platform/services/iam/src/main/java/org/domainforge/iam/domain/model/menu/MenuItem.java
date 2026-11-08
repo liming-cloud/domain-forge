@@ -1,7 +1,8 @@
 package org.domainforge.iam.domain.model.menu;
 
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.model.shared.DisplayName;
 import org.domainforge.shared.AggregateRoot;
 
 import java.util.List;
@@ -26,12 +27,12 @@ public record MenuItem(
      */
     public MenuItem {
         if (id <= 0 || version < 1 || type == null || (parentId != null && parentId == id))
-            throw new IllegalArgumentException("菜单身份、父节点或版本无效");
+            throw IamRuleViolation.invalid("MENU_STATE_INVALID", "菜单身份、父节点或版本无效");
         if (code == null || !code.matches("[a-z][a-z0-9:._-]{1,63}"))
-            throw new IllegalArgumentException("菜单代码格式无效");
-        name = Role.requireName(name);
+            throw IamRuleViolation.invalid("MENU_CODE_INVALID", "菜单代码格式无效");
+        name = new DisplayName(name).value();
         requireTarget(type, path, permission);
-        if (sortOrder < 0 || sortOrder > 100_000) throw new IllegalArgumentException("排序值须为0至100000");
+        if (sortOrder < 0 || sortOrder > 100_000) throw IamRuleViolation.invalid("MENU_SORT_INVALID", "排序值须为0至100000");
     }
 
     /**
@@ -39,11 +40,11 @@ public record MenuItem(
      */
     private static void requireTarget(MenuType type, String path, String permission) {
         if (path != null && (path.isBlank() || path.length() > 256))
-            throw new IllegalArgumentException("路径须为1至256个字符");
-        if (type == MenuType.BUTTON && path != null) throw new IllegalArgumentException("按钮没有路径");
+            throw IamRuleViolation.invalid("MENU_PATH_INVALID", "路径须为1至256个字符");
+        if (type == MenuType.BUTTON && path != null) throw IamRuleViolation.invalid("MENU_BUTTON_PATH", "按钮没有路径");
         if (permission != null) PermissionDefinition.requireCode(permission);
         if (type != MenuType.DIRECTORY && permission == null)
-            throw new IllegalArgumentException("页面和按钮必须关联权限");
+            throw IamRuleViolation.invalid("MENU_PERMISSION_REQUIRED", "页面和按钮必须关联权限");
     }
 
     /**
@@ -60,12 +61,12 @@ public record MenuItem(
      */
     public void requireParent(MenuItem parent) {
         if (parent == null) {
-            if (type == MenuType.BUTTON) throw new IllegalStateException("按钮必须挂在页面下");
+            if (type == MenuType.BUTTON) throw IamRuleViolation.conflict("MENU_BUTTON_PARENT", "按钮必须挂在页面下");
             return;
         }
-        if (parent.type == MenuType.BUTTON) throw new IllegalStateException("按钮不能作父节点");
+        if (parent.type == MenuType.BUTTON) throw IamRuleViolation.conflict("MENU_PARENT_INVALID", "按钮不能作父节点");
         if (type == MenuType.BUTTON && parent.type != MenuType.PAGE)
-            throw new IllegalStateException("按钮必须挂在页面下");
+            throw IamRuleViolation.conflict("MENU_BUTTON_PARENT", "按钮必须挂在页面下");
     }
 
     /**
@@ -84,7 +85,7 @@ public record MenuItem(
      * 移到新父节点（null 为顶层）；新父节点及其祖先中不能出现本节点。
      */
     public MenuItem moveTo(Long newParent, List<Long> ancestorsOfParent) {
-        if (ancestorsOfParent.contains(id)) throw new IllegalStateException("不能移到自身或下级之下");
+        if (ancestorsOfParent.contains(id)) throw IamRuleViolation.conflict("MENU_MOVE_CYCLE", "不能移到自身或下级之下");
         if (java.util.Objects.equals(parentId, newParent)) return this;
         return new MenuItem(id, newParent, type, code, name, path, sortOrder, permission, enabled, version + 1);
     }

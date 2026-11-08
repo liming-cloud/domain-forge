@@ -1,5 +1,6 @@
 package org.domainforge.iam.domain.model.permission;
 
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.shared.ValueObject;
 
 /**
@@ -23,9 +24,9 @@ public record PermissionDefinition(String code, String name, boolean scoped, boo
     public PermissionDefinition {
         requireCode(code);
         if (name == null || name.isBlank() || name.strip().length() > 64)
-            throw new IllegalArgumentException("权限名称须为1至64个字符");
+            throw IamRuleViolation.invalid("PERMISSION_NAME_INVALID", "权限名称须为1至64个字符");
         name = name.strip();
-        if (scoped && systemOnly) throw new IllegalArgumentException("系统专属权限不需要数据范围");
+        if (scoped && systemOnly) throw IamRuleViolation.invalid("PERMISSION_SCOPE_INVALID", "系统专属权限不需要数据范围");
     }
 
     /**
@@ -33,7 +34,7 @@ public record PermissionDefinition(String code, String name, boolean scoped, boo
      */
     public static void requireCode(String code) {
         if (code == null || !code.matches("[a-z][a-z0-9-]{1,31}(:[a-z][a-z0-9-]{0,47}){1,3}") || code.length() > 128)
-            throw new IllegalArgumentException("权限码格式无效");
+            throw IamRuleViolation.invalid("PERMISSION_CODE_INVALID", "权限码格式无效");
     }
 
     /**
@@ -41,7 +42,7 @@ public record PermissionDefinition(String code, String name, boolean scoped, boo
      */
     public static void requireNamespace(String namespace) {
         if (namespace == null || !namespace.matches("[a-z][a-z0-9-]{1,31}"))
-            throw new IllegalArgumentException("命名空间格式无效");
+            throw IamRuleViolation.invalid("NAMESPACE_INVALID", "命名空间格式无效");
     }
 
     /**

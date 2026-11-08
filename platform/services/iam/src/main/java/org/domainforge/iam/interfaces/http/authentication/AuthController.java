@@ -12,10 +12,11 @@ import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.registration.RegistrationRequest;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -52,8 +53,8 @@ public final class AuthController {
     @SaIgnore
     @PostMapping("/api/auth/login")
     @Operation(summary = "登录", description = "默认保护启用；返回的原生Bearer令牌只在SQL提交确认后交付")
-    public ApiResponse<LoginResult> login(@RequestBody LoginRequest input, HttpServletRequest request) {
-        return ApiResponse.success(login.execute(input.loginName(), input.password(), request.getRemoteAddr()));
+    public LoginResult login(@RequestBody LoginRequest input, HttpServletRequest request) {
+        return login.execute(input.loginName(), input.password(), request.getRemoteAddr());
     }
 
     /**
@@ -62,9 +63,9 @@ public final class AuthController {
     @SaIgnore
     @PostMapping("/api/auth/invitations/accept")
     @Operation(summary = "接受注册邀请", description = "邀请秘密放请求体；邀请已使用或过期时返回409")
-    public ApiResponse<ChangeResponse> register(@RequestBody RegistrationRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                registration.execute(input.invitationSecret(), input.loginName(), input.password())));
+    public ChangeResponse register(@RequestBody RegistrationRequest input) {
+        return ChangeResponse.of(
+                registration.execute(input.invitationSecret(), input.loginName(), input.password()));
     }
 
     /**
@@ -73,9 +74,9 @@ public final class AuthController {
     @SaCheckLogin
     @PostMapping("/api/auth/password")
     @Operation(summary = "修改本人密码", description = "当前会话及旧密码必需；SQL提交后所有旧会话立即拒绝")
-    public ApiResponse<ChangeResponse> password(@RequestBody PasswordChangeRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                passwords.execute(identity.current(), input.oldPassword(), input.newPassword())));
+    public ChangeResponse password(@RequestBody PasswordChangeRequest input) {
+        return ChangeResponse.of(
+                passwords.execute(identity.current(), input.oldPassword(), input.newPassword()));
     }
 
     /**
@@ -84,8 +85,8 @@ public final class AuthController {
     @SaCheckLogin
     @PostMapping("/api/auth/logout")
     @Operation(summary = "退出当前会话")
-    public ApiResponse<Void> logout() {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout() {
         logout.execute(identity.current(), identity.token());
-        return ApiResponse.success(null);
     }
 }

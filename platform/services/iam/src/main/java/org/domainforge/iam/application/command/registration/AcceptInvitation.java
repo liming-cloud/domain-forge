@@ -9,8 +9,10 @@ import org.domainforge.iam.application.port.authentication.Passwords;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.application.port.operation.Identifiers;
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
+import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.domain.repository.InvitationRepository;
 import org.springframework.stereotype.Service;
@@ -58,7 +60,7 @@ public final class AcceptInvitation {
     public CommandResult execute(String secret, String loginName, String password) {
         if (secret == null || !secret.matches("[A-Za-z0-9_-]{43}"))
             throw new IamException(IamFailure.INVALID_REQUEST, "注册输入无效");
-        String name = Account.normalizeLoginName(loginName);
+        String name = new LoginName(loginName).value();
         String invitationDigest = secrets.digest(secret);
         String digest = passwords.encode(password);
         return transactions.execute(status -> register(invitationDigest, name, digest));
@@ -70,14 +72,9 @@ public final class AcceptInvitation {
     private CommandResult register(String invitationDigest, String name, String digest) {
         RegistrationInvitation invitation = invitations.lockByDigest(invitationDigest);
         if (invitation == null || !invitation.loginName().equals(name))
-            throw new IamException(IamFailure.CONFLICT, "邀请无效或已失效");
+            throw IamRuleViolation.conflict("INVITATION_UNUSABLE", "邀请无效或已失效");
         Account account = Account.register(identifiers.next(), name, digest);
-        RegistrationInvitation consumed;
-        try {
-            consumed = invitation.consume(account.id(), clock.now());
-        } catch (IllegalStateException e) {
-            throw new IamException(IamFailure.CONFLICT, "邀请无效或已失效");
-        }
+        RegistrationInvitation consumed = invitation.consume(account.id(), clock.now());
         accounts.insert(account);
         invitations.finish(consumed);
         audit.record(new AuditEvent("invitation-holder", account.id(), "invitation.accept"));

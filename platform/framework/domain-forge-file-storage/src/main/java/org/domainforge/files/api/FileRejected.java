@@ -1,16 +1,18 @@
 package org.domainforge.files.api;
 
+import org.domainforge.shared.BusinessRuleViolation;
+
 /**
- * 上传不符合策略。组件把它映射为业务拒绝（HTTP 200），代码见 {@link Reason}。
+ * 上传不符合策略。组件把它按类别转为 4xx，代码见 {@link Reason}。
  */
-public final class FileRejected extends RuntimeException {
+public final class FileRejected extends BusinessRuleViolation {
     private final Reason reason;
 
     /**
      * 原因决定稳定代码，提示可安全展示。
      */
     public FileRejected(Reason reason, String message) {
-        super(message);
+        super(reason.kind(), reason.code(), message);
         this.reason = reason;
     }
 
@@ -26,18 +28,27 @@ public final class FileRejected extends RuntimeException {
      */
     public enum Reason {
         /** 空文件。 */
-        EMPTY("FILE_EMPTY"),
+        EMPTY(Kind.UNPROCESSABLE, "FILE_EMPTY"),
         /** 超过大小上限。 */
-        TOO_LARGE("FILE_TOO_LARGE"),
+        TOO_LARGE(Kind.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE"),
         /** 类型不在白名单中。 */
-        TYPE_NOT_ALLOWED("FILE_TYPE_NOT_ALLOWED"),
+        TYPE_NOT_ALLOWED(Kind.UNPROCESSABLE, "FILE_TYPE_NOT_ALLOWED"),
         /** 清理后文件名为空。 */
-        NAME_INVALID("FILE_NAME_INVALID");
+        NAME_INVALID(Kind.UNPROCESSABLE, "FILE_NAME_INVALID");
 
+        private final Kind kind;
         private final String code;
 
-        Reason(String code) {
+        Reason(Kind kind, String code) {
+            this.kind = kind;
             this.code = code;
+        }
+
+        /**
+         * 违反的类别，决定协议状态。
+         */
+        public Kind kind() {
+            return kind;
         }
 
         /**

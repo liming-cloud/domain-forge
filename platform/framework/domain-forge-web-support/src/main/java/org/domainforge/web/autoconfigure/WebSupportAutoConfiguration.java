@@ -1,9 +1,8 @@
 package org.domainforge.web.autoconfigure;
 
-import org.domainforge.web.api.BusinessRejectionMapping;
 import org.domainforge.web.internal.AdviceConflicts;
+import org.domainforge.web.internal.MultipartExceptionAdvice;
 import org.domainforge.web.internal.PlatformExceptionAdvice;
-import org.domainforge.web.internal.RejectionMappings;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -15,32 +14,30 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import java.util.List;
 
 /**
- * Servlet MVC 专用默认装配；非 Web 容器不注册映射或 Advice。
+ * Servlet MVC 专用默认装配；非 Web 容器不注册 Advice。
  */
 @AutoConfiguration
 @ConditionalOnClass(DispatcherServlet.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class WebSupportAutoConfiguration {
     /**
-     * 固定所有公开扩展，无扩展时使用空表。
-     *
-     * @param mappings 消费方映射 Bean
-     * @return 已校验的映射表
-     */
-    @Bean
-    RejectionMappings rejectionMappings(List<BusinessRejectionMapping<?>> mappings) {
-        return new RejectionMappings(mappings);
-    }
-
-    /**
      * 注册仅适用于标记入口的异常处理器。
      *
-     * @param mappings 已校验映射
      * @return 平台内部 Advice
      */
     @Bean
-    PlatformExceptionAdvice platformExceptionAdvice(RejectionMappings mappings) {
-        return new PlatformExceptionAdvice(mappings);
+    PlatformExceptionAdvice platformExceptionAdvice() {
+        return new PlatformExceptionAdvice();
+    }
+
+    /**
+     * multipart 解析失败发生在选定处理器之前，需要全局接管。
+     *
+     * @return 平台内部 Advice
+     */
+    @Bean
+    MultipartExceptionAdvice multipartExceptionAdvice() {
+        return new MultipartExceptionAdvice();
     }
 
     /**

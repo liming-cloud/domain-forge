@@ -4,9 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 组织树规则：根受保护、移动不成环。
@@ -16,18 +16,18 @@ class OrganizationUnitTest {
 
     @Test
     void rootCannotMoveDisableOrDelete() {
-        assertThrows(IllegalStateException.class, () -> ROOT.changeEnabled(false));
-        assertThrows(IllegalStateException.class, () -> ROOT.moveTo(5, List.of(5L, 1L)));
-        assertThrows(IllegalStateException.class, ROOT::requireDeletable);
-        assertThrows(IllegalArgumentException.class, () -> new OrganizationUnit(2, null, "x", true, 1));
-        assertThrows(IllegalArgumentException.class, () -> new OrganizationUnit(1, 3L, "x", true, 1));
+        assertRule("ORG_ROOT_DISABLE", () -> ROOT.changeEnabled(false));
+        assertRule("ORG_ROOT_MOVE", () -> ROOT.moveTo(5, List.of(5L, 1L)));
+        assertRule("ORG_ROOT_DELETE", ROOT::requireDeletable);
+        assertRule("ORG_STATE_INVALID", () -> new OrganizationUnit(2, null, "x", true, 1));
+        assertRule("ORG_STATE_INVALID", () -> new OrganizationUnit(1, 3L, "x", true, 1));
     }
 
     @Test
     void moveRejectsSelfAndDescendants() {
         OrganizationUnit unit = OrganizationUnit.create(10, 1, "华东");
-        assertThrows(IllegalStateException.class, () -> unit.moveTo(10, List.of(10L, 1L)));
-        assertThrows(IllegalStateException.class, () -> unit.moveTo(11, List.of(11L, 10L, 1L)));
+        assertRule("ORG_MOVE_CYCLE", () -> unit.moveTo(10, List.of(10L, 1L)));
+        assertRule("ORG_MOVE_CYCLE", () -> unit.moveTo(11, List.of(11L, 10L, 1L)));
         OrganizationUnit moved = unit.moveTo(12, List.of(12L, 1L));
         assertEquals(12L, moved.parentId());
         assertEquals(2, moved.version());
@@ -36,7 +36,7 @@ class OrganizationUnitTest {
 
     @Test
     void nameIsBounded() {
-        assertThrows(IllegalArgumentException.class, () -> OrganizationUnit.create(10, 1, " "));
-        assertThrows(IllegalArgumentException.class, () -> OrganizationUnit.create(10, 1, "x".repeat(65)));
+        assertRule("NAME_INVALID", () -> OrganizationUnit.create(10, 1, " "));
+        assertRule("NAME_INVALID", () -> OrganizationUnit.create(10, 1, "x".repeat(65)));
     }
 }

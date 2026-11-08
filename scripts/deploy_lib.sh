@@ -6,8 +6,8 @@ fail() { echo "deploy_check=failed: $*" >&2; exit 1; }
 secret() { python3 -I -c 'import secrets; print(secrets.token_hex(24))'; }
 key() { python3 -I -c 'import base64, secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())'; }
 free_port() { python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
-field() { python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"][sys.argv[1]])' "$1"; }
-size() { python3 -I -c 'import json, sys; print(len(json.load(sys.stdin)["data"]))'; }
+field() { python3 -I -c 'import json, sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
+size() { python3 -I -c 'import json, sys; print(len(json.load(sys.stdin)))'; }
 sql() { compose exec -T postgres psql -U domainforge -d domainforge -tAc "$1"; }
 
 # write_env <入口端口> [额外行...]：生成带随机密钥的环境文件

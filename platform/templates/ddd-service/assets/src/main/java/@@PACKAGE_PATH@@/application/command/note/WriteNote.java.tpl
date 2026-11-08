@@ -13,7 +13,6 @@ import org.domainforge.shared.CurrentScope;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.function.Supplier;
 
 /**
  * 便笺命令：权限码由入口声明检查，数据范围在用例内按目标对象核对，写入在一个本地事务中完成。
@@ -47,7 +46,7 @@ public class WriteNote {
     public NoteChange create(Long unitId, String title, String content) {
         long account = access.current().accountId();
         CurrentScope scope = scopes.scope(NotePermissions.WRITE);
-        Note note = rules(() -> Note.create(ids.next(), account, unitId, title, content));
+        Note note = Note.create(ids.next(), account, unitId, title, content);
         if (!Note.creatable(unitId, scope.all(), scope.self(), scope.unitIds()))
             throw new AccessException(AccessFailure.FORBIDDEN);
         notes.insert(note);
@@ -64,19 +63,11 @@ public class WriteNote {
         CurrentScope scope = scopes.scope(NotePermissions.WRITE);
         Note current = notes.lock(id);
         if (current == null || !current.within(account, scope.all(), scope.self(), scope.unitIds()))
-            throw new NoteRejected("NOTE_NOT_FOUND", "便笺不存在");
-        if (current.version() != version) throw new NoteRejected("NOTE_CONFLICT", "便笺已被修改，请刷新后重试");
-        Note changed = rules(() -> current.edit(title, content));
+            throw NoteRejected.notFound("NOTE_NOT_FOUND", "便笺不存在");
+        if (current.version() != version) throw NoteRejected.conflict("NOTE_CONFLICT", "便笺已被修改，请刷新后重试");
+        Note changed = current.edit(title, content);
         if (changed != current && !notes.update(changed, current.version()))
-            throw new NoteRejected("NOTE_CONFLICT", "便笺已被修改，请刷新后重试");
+            throw NoteRejected.conflict("NOTE_CONFLICT", "便笺已被修改，请刷新后重试");
         return new NoteChange(changed.id(), changed.version());
-    }
-
-    private static Note rules(Supplier<Note> transition) {
-        try {
-            return transition.get();
-        } catch (IllegalArgumentException rejected) {
-            throw new NoteRejected("NOTE_INVALID", rejected.getMessage());
-        }
     }
 }

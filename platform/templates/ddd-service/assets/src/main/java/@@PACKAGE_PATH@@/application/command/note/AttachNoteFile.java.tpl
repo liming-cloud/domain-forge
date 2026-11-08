@@ -54,7 +54,7 @@ public class AttachNoteFile {
         long account = access.current().accountId();
         Note note = writable(account, noteId);
         if (!Note.attachable(attachments.count(note.id())))
-            throw new NoteRejected("NOTE_FILES_FULL", "每条便笺最多 " + Note.MAX_FILES + " 个附件");
+            throw NoteRejected.unprocessable("NOTE_FILES_FULL", "每条便笺最多 " + Note.MAX_FILES + " 个附件");
         StoredFile stored = files.store(new FileUpload(name, contentType, content, account), POLICY);
         attachments.add(note.id(), stored.id());
         return stored;
@@ -67,7 +67,7 @@ public class AttachNoteFile {
     public void detach(long noteId, String fileId) {
         Note note = writable(access.current().accountId(), noteId);
         if (!attachments.remove(note.id(), fileId))
-            throw new NoteRejected("NOTE_FILE_NOT_FOUND", "附件不存在");
+            throw NoteRejected.notFound("NOTE_FILE_NOT_FOUND", "附件不存在");
         files.delete(fileId);
     }
 
@@ -75,7 +75,7 @@ public class AttachNoteFile {
         CurrentScope scope = scopes.scope(NotePermissions.WRITE);
         Note note = notes.lock(noteId);
         if (note == null || !note.within(account, scope.all(), scope.self(), scope.unitIds()))
-            throw new NoteRejected("NOTE_NOT_FOUND", "便笺不存在");
+            throw NoteRejected.notFound("NOTE_NOT_FOUND", "便笺不存在");
         return note;
     }
 }

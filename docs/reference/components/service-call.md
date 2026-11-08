@@ -11,7 +11,7 @@
 | 环节 | 官方做法 | 平台实现 |
 |---|---|---|
 | 网关转发 | 全局过滤器为请求加 `SA-SAME-TOKEN: SaSameUtil.getToken()` | 网关 `SameTokenRelayFilter`（先删除客户端自带的同名头） |
-| 子服务校验 | 注册 `SaServletFilter`，`setAuth` 中 `SaSameUtil.checkCurrentRequestToken()` | access-control 组件注册该过滤器（顺序 -100，在 Sa-Token 上下文过滤器之后），`setError` 返回平台外壳：不符 401，存储不可用 503 |
+| 子服务校验 | 注册 `SaServletFilter`，`setAuth` 中 `SaSameUtil.checkCurrentRequestToken()` | access-control 组件注册该过滤器（顺序 -100，在 Sa-Token 上下文过滤器之后），`setError` 返回 Problem Details：不符 401，存储不可用 503 |
 | 服务间调用 | Feign `RequestInterceptor` 加 Same-Token；需要被调方有会话时同时加用户令牌 | 本组件的 `IdentityPropagation` |
 | 刷新 | 专门的定时任务按固定间隔 `refreshToken()`，间隔低于有效期；集群中不要多处重复刷新 | 网关每 30 分钟（`domainforge.gateway.same-token-refresh-interval`）在分布式锁内刷新，当前值未满一个间隔则跳过 |
 
@@ -25,14 +25,14 @@
 | 超时 | 连接 1 秒、读取 2 秒，不跟随重定向；个别客户端在 `spring.cloud.openfeign.client.config.<contextId>` 覆盖 |
 | 实例列表 | 关闭负载均衡层的实例缓存，直接取 Nacos 发现客户端订阅的列表，被调服务重建后不再使用旧地址 |
 | 重试 | Feign 与负载均衡层都不重试；是否重试由调用方按接口的幂等合同决定（[F-03](../../rules/09-故障与可观测性.md#f-03-一条调用链只有一处负责重试)） |
-| 失败 | 统一抛出 `ServiceCallException`，分类见下表；消息为固定文本，不带对方的提示、地址或令牌 |
-| 外壳 | `ServiceCalls.data(response)`：只有 `SUCCESS` 返回数据，其他代码为对方的业务拒绝 |
+| 失败 | 统一抛出 `ServiceCallException`（继承 `DependencyUnavailableException`，调用方不翻译时按 503 返回），分类见下表；消息为固定文本，不带对方的提示、地址或令牌 |
+| 成功响应 | 直接是资源，Feign 客户端返回业务类型；对方的失败为 Problem Details，组件读取其 `code` |
 
 | 分类 | 来源 | 含义 |
 |---|---|---|
 | `UNAUTHENTICATED` | 401 | 对方判定未认证（用户令牌失效，或 Same-Token 不符） |
 | `FORBIDDEN` | 403 | 对方判定无权限 |
-| `REJECTED` | 其他 4xx；200 外壳中的非 `SUCCESS` 代码 | 对方的拒绝，`code()` 为对方代码 |
+| `REJECTED` | 其他 4xx | 对方的拒绝，`code()` 为对方代码 |
 | `UNAVAILABLE` | 连接失败、无可用实例、5xx（504 除外）、响应缺失 | 请求确定没有被处理 |
 | `UNKNOWN` | 读取超时、连接中断、504 | 请求已发出，远端可能已经执行（[S-15](../../rules/02-系统设计.md#s-15-结果未知不能当成功)） |
 
@@ -42,7 +42,7 @@
 
 ```
 application/port/<对方>/...        端口：技术无关的读取或命令，失败以本服务的语义报告
-infrastructure/acl/<对方>/...      Feign 客户端（只声明路径与参数）＋ 端口实现（ServiceCalls.data 与失败翻译）
+infrastructure/acl/<对方>/...      Feign 客户端（只声明路径与参数）＋ 端口实现（失败翻译）
 ```
 
 - 以当前用户身份调用时，调用方入口至少要求登录；能读到什么由被调方按同一用户的权限与范围决定，调用方不放宽。

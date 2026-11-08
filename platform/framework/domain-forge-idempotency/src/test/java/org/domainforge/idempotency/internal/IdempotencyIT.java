@@ -5,6 +5,7 @@ import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.stp.StpLogic;
 import org.domainforge.access.api.SameTokens;
 import org.domainforge.idempotency.api.Idempotent;
+import org.domainforge.web.api.PlatformJsonApi;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -214,6 +215,7 @@ class IdempotencyIT {
      * 测试入口：订单创建（幂等，返回 201）、总是失败的入口（幂等）、普通入口。
      */
     @RestController
+    @PlatformJsonApi
     static class Orders {
         private final AtomicInteger ids = new AtomicInteger();
 

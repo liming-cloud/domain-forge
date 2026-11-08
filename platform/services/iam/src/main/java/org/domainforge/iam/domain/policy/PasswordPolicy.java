@@ -1,5 +1,7 @@
 package org.domainforge.iam.domain.policy;
 
+import org.domainforge.iam.domain.IamRuleViolation;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
@@ -21,7 +23,7 @@ public final class PasswordPolicy {
      */
     public void requireNew(String password) {
         requireInput(password);
-        if (blocked.contains(password)) throw new IllegalArgumentException("密码过于常见");
+        if (blocked.contains(password)) throw IamRuleViolation.invalid("PASSWORD_COMMON", "密码过于常见");
     }
 
     /**
@@ -33,7 +35,7 @@ public final class PasswordPolicy {
                 || password.codePointCount(0, password.length()) > 128
                 || password.getBytes(StandardCharsets.UTF_8).length > 512
                 || password.codePoints().anyMatch(c -> c >= 0xD800 && c <= 0xDFFF)) {
-            throw new IllegalArgumentException("密码须为15至128个Unicode码点且最多512字节");
+            throw IamRuleViolation.invalid("PASSWORD_LENGTH_INVALID", "密码须为15至128个Unicode码点且最多512字节");
         }
     }
 }

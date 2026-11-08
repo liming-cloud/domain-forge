@@ -10,6 +10,7 @@ import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
@@ -63,7 +64,7 @@ public final class Login {
      * <p>令牌只在 SQL 许可提交成功后返回；任何失败都尽力撤销已签发的原生会话。
      */
     public LoginResult execute(String loginName, String password, String directAddress) {
-        String name = Account.normalizeLoginName(loginName);
+        String name = new LoginName(loginName).value();
         var reservation = protection.reserve(name, directAddress);
         Account verified = accounts.findByLoginName(name);
         boolean matches = passwords.matches(password, verified == null ? null : verified.credentialDigest());

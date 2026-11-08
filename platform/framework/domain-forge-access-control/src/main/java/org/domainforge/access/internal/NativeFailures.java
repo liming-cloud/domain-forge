@@ -4,7 +4,7 @@ import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
 import org.domainforge.access.api.AccessException;
-import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 
 /**
  * 原生读取的统一失败边界：身份失效保留原生分类但去掉令牌，存储故障转为不可用，不改写授权判定。
@@ -22,7 +22,7 @@ final class NativeFailures {
                 || failure instanceof NotRoleException
                 || failure instanceof AccessException)
             return failure;
-        return new AccessException(AccessFailure.UNAVAILABLE);
+        return new AccessUnavailableException();
     }
 
     /**

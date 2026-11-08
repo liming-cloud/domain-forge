@@ -128,9 +128,10 @@ class NoteServiceIT {
         String path = exchange.getRequestURI().getPath();
         String body = path.endsWith("/current") ? SUBJECTS.get(token) : SCOPES.get(token);
         int status = IAM_DOWN.get() ? 503 : body == null || !internal ? 401 : 200;
-        byte[] bytes = (status == 200 ? "{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":" + body + "}"
-                : "{\"code\":\"X\",\"message\":\"x\",\"data\":null}").getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        byte[] bytes = (status == 200 ? body
+                : "{\"type\":\"about:blank\",\"status\":" + status + ",\"detail\":\"x\",\"code\":\"X\"}")
+                .getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", status == 200 ? "application/json" : "application/problem+json");
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
@@ -212,6 +213,18 @@ class NoteServiceIT {
         return JSON.readTree(response.body());
     }
 
+    // 失败统一为 Problem Details：状态码、类型与扩展字段 code 都确定。
+    private static void assertProblem(int status, String code, HttpResponse<?> response) {
+        assertEquals(status, response.statusCode());
+        assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("application/problem+json"),
+                response.headers().toString());
+        String body = response.body() instanceof byte[] bytes
+                ? new String(bytes, StandardCharsets.UTF_8) : String.valueOf(response.body());
+        var problem = JSON.readTree(body);
+        assertEquals(status, problem.get("status").asInt());
+        assertEquals(code, problem.get("code").asString());
+    }
+
     private static final String READ = NotePermissions.READ;
     private static final String WRITE = NotePermissions.WRITE;
     private static final String BOTH = "\"" + READ + "\",\"" + WRITE + "\"";
@@ -237,18 +250,19 @@ class NoteServiceIT {
     void scopesDecideWritesAndVisibility() throws Exception {
         String east = user(101, BOTH, scope(false, true, "\"10\""), scope(false, true, "\"10\""));
         var created = call("POST", "/api/notes", east, "{\"unitId\":\"10\",\"title\":\"华东\",\"content\":\"a\"}");
-        assertEquals("SUCCESS", json(created).get("code").asString());
+        assertEquals(200, created.statusCode());
+        assertNotNull(json(created).get("id"));
         assertEquals(403, call("POST", "/api/notes", east, "{\"unitId\":\"20\",\"title\":\"越界\",\"content\":\"\"}")
                 .statusCode());
         String self = user(102, BOTH, scope(false, true, ""), scope(false, true, ""));
         call("POST", "/api/notes", self, "{\"title\":\"本人\",\"content\":\"\"}");
-        assertEquals(1, json(call("GET", "/api/notes", self, null)).get("data").size());
-        assertEquals(1, json(call("GET", "/api/notes", east, null)).get("data").size());
+        assertEquals(1, json(call("GET", "/api/notes", self, null)).size());
+        assertEquals(1, json(call("GET", "/api/notes", east, null)).size());
         String all = user(103, "\"" + READ + "\"", scope(true, false, ""), scope(false, false, ""));
-        assertEquals(2, json(call("GET", "/api/notes", all, null)).get("data").size());
+        assertEquals(2, json(call("GET", "/api/notes", all, null)).size());
         String none = user(104, "\"" + READ + "\"", scope(false, false, ""), scope(false, false, ""));
-        assertEquals(0, json(call("GET", "/api/notes", none, null)).get("data").size());
-        assertEquals(1, json(call("GET", "/api/me/notes", east, null)).get("data").size());
+        assertEquals(0, json(call("GET", "/api/notes", none, null)).size());
+        assertEquals(1, json(call("GET", "/api/me/notes", east, null)).size());
     }
 
     // 创建便笺与 NoteCreated 同事务写入 Outbox；被拒绝的创建（业务回滚）不留下事件。
@@ -256,7 +270,7 @@ class NoteServiceIT {
     void creationPublishesEventInSameTransaction() throws Exception {
         String writer = user(601, BOTH, scope(false, true, ""), scope(false, true, ""));
         String id = json(call("POST", "/api/notes", writer, "{\"title\":\"有事件\",\"content\":\"\"}"))
-                .get("data").get("id").asString();
+                .get("id").asString();
         call("POST", "/api/notes", writer, "{\"title\":\" \",\"content\":\"\"}");
         var jdbc = application.getBean(JdbcTemplate.class);
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
@@ -267,23 +281,23 @@ class NoteServiceIT {
         assertTrue(event.get("payload").toString().contains("\"ownerId\":\"601\""));
     }
 
-    // 权限码缺失 403；过期版本为业务冲突（HTTP 200 + 稳定代码）；范围外对象按不存在处理。
+    // 权限码缺失 403；过期版本为 409 + 稳定代码；范围外对象按不存在处理。
     @Test
     void permissionsVersionsAndHiddenObjects() throws Exception {
         String writer = user(201, BOTH, scope(false, true, ""), scope(false, true, ""));
         String reader = user(202, "\"" + READ + "\"", scope(true, false, ""), scope(false, false, ""));
         assertEquals(403, call("POST", "/api/notes", reader, "{\"title\":\"x\",\"content\":\"\"}").statusCode());
         String id = json(call("POST", "/api/notes", writer, "{\"title\":\"原\",\"content\":\"\"}"))
-                .get("data").get("id").asString();
+                .get("id").asString();
         var edited = call("PUT", "/api/notes/" + id, writer, edit(1, "新"));
-        assertEquals(2, json(edited).get("data").get("version").asInt());
+        assertEquals(2, json(edited).get("version").asInt());
         var stale = call("PUT", "/api/notes/" + id, writer, edit(1, "旧"));
-        assertEquals("NOTE_CONFLICT", json(stale).get("code").asString());
+        assertProblem(409, "NOTE_CONFLICT", stale);
         String other = user(203, BOTH, scope(false, true, ""), scope(false, true, ""));
         var hidden = call("PUT", "/api/notes/" + id, other, edit(2, "改"));
-        assertEquals("NOTE_NOT_FOUND", json(hidden).get("code").asString());
+        assertProblem(404, "NOTE_NOT_FOUND", hidden);
         var invalid = call("POST", "/api/notes", writer, "{\"title\":\" \",\"content\":\"\"}");
-        assertEquals("NOTE_INVALID", json(invalid).get("code").asString());
+        assertProblem(400, "NOTE_INVALID", invalid);
     }
 
     // 幂等创建：同一 Idempotency-Key 的重复提交返回首次结果，只有一条便笺与一个事件；同一键换了内容 422。
@@ -302,7 +316,7 @@ class NoteServiceIT {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
         var reused = keyed(writer, key, "{\"title\":\"换了内容\",\"content\":\"\"}");
         assertEquals(422, reused.statusCode());
-        assertEquals("IDEMPOTENCY_KEY_REUSED", json(reused).get("code").asString());
+        assertProblem(422, "IDEMPOTENCY_KEY_REUSED", reused);
         assertEquals(200, keyed(writer, UUID.randomUUID().toString(), body).statusCode(), "新的键再创建一条");
         assertEquals(200, call("POST", "/api/notes", writer, body).statusCode(), "不带键照常创建");
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM note WHERE owner_id = 801", Integer.class));
@@ -323,11 +337,10 @@ class NoteServiceIT {
     void archiveGoesToSecondDatabase() throws Exception {
         String writer = user(901, BOTH, scope(false, true, ""), scope(false, true, ""));
         String note = json(call("POST", "/api/notes", writer, "{\"title\":\"归档前\",\"content\":\"a\"}"))
-                .get("data").get("id").asString();
-        assertEquals("NOTE_NOT_ARCHIVED", json(call("GET", "/api/notes/" + note + "/archive", writer, null))
-                .get("code").asString());
+                .get("id").asString();
+        assertProblem(409, "NOTE_NOT_ARCHIVED", call("GET", "/api/notes/" + note + "/archive", writer, null));
         assertEquals("归档前", json(call("POST", "/api/notes/" + note + "/archive", writer, null))
-                .get("data").get("title").asString());
+                .get("title").asString());
         assertEquals("@@SCHEMA@@_archive", archive().queryForObject("SELECT current_database()", String.class));
         assertEquals(1, archive().queryForObject("SELECT count(*) FROM note_archive WHERE note_id = ?",
                 Integer.class, Long.parseLong(note)));
@@ -335,28 +348,27 @@ class NoteServiceIT {
                 "SELECT count(*) FROM information_schema.tables WHERE table_name = 'note_archive'", Integer.class));
         call("PUT", "/api/notes/" + note, writer, edit(1, "改后"));
         call("POST", "/api/notes/" + note + "/archive", writer, null);
-        var archived = json(call("GET", "/api/notes/" + note + "/archive", writer, null)).get("data");
+        var archived = json(call("GET", "/api/notes/" + note + "/archive", writer, null));
         assertEquals("改后", archived.get("title").asString());
         assertEquals(2, archived.get("version").asInt());
         String other = user(902, BOTH, scope(false, true, ""), scope(false, true, ""));
-        assertEquals("NOTE_NOT_FOUND", json(call("POST", "/api/notes/" + note + "/archive", other, null))
-                .get("code").asString());
-        assertEquals("NOTE_NOT_FOUND", json(call("GET", "/api/notes/" + note + "/archive", other, null))
-                .get("code").asString());
+        assertProblem(404, "NOTE_NOT_FOUND", call("POST", "/api/notes/" + note + "/archive", other, null));
+        assertProblem(404, "NOTE_NOT_FOUND", call("GET", "/api/notes/" + note + "/archive", other, null));
     }
 
     // 附件经本服务转发：写范围内上传，读范围内列出与下载（附件响应、内容一致），范围外的便笺按不存在处理；
-    // 不允许的类型为业务拒绝，超过 multipart 上限 413；删除后读取不到。
+    // 不允许的类型为 422，超过 multipart 上限 413；删除后读取不到。
     @Test
     void attachmentsFollowNoteScopes() throws Exception {
         String writer = user(701, BOTH, scope(false, true, ""), scope(false, true, ""));
         String note = json(call("POST", "/api/notes", writer, "{\"title\":\"带附件\",\"content\":\"\"}"))
-                .get("data").get("id").asString();
+                .get("id").asString();
         byte[] content = "第一季度".getBytes(StandardCharsets.UTF_8);
-        var uploaded = json(upload(note, writer, "报告.txt", "text/plain", content));
-        assertEquals("SUCCESS", uploaded.get("code").asString(), uploaded.toString());
-        String file = uploaded.get("data").get("id").asString();
-        var listed = json(call("GET", "/api/notes/" + note + "/files", writer, null)).get("data");
+        var upload = upload(note, writer, "报告.txt", "text/plain", content);
+        assertEquals(200, upload.statusCode(), upload.body());
+        var uploaded = json(upload);
+        String file = uploaded.get("id").asString();
+        var listed = json(call("GET", "/api/notes/" + note + "/files", writer, null));
         assertEquals(1, listed.size());
         assertEquals("报告.txt", listed.get(0).get("name").asString());
         assertEquals(content.length, listed.get(0).get("size").asInt());
@@ -367,28 +379,20 @@ class NoteServiceIT {
         assertEquals("nosniff", downloaded.headers().firstValue("X-Content-Type-Options").orElse(null));
 
         String other = user(702, BOTH, scope(false, true, ""), scope(false, true, ""));
-        assertEquals("NOTE_NOT_FOUND", json(call("GET", "/api/notes/" + note + "/files", other, null))
-                .get("code").asString());
-        assertEquals("NOTE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/" + file, other)
-                .body()).get("code").asString());
-        assertEquals("NOTE_NOT_FOUND", json(upload(note, other, "a.txt", "text/plain", content))
-                .get("code").asString());
+        assertProblem(404, "NOTE_NOT_FOUND", call("GET", "/api/notes/" + note + "/files", other, null));
+        assertProblem(404, "NOTE_NOT_FOUND", download("/api/notes/" + note + "/files/" + file, other));
+        assertProblem(404, "NOTE_NOT_FOUND", upload(note, other, "a.txt", "text/plain", content));
         String reader = user(703, "\"" + READ + "\"", scope(true, false, ""), scope(false, false, ""));
         assertEquals(403, upload(note, reader, "a.txt", "text/plain", content).statusCode());
 
-        assertEquals("FILE_TYPE_NOT_ALLOWED", json(upload(note, writer, "a.html", "text/html", content))
-                .get("code").asString());
+        assertProblem(422, "FILE_TYPE_NOT_ALLOWED", upload(note, writer, "a.html", "text/html", content));
         var tooLarge = upload(note, writer, "big.txt", "text/plain", new byte[100 * 1024]);
-        assertEquals(413, tooLarge.statusCode());
-        assertEquals("PAYLOAD_TOO_LARGE", json(tooLarge).get("code").asString());
-        assertEquals("NOTE_FILE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/"
-                + UUID.randomUUID(), writer).body()).get("code").asString());
+        assertProblem(413, "PAYLOAD_TOO_LARGE", tooLarge);
+        assertProblem(404, "NOTE_FILE_NOT_FOUND", download("/api/notes/" + note + "/files/" + UUID.randomUUID(), writer));
 
-        assertEquals("SUCCESS", json(call("DELETE", "/api/notes/" + note + "/files/" + file, writer, null))
-                .get("code").asString());
-        assertEquals("NOTE_FILE_NOT_FOUND", JSON.readTree(download("/api/notes/" + note + "/files/" + file, writer)
-                .body()).get("code").asString());
-        assertEquals(0, json(call("GET", "/api/notes/" + note + "/files", writer, null)).get("data").size());
+        assertEquals(204, call("DELETE", "/api/notes/" + note + "/files/" + file, writer, null).statusCode());
+        assertProblem(404, "NOTE_FILE_NOT_FOUND", download("/api/notes/" + note + "/files/" + file, writer));
+        assertEquals(0, json(call("GET", "/api/notes/" + note + "/files", writer, null)).size());
         assertNotNull(application.getBean(JdbcTemplate.class).queryForObject(
                 "SELECT deleted_at FROM domainforge_file WHERE id = ?", java.sql.Timestamp.class, file));
     }
@@ -421,7 +425,7 @@ class NoteServiceIT {
     void iamFailureIsUnavailable() throws Exception {
         String token = user(301, BOTH, scope(true, false, ""), scope(true, false, ""));
         IAM_DOWN.set(true);
-        assertEquals(503, call("GET", "/api/notes", token, null).statusCode());
+        assertProblem(503, "SERVICE_UNAVAILABLE", call("GET", "/api/notes", token, null));
         IAM_DOWN.set(false);
         assertEquals(200, call("GET", "/api/notes", token, null).statusCode());
     }

@@ -7,7 +7,7 @@
 | 能力 | 行为 |
 |---|---|
 | 会话与权限执行 | 直接使用 Sa-Token 原生类／方法注解；令牌只从 `Authorization: Bearer <token>` 读取；会话存于 Redis，使用官方 Redisson DAO，与 [cache](cache.md) 共用同一个 `RedissonClient` |
-| 默认拒绝 | 入口未声明访问策略即拒绝，安全失败返回平台错误外壳（401／403／503，见[错误码](../错误码.md)） |
+| 默认拒绝 | 入口未声明访问策略即拒绝，安全失败返回Problem Details（401／403／503，见[错误码](../错误码.md)） |
 | Same-Token 校验 | 注册 `SaServletFilter`（顺序 -100，在 Sa-Token 上下文过滤器之后），`setAuth` 中 `SaSameUtil.checkCurrentRequestToken()`，接受当前值与上一个值：缺失或不符 401，会话 Redis 不可用 503。管理端点在独立端口，不经过该过滤器 |
 | 开关 | `domainforge.access.same-token.enabled` 默认开启，只允许本地开发与测试关闭；启用 `config-center` profile（部署环境）时关闭会使启动失败 |
 

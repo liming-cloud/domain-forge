@@ -11,7 +11,6 @@ import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess
 import org.domainforge.iam.application.query.account.AccountQueries;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.protocol.StateRequest;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,8 +52,8 @@ public final class AccountController {
     @SaCheckLogin
     @GetMapping("/api/me")
     @Operation(summary = "读取本人最小资料")
-    public ApiResponse<AccountResponse> me() {
-        return ApiResponse.success(AccountResponse.of(queries.self(access.current().accountId())));
+    public AccountResponse me() {
+        return AccountResponse.of(queries.self(access.current().accountId()));
     }
 
     /**
@@ -63,9 +62,9 @@ public final class AccountController {
     @SaCheckPermission("iam:account:read")
     @GetMapping("/api/accounts")
     @Operation(summary = "分页查询账号")
-    public ApiResponse<AccountPageResponse> accounts(
+    public AccountPageResponse accounts(
             @RequestParam(defaultValue = "0") long after, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(AccountPageResponse.of(queries.list(after, limit)));
+        return AccountPageResponse.of(queries.list(after, limit));
     }
 
     /**
@@ -74,10 +73,10 @@ public final class AccountController {
     @SaCheckPermission("iam:account:read")
     @GetMapping("/api/accounts/{id}")
     @Operation(summary = "读取账号详情")
-    public ApiResponse<AccountDetailResponse> account(@PathVariable long id) {
+    public AccountDetailResponse account(@PathVariable long id) {
         var detail = queries.detail(id);
         if (detail == null) throw new IamException(IamFailure.CONFLICT, "账号不存在");
-        return ApiResponse.success(AccountDetailResponse.of(detail));
+        return AccountDetailResponse.of(detail);
     }
 
     /**
@@ -86,9 +85,9 @@ public final class AccountController {
     @SaCheckPermission("iam:account:state")
     @PutMapping("/api/accounts/{id}/state")
     @Operation(summary = "变更账号启用状态")
-    public ApiResponse<ChangeResponse> state(@PathVariable long id, @RequestBody StateRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.state(
-                identity.current().tokenDigest(), id, input.expectedVersion(), input.enabled())));
+    public ChangeResponse state(@PathVariable long id, @RequestBody StateRequest input) {
+        return ChangeResponse.of(management.state(
+                identity.current().tokenDigest(), id, input.expectedVersion(), input.enabled()));
     }
 
     /**
@@ -97,9 +96,9 @@ public final class AccountController {
     @SaCheckPermission("iam:account:role")
     @PutMapping("/api/accounts/{id}/roles")
     @Operation(summary = "分配账号角色")
-    public ApiResponse<ChangeResponse> roles(@PathVariable long id, @RequestBody RolesRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.roles(
-                identity.current().tokenDigest(), id, input.expectedVersion(), new HashSet<>(input.roleIds()))));
+    public ChangeResponse roles(@PathVariable long id, @RequestBody RolesRequest input) {
+        return ChangeResponse.of(management.roles(
+                identity.current().tokenDigest(), id, input.expectedVersion(), new HashSet<>(input.roleIds())));
     }
 
     /**
@@ -108,8 +107,8 @@ public final class AccountController {
     @SaCheckPermission("iam:member:manage")
     @PutMapping("/api/accounts/{id}/memberships")
     @Operation(summary = "变更成员归属")
-    public ApiResponse<ChangeResponse> memberships(@PathVariable long id, @RequestBody MembershipsRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.memberships(
-                identity.current().tokenDigest(), id, input.expectedVersion(), input.toDomain())));
+    public ChangeResponse memberships(@PathVariable long id, @RequestBody MembershipsRequest input) {
+        return ChangeResponse.of(management.memberships(
+                identity.current().tokenDigest(), id, input.expectedVersion(), input.toDomain()));
     }
 }

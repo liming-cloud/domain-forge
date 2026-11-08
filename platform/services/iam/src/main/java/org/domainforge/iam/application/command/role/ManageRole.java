@@ -2,7 +2,7 @@ package org.domainforge.iam.application.command.role;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.command.DomainRules;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
@@ -58,7 +58,7 @@ public class ManageRole {
     @Transactional
     public CommandResult create(String tokenDigest, String code, String name) {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
-        Role role = DomainRules.apply(() -> Role.create(identifiers.next(), code, name));
+        Role role = Role.create(identifiers.next(), code, name);
         if (roles.codeTaken(role.code())) throw new IamException(IamFailure.CONFLICT, "角色代码已存在");
         roles.insert(role);
         record(actor, role.id(), "role.create");
@@ -70,10 +70,10 @@ public class ManageRole {
      */
     @Transactional
     public CommandResult rename(String tokenDigest, long id, long version, String name) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         Role current = lock(id, version);
-        return save(actor, current, DomainRules.apply(() -> current.rename(name)), "role.update");
+        return save(actor, current, current.rename(name), "role.update");
     }
 
     /**
@@ -81,10 +81,10 @@ public class ManageRole {
      */
     @Transactional
     public CommandResult state(String tokenDigest, long id, long version, boolean enabled) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         Role current = lock(id, version);
-        return save(actor, current, DomainRules.apply(() -> current.changeEnabled(enabled)), "role.state");
+        return save(actor, current, current.changeEnabled(enabled), "role.state");
     }
 
     /**
@@ -92,7 +92,7 @@ public class ManageRole {
      */
     @Transactional
     public CommandResult grants(String tokenDigest, long id, long version, Set<PermissionGrant> grants) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         if (grants == null || grants.size() > PermissionCatalog.MAX_TOTAL)
             throw new IamException(IamFailure.INVALID_REQUEST, "授予无效");
         organizations.lockStructure();
@@ -101,11 +101,11 @@ public class ManageRole {
         Role current = lock(id, version);
         var definitions = catalog.find(grants.stream().map(PermissionGrant::permission).toList());
         for (PermissionGrant grant : grants) {
-            DomainRules.check(() -> grant.requireCompatible(definitions.get(grant.permission()), current.system()));
+            grant.requireCompatible(definitions.get(grant.permission()), current.system());
             if (organizations.existing(grant.unitIds()) != grant.unitIds().size())
                 throw new IamException(IamFailure.CONFLICT, "范围中的组织不存在");
         }
-        return save(actor, current, DomainRules.apply(() -> current.replaceGrants(grants)), "role.grants");
+        return save(actor, current, current.replaceGrants(grants), "role.grants");
     }
 
     /**
@@ -113,10 +113,10 @@ public class ManageRole {
      */
     @Transactional
     public void delete(String tokenDigest, long id, long version) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         Role current = lock(id, version);
-        DomainRules.check(current::requireDeletable);
+        current.requireDeletable();
         if (roles.assignments(id) > 0) throw new IamException(IamFailure.CONFLICT, "角色仍分配给账号，先撤销分配");
         roles.delete(id);
         record(actor, id, "role.delete");
@@ -124,7 +124,7 @@ public class ManageRole {
 
     private Role lock(long id, long version) {
         Role role = roles.lock(id);
-        return DomainRules.requireCurrent(role, role == null ? 0 : role.version(), version);
+        return ExpectedVersion.current(role, role == null ? 0 : role.version(), version);
     }
 
     private CommandResult save(CurrentIdentity actor, Role current, Role changed, String action) {

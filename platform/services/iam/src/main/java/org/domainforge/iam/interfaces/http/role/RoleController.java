@@ -10,8 +10,8 @@ import org.domainforge.iam.application.query.role.RoleQueries;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.protocol.RenameRequest;
 import org.domainforge.iam.interfaces.http.protocol.StateRequest;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -48,8 +49,8 @@ public final class RoleController {
     @SaCheckPermission("iam:role:read")
     @GetMapping("/api/roles")
     @Operation(summary = "查询角色")
-    public ApiResponse<List<RoleResponse>> roles() {
-        return ApiResponse.success(queries.list().stream().map(RoleResponse::of).toList());
+    public List<RoleResponse> roles() {
+        return queries.list().stream().map(RoleResponse::of).toList();
     }
 
     /**
@@ -58,10 +59,10 @@ public final class RoleController {
     @SaCheckPermission("iam:role:read")
     @GetMapping("/api/roles/{id}")
     @Operation(summary = "读取角色详情")
-    public ApiResponse<RoleDetailResponse> role(@PathVariable long id) {
+    public RoleDetailResponse role(@PathVariable long id) {
         var detail = queries.detail(id);
         if (detail == null) throw new IamException(IamFailure.CONFLICT, "角色不存在");
-        return ApiResponse.success(RoleDetailResponse.of(detail));
+        return RoleDetailResponse.of(detail);
     }
 
     /**
@@ -70,8 +71,8 @@ public final class RoleController {
     @SaCheckPermission("iam:role:manage")
     @PostMapping("/api/roles")
     @Operation(summary = "创建角色")
-    public ApiResponse<ChangeResponse> create(@RequestBody CreateRoleRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.create(digest(), input.code(), input.name())));
+    public ChangeResponse create(@RequestBody CreateRoleRequest input) {
+        return ChangeResponse.of(management.create(digest(), input.code(), input.name()));
     }
 
     /**
@@ -80,9 +81,9 @@ public final class RoleController {
     @SaCheckPermission("iam:role:manage")
     @PutMapping("/api/roles/{id}/name")
     @Operation(summary = "修改角色名称")
-    public ApiResponse<ChangeResponse> rename(@PathVariable long id, @RequestBody RenameRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.rename(digest(), id, input.expectedVersion(), input.name())));
+    public ChangeResponse rename(@PathVariable long id, @RequestBody RenameRequest input) {
+        return ChangeResponse.of(
+                management.rename(digest(), id, input.expectedVersion(), input.name()));
     }
 
     /**
@@ -91,9 +92,9 @@ public final class RoleController {
     @SaCheckPermission("iam:role:manage")
     @PutMapping("/api/roles/{id}/state")
     @Operation(summary = "启停角色")
-    public ApiResponse<ChangeResponse> state(@PathVariable long id, @RequestBody StateRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.state(digest(), id, input.expectedVersion(), input.enabled())));
+    public ChangeResponse state(@PathVariable long id, @RequestBody StateRequest input) {
+        return ChangeResponse.of(
+                management.state(digest(), id, input.expectedVersion(), input.enabled()));
     }
 
     /**
@@ -102,9 +103,9 @@ public final class RoleController {
     @SaCheckPermission("iam:role:manage")
     @PutMapping("/api/roles/{id}/grants")
     @Operation(summary = "替换角色授予")
-    public ApiResponse<ChangeResponse> grants(@PathVariable long id, @RequestBody GrantsRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.grants(digest(), id, input.expectedVersion(), input.toDomain())));
+    public ChangeResponse grants(@PathVariable long id, @RequestBody GrantsRequest input) {
+        return ChangeResponse.of(
+                management.grants(digest(), id, input.expectedVersion(), input.toDomain()));
     }
 
     /**
@@ -113,9 +114,9 @@ public final class RoleController {
     @SaCheckPermission("iam:role:manage")
     @DeleteMapping("/api/roles/{id}")
     @Operation(summary = "删除角色")
-    public ApiResponse<Void> delete(@PathVariable long id, @RequestParam long expectedVersion) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id, @RequestParam long expectedVersion) {
         management.delete(digest(), id, expectedVersion);
-        return ApiResponse.success(null);
     }
 
     private String digest() {
