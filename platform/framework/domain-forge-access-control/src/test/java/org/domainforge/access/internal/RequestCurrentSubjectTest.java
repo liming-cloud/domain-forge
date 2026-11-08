@@ -4,6 +4,7 @@ import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.exception.NotLoginException;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.shared.CurrentSubject;
 import org.junit.jupiter.api.Test;
 
@@ -70,8 +71,7 @@ class RequestCurrentSubjectTest {
             });
             assertThrows(NotLoginException.class, () -> subjects.current(" "));
             assertEquals(0, reads.get());
-            var error = assertThrows(AccessException.class, () -> subjects.current("token"));
-            assertEquals(AccessFailure.UNAVAILABLE, error.failure());
+            assertThrows(AccessUnavailableException.class, () -> subjects.current("token"));
         } finally {
             SaTokenContextMockUtil.clearContext();
         }

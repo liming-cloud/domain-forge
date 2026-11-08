@@ -2,6 +2,7 @@ package org.domainforge.iam.interfaces.http.protocol;
 
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
@@ -38,15 +39,21 @@ class IamHttpErrorsTest {
         assertStatus(503, "IAM_RESULT_UNKNOWN", new TransactionSystemException("commit failed"));
         assertStatus(503, "SERVICE_UNAVAILABLE", new DataAccessResourceFailureException("db down"));
         assertStatus(409, "IAM_CONFLICT", new DuplicateKeyException("duplicate"));
-        assertStatus(400, "INVALID_REQUEST", new IllegalArgumentException("secret detail"));
-        var internal = errors.handle(new IllegalStateException("secret detail"));
+        var internal = errors.handle(new IllegalArgumentException("secret detail"));
         assertEquals(500, internal.getStatusCode().value());
-        assertEquals("服务内部错误", internal.getBody().message());
+        assertEquals("服务处理失败", internal.getBody().getDetail());
+    }
+
+    // 领域规则违反由唯一分派点按类别转换，错误码原样保留；通用异常不再被兜底为 400。
+    @Test
+    void ruleViolationsUseDispatchPoint() {
+        assertStatus(400, "ROLE_CODE_INVALID", IamRuleViolation.invalid("ROLE_CODE_INVALID", "角色代码无效"));
+        assertStatus(409, "ROLE_SYSTEM_DISABLE", IamRuleViolation.conflict("ROLE_SYSTEM_DISABLE", "系统角色不能停用"));
     }
 
     private void assertStatus(int status, String code, Exception failure) {
         var response = errors.handle(failure);
         assertEquals(status, response.getStatusCode().value());
-        assertEquals(code, response.getBody().code());
+        assertEquals(code, response.getBody().getProperties().get("code"));
     }
 }

@@ -4,7 +4,7 @@ import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.account.Membership;
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Repository;
 
@@ -75,6 +75,6 @@ public class SqlAccounts implements AccountRepository {
 
     @Override
     public long systemAdministrators() {
-        return mapper.systemAdministrators(Role.SYSTEM_ADMIN_ID);
+        return mapper.systemAdministrators(SystemRole.ADMIN_ID);
     }
 }

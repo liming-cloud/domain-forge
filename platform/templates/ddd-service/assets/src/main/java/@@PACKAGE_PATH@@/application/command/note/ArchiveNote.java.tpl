@@ -44,7 +44,7 @@ public class ArchiveNote {
         CurrentScope scope = scopes.scope(NotePermissions.WRITE);
         Note note = notes.find(noteId);
         if (note == null || !note.within(account, scope.all(), scope.self(), scope.unitIds()))
-            throw new NoteRejected("NOTE_NOT_FOUND", "便笺不存在");
+            throw NoteRejected.notFound("NOTE_NOT_FOUND", "便笺不存在");
         var snapshot = new ArchivedNote(note.id(), note.ownerId(), note.unitId(), note.title(), note.content(),
                 note.version(), Instant.now(clock));
         archive.save(snapshot);

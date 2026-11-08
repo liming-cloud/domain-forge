@@ -1,20 +1,26 @@
 package org.domainforge.access.api;
 
+import org.domainforge.shared.BusinessRuleViolation;
+
 /**
- * 明确的访问失败分类，错误消息不携带传输细节或秘密。
+ * 明确的访问拒绝：未认证为 401，无权限为 403；错误消息不携带传输细节或秘密。
  */
-public final class AccessException extends RuntimeException {
+public final class AccessException extends BusinessRuleViolation {
     private final AccessFailure failure;
 
     /**
-     * 外部依赖错误不能伪装成无身份，也不能返回匿名允许。
+     * 外部依赖错误不能伪装成无身份，那属于 {@link AccessUnavailableException}。
      */
     public AccessException(AccessFailure failure) {
         super(
                 switch (failure) {
+                    case UNAUTHENTICATED -> Kind.UNAUTHENTICATED;
+                    case FORBIDDEN -> Kind.FORBIDDEN;
+                },
+                failure.name(),
+                switch (failure) {
                     case UNAUTHENTICATED -> "需要有效登录";
                     case FORBIDDEN -> "无权执行该操作";
-                    case UNAVAILABLE -> "身份服务暂不可用";
                 });
         this.failure = failure;
     }

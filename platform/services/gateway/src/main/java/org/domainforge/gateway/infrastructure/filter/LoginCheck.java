@@ -9,6 +9,7 @@ import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.gateway.infrastructure.routing.GatewaySettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.PathContainer;
 
 /**
@@ -29,9 +30,9 @@ public final class LoginCheck {
      */
     public static final String ACCOUNT = "domainforge.account-id";
     private static final String UNAUTHENTICATED =
-            "{\"code\":\"UNAUTHENTICATED\",\"message\":\"需要身份认证\",\"data\":null}";
+            GatewayResponses.problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "需要身份认证");
     private static final String UNAVAILABLE =
-            "{\"code\":\"SERVICE_UNAVAILABLE\",\"message\":\"服务暂不可用\",\"data\":null}";
+            GatewayResponses.problem(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "服务暂不可用");
 
     private LoginCheck() {
     }
@@ -62,7 +63,7 @@ public final class LoginCheck {
 
     private static Object respond(Throwable failure) {
         var response = SaHolder.getResponse();
-        response.setHeader("Content-Type", "application/json");
+        response.setHeader("Content-Type", "application/problem+json");
         if (failure instanceof NotLoginException) {
             response.setStatus(401);
             return UNAUTHENTICATED;

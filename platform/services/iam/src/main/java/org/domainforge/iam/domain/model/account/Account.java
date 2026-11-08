@@ -1,9 +1,10 @@
 package org.domainforge.iam.domain.model.account;
 
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.IamRuleViolation;
+import org.domainforge.iam.domain.model.shared.LoginName;
+import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.shared.AggregateRoot;
 
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -37,22 +38,12 @@ public record Account(
      */
     public Account {
         if (id <= 0 || credentialVersion < 1 || version < 1) {
-            throw new IllegalArgumentException("账号身份与版本无效");
+            throw IamRuleViolation.invalid("ACCOUNT_STATE_INVALID", "账号身份与版本无效");
         }
-        loginName = normalizeLoginName(loginName);
+        loginName = new LoginName(loginName).value();
         requireCredential(credentialDigest);
         roleIds = requireRoles(roleIds);
         memberships = requireMemberships(memberships);
-    }
-
-    /**
-     * 规范化登录名大小写；不修剪空白，不改变密码输入。
-     */
-    public static String normalizeLoginName(String name) {
-        if (name == null || !name.matches("[a-zA-Z0-9._-]{3,64}")) {
-            throw new IllegalArgumentException("登录名必须为3至64个ASCII字母、数字或._-");
-        }
-        return name.toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -66,7 +57,7 @@ public record Account(
      * 创建初始管理者：只分配系统管理员角色，不关联组织。
      */
     public static Account administrator(long id, String loginName, String digest) {
-        return new Account(id, loginName, digest, 1, 1, true, Set.of(Role.SYSTEM_ADMIN_ID), Set.of());
+        return new Account(id, loginName, digest, 1, 1, true, Set.of(SystemRole.ADMIN_ID), Set.of());
     }
 
     /**
@@ -74,13 +65,13 @@ public record Account(
      */
     private static void requireCredential(String digest) {
         if (digest == null || digest.isBlank() || digest.length() > 512) {
-            throw new IllegalArgumentException("凭据摘要无效");
+            throw IamRuleViolation.invalid("CREDENTIAL_DIGEST_INVALID", "凭据摘要无效");
         }
     }
 
     private static Set<Long> requireRoles(Set<Long> roles) {
         if (roles == null || roles.size() > MAX_ROLES || roles.stream().anyMatch(id -> id == null || id <= 0))
-            throw new IllegalArgumentException("角色分配无效");
+            throw IamRuleViolation.invalid("ROLE_ASSIGNMENT_INVALID", "角色分配无效");
         return Set.copyOf(roles);
     }
 
@@ -89,11 +80,11 @@ public record Account(
      */
     private static Set<Membership> requireMemberships(Set<Membership> values) {
         if (values == null || values.size() > MAX_MEMBERSHIPS || values.stream().anyMatch(Objects::isNull))
-            throw new IllegalArgumentException("成员归属无效");
+            throw IamRuleViolation.invalid("MEMBERSHIP_INVALID", "成员归属无效");
         long units = values.stream().mapToLong(Membership::unitId).distinct().count();
         long primary = values.stream().filter(Membership::primary).count();
         if (units != values.size() || (!values.isEmpty() && primary != 1))
-            throw new IllegalArgumentException("成员归属须不重复且恰有一个主部门");
+            throw IamRuleViolation.invalid("MEMBERSHIP_PRIMARY_INVALID", "成员归属须不重复且恰有一个主部门");
         return Set.copyOf(values);
     }
 
@@ -101,7 +92,7 @@ public record Account(
      * 改密同时提升凭据和并发版本；禁用账号不能使用此自助转换。
      */
     public Account changePassword(String digest) {
-        if (!enabled) throw new IllegalStateException("禁用账号不能自助改密");
+        if (!enabled) throw IamRuleViolation.conflict("ACCOUNT_DISABLED", "禁用账号不能自助改密");
         return new Account(
                 id, loginName, digest, credentialVersion + 1, version + 1, true, roleIds, memberships);
     }
@@ -139,7 +130,7 @@ public record Account(
      * 启用且持有系统管理员角色；“至少保留一名”的规则由应用在管理守卫内协调。
      */
     public boolean isSystemAdministrator() {
-        return enabled && roleIds.contains(Role.SYSTEM_ADMIN_ID);
+        return enabled && roleIds.contains(SystemRole.ADMIN_ID);
     }
 
     /**

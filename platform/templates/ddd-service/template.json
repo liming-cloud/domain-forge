@@ -118,6 +118,11 @@
       "example": true
     },
     {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/note/NoteRuleViolation.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/note/NoteRuleViolation.java",
+      "example": true
+    },
+    {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/domain/model/note/Note.java",
       "example": true
@@ -170,11 +175,6 @@
     {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteController.java",
-      "example": true
-    },
-    {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteRejectionMapping.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/interfaces/http/note/NoteRejectionMapping.java",
       "example": true
     },
     {

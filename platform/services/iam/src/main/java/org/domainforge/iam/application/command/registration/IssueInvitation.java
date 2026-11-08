@@ -8,8 +8,8 @@ import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.application.port.operation.Identifiers;
-import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
+import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.domain.repository.InvitationRepository;
 import org.springframework.stereotype.Service;
@@ -56,7 +56,7 @@ public class IssueInvitation {
      */
     @Transactional
     public InvitationIssued execute(String tokenDigest, String loginName, Long replacement) {
-        String name = Account.normalizeLoginName(loginName);
+        String name = new LoginName(loginName).value();
         var actor = authorization.require(tokenDigest, "iam:invitation:create");
         if (accounts.findByLoginName(name) != null) throw new IamException(IamFailure.CONFLICT, "该登录名已不可邀请");
         if (replacement != null) invalidate(replacement, name);
@@ -81,10 +81,6 @@ public class IssueInvitation {
         RegistrationInvitation original = invitations.lock(id);
         if (original == null || !original.loginName().equals(name))
             throw new IamException(IamFailure.CONFLICT, "原邀请不可重发");
-        try {
-            invitations.finish(original.invalidate());
-        } catch (IllegalStateException e) {
-            throw new IamException(IamFailure.CONFLICT, "原邀请不可重发");
-        }
+        invitations.finish(original.invalidate());
     }
 }

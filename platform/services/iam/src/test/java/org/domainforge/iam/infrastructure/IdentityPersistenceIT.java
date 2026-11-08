@@ -22,13 +22,15 @@ import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.bootstrap.IamApplication;
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.iam.infrastructure.persistence.retention.RetentionCleanup;
+import org.domainforge.shared.BusinessRuleViolation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -135,7 +138,7 @@ class IdentityPersistenceIT {
     private static void grantAll(String adminToken, String name) {
         Account target = account(name);
         bean(ManageAccount.class).roles(
-                identity(adminToken).tokenDigest(), target.id(), target.version(), Set.of(Role.SYSTEM_ADMIN_ID));
+                identity(adminToken).tokenDigest(), target.id(), target.version(), Set.of(SystemRole.ADMIN_ID));
     }
 
     private static void setEnabled(String actorToken, String name, boolean enabled) {
@@ -144,7 +147,15 @@ class IdentityPersistenceIT {
     }
 
     private static void assertFailure(IamFailure expected, Executable command) {
-        assertEquals(expected, assertThrows(IamException.class, command).failure());
+        assertEquals(expected, failureOf(assertThrows(RuntimeException.class, command)));
+    }
+
+    // 应用层拒绝与领域规则违反按同一分类比较：违反的 400／409 类别对应 INVALID_REQUEST／CONFLICT。
+    private static IamFailure failureOf(Exception failure) {
+        if (failure instanceof IamRuleViolation rule)
+            return rule.kind() == BusinessRuleViolation.Kind.CONFLICT ? IamFailure.CONFLICT
+                    : IamFailure.INVALID_REQUEST;
+        return assertInstanceOf(IamException.class, failure).failure();
     }
 
     private static void assertUnauthenticated(String token) {
@@ -183,15 +194,14 @@ class IdentityPersistenceIT {
         long failures = results.stream().filter(Exception.class::isInstance).count();
         assertEquals(1, failures, () -> "期望恰好一个失败: " + results);
         var loser = (Exception) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
-        assertEquals(IamException.class, loser.getClass(), () -> "落败原因: " + loser);
-        if (loserFailure != null) assertEquals(loserFailure, ((IamException) loser).failure());
+        assertEquals(loserFailure == null ? failureOf(loser) : loserFailure, failureOf(loser), () -> "落败原因: " + loser);
     }
 
     private static void assertOneRejected(List<Object> results) {
         assertOneSucceeded(results, null);
-        var loser = (IamException) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
-        assertTrue(Set.of(IamFailure.CONFLICT, IamFailure.UNAUTHENTICATED).contains(loser.failure()),
-                () -> "落败原因: " + loser.failure());
+        var loser = (Exception) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
+        assertTrue(Set.of(IamFailure.CONFLICT, IamFailure.UNAUTHENTICATED).contains(failureOf(loser)),
+                () -> "落败原因: " + loser);
     }
 
     /**

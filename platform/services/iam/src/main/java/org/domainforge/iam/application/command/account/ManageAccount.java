@@ -2,7 +2,7 @@ package org.domainforge.iam.application.command.account;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.command.DomainRules;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
@@ -12,6 +12,7 @@ import org.domainforge.iam.application.port.operation.AdministrationGuard;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.account.Membership;
 import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.domain.repository.OrganizationRepository;
 import org.domainforge.iam.domain.repository.RoleRepository;
@@ -59,11 +60,11 @@ public class ManageAccount {
      */
     @Transactional
     public CommandResult state(String tokenDigest, long target, long version, boolean enabled) {
-        DomainRules.requireVersion(target, version);
+        ExpectedVersion.require(target, version);
         guard.lock();
         var actor = authorization.require(tokenDigest, "iam:account:state");
         Account current = currentAccount(target, version);
-        if (current.roleIds().contains(Role.SYSTEM_ADMIN_ID) && !actor.systemAdministrator())
+        if (current.roleIds().contains(SystemRole.ADMIN_ID) && !actor.systemAdministrator())
             throw new IamException(IamFailure.FORBIDDEN, "只有系统管理员可以修改系统管理员账号");
         return save(current, current.changeEnabled(enabled), actor, "account.state");
     }
@@ -73,7 +74,7 @@ public class ManageAccount {
      */
     @Transactional
     public CommandResult roles(String tokenDigest, long target, long version, Set<Long> roleIds) {
-        DomainRules.requireVersion(target, version);
+        ExpectedVersion.require(target, version);
         if (roleIds == null || roleIds.size() > Account.MAX_ROLES)
             throw new IamException(IamFailure.INVALID_REQUEST, "角色分配无效");
         guard.lock();
@@ -83,7 +84,7 @@ public class ManageAccount {
             Role role = roles.lock(roleId);
             if (role == null || !role.enabled()) throw new IamException(IamFailure.CONFLICT, "角色不存在或已停用");
         }
-        return save(current, DomainRules.apply(() -> current.changeRoles(roleIds)), actor, "account.roles");
+        return save(current, current.changeRoles(roleIds), actor, "account.roles");
     }
 
     /**
@@ -91,12 +92,12 @@ public class ManageAccount {
      */
     @Transactional
     public CommandResult memberships(String tokenDigest, long target, long version, Set<Membership> memberships) {
-        DomainRules.requireVersion(target, version);
+        ExpectedVersion.require(target, version);
         if (memberships == null) throw new IamException(IamFailure.INVALID_REQUEST, "成员归属无效");
         organizations.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, "iam:member:manage");
         Account current = currentAccount(target, version);
-        Account changed = DomainRules.apply(() -> current.changeMemberships(memberships));
+        Account changed = current.changeMemberships(memberships);
         var units = changed.memberships().stream().map(Membership::unitId).toList();
         if (organizations.existing(units) != units.size())
             throw new IamException(IamFailure.CONFLICT, "组织不存在");
@@ -108,7 +109,7 @@ public class ManageAccount {
      */
     private Account currentAccount(long target, long version) {
         Account account = accounts.find(target);
-        return DomainRules.requireCurrent(account, account == null ? 0 : account.version(), version);
+        return ExpectedVersion.current(account, account == null ? 0 : account.version(), version);
     }
 
     /**

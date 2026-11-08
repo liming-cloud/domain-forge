@@ -9,14 +9,14 @@ import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 网关自身产生的失败响应，使用与 Web 组件相同的三字段外壳；代码与提示都是固定文本，不回显请求内容。
+ * 网关自身产生的失败响应，使用与 Web 组件相同的 Problem Details（RFC 9457），稳定代码在扩展字段 code；代码与提示都是固定文本，不回显请求内容。
  */
 public final class GatewayResponses {
     private GatewayResponses() {
     }
 
     /**
-     * 写出无数据的失败外壳。
+     * 写出 Problem Details 失败响应。
      *
      * @param exchange 当前交换
      * @param status   HTTP 状态
@@ -27,11 +27,23 @@ public final class GatewayResponses {
     public static Mono<Void> failure(ServerWebExchange exchange, HttpStatus status, String code, String message) {
         var response = exchange.getResponse();
         response.setStatusCode(status);
-        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        byte[] body = ("{\"code\":\"" + code + "\",\"message\":\"" + message + "\",\"data\":null}")
-                .getBytes(StandardCharsets.UTF_8);
+        response.getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        byte[] body = problem(status, code, message).getBytes(StandardCharsets.UTF_8);
         DataBuffer buffer = response.bufferFactory().wrap(body);
         return response.writeWith(Mono.just(buffer));
+    }
+
+    /**
+     * Problem Details 文本；代码与提示均为固定文本，无需转义。
+     *
+     * @param status  HTTP 状态
+     * @param code    平台稳定代码
+     * @param message 固定安全提示
+     * @return JSON 文本
+     */
+    static String problem(HttpStatus status, String code, String message) {
+        return "{\"type\":\"about:blank\",\"title\":\"" + status.getReasonPhrase() + "\",\"status\":"
+                + status.value() + ",\"detail\":\"" + message + "\",\"code\":\"" + code + "\"}";
     }
 
     /**

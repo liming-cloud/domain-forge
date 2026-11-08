@@ -3,6 +3,7 @@ package org.domainforge.access.internal;
 import cn.dev33.satoken.context.SaHolder;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.access.api.CurrentSubjectSource;
 import org.domainforge.shared.CurrentSubject;
 
@@ -33,7 +34,7 @@ public final class RequestCurrentSubject {
         storage.delete(KEY);
         try {
             CurrentSubject subject = source.resolve(token);
-            if (subject == null) throw new AccessException(AccessFailure.UNAVAILABLE);
+            if (subject == null) throw new AccessUnavailableException();
             storage.set(KEY, new Snapshot(token, subject));
             return subject;
         } catch (AccessException failure) {

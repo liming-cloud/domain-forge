@@ -3,6 +3,7 @@ package org.domainforge.iam.interfaces.security;
 import cn.dev33.satoken.context.SaHolder;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.access.api.CurrentSubjectSource;
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
@@ -41,14 +42,13 @@ public final class IamCurrentSubjectSource implements CurrentSubjectSource {
             storage.set(PRIVATE_IDENTITY, new PrivateIdentity(token, identity));
             return subject;
         } catch (IamException failure) {
-            throw new AccessException(
-                    switch (failure.failure()) {
-                        case UNAUTHENTICATED -> AccessFailure.UNAUTHENTICATED;
-                        case FORBIDDEN -> AccessFailure.FORBIDDEN;
-                        default -> AccessFailure.UNAVAILABLE;
-                    });
+            throw switch (failure.failure()) {
+                case UNAUTHENTICATED -> new AccessException(AccessFailure.UNAUTHENTICATED);
+                case FORBIDDEN -> new AccessException(AccessFailure.FORBIDDEN);
+                default -> new AccessUnavailableException();
+            };
         } catch (RuntimeException failure) {
-            throw new AccessException(AccessFailure.UNAVAILABLE);
+            throw new AccessUnavailableException();
         }
     }
 

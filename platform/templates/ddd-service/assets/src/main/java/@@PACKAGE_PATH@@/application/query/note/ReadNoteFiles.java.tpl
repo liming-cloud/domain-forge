@@ -53,8 +53,8 @@ public class ReadNoteFiles {
     public FileContent open(long noteId, String fileId) {
         Note note = readable(noteId);
         if (!attachments.contains(note.id(), fileId))
-            throw new NoteRejected("NOTE_FILE_NOT_FOUND", "附件不存在");
-        return files.open(fileId).orElseThrow(() -> new NoteRejected("NOTE_FILE_NOT_FOUND", "附件不存在"));
+            throw NoteRejected.notFound("NOTE_FILE_NOT_FOUND", "附件不存在");
+        return files.open(fileId).orElseThrow(() -> NoteRejected.notFound("NOTE_FILE_NOT_FOUND", "附件不存在"));
     }
 
     private Note readable(long noteId) {
@@ -62,7 +62,7 @@ public class ReadNoteFiles {
         CurrentScope scope = scopes.scope(NotePermissions.READ);
         Note note = notes.find(noteId);
         if (note == null || !note.within(account, scope.all(), scope.self(), scope.unitIds()))
-            throw new NoteRejected("NOTE_NOT_FOUND", "便笺不存在");
+            throw NoteRejected.notFound("NOTE_NOT_FOUND", "便笺不存在");
         return note;
     }
 }

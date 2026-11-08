@@ -10,8 +10,8 @@ import org.domainforge.iam.application.query.menu.MenuQueries;
 import org.domainforge.iam.interfaces.http.organization.MoveRequest;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
 import org.domainforge.iam.interfaces.http.protocol.StateRequest;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -53,9 +54,8 @@ public final class MenuController {
     @SaCheckLogin
     @GetMapping("/api/me/menus")
     @Operation(summary = "读取本人可见菜单")
-    public ApiResponse<List<MenuResponse>> mine() {
-        return ApiResponse.success(
-                queries.visible(access.current().permissions()).stream().map(MenuResponse::of).toList());
+    public List<MenuResponse> mine() {
+        return queries.visible(access.current().permissions()).stream().map(MenuResponse::of).toList();
     }
 
     /**
@@ -64,8 +64,8 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:read")
     @GetMapping("/api/menus")
     @Operation(summary = "查询菜单目录")
-    public ApiResponse<List<MenuResponse>> all() {
-        return ApiResponse.success(queries.all().stream().map(MenuResponse::of).toList());
+    public List<MenuResponse> all() {
+        return queries.all().stream().map(MenuResponse::of).toList();
     }
 
     /**
@@ -74,8 +74,8 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:manage")
     @PostMapping("/api/menus")
     @Operation(summary = "创建菜单项")
-    public ApiResponse<ChangeResponse> create(@RequestBody CreateMenuRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.create(digest(), input.toInput())));
+    public ChangeResponse create(@RequestBody CreateMenuRequest input) {
+        return ChangeResponse.of(management.create(digest(), input.toInput()));
     }
 
     /**
@@ -84,10 +84,10 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:manage")
     @PutMapping("/api/menus/{id}")
     @Operation(summary = "修改菜单项")
-    public ApiResponse<ChangeResponse> update(@PathVariable long id, @RequestBody UpdateMenuRequest input) {
-        return ApiResponse.success(ChangeResponse.of(management.update(
+    public ChangeResponse update(@PathVariable long id, @RequestBody UpdateMenuRequest input) {
+        return ChangeResponse.of(management.update(
                 digest(), id, input.expectedVersion(), input.name(), input.path(), input.sortOrder(),
-                input.permission())));
+                input.permission()));
     }
 
     /**
@@ -96,9 +96,9 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:manage")
     @PutMapping("/api/menus/{id}/parent")
     @Operation(summary = "移动菜单项")
-    public ApiResponse<ChangeResponse> move(@PathVariable long id, @RequestBody MoveRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.move(digest(), id, input.expectedVersion(), input.parentId())));
+    public ChangeResponse move(@PathVariable long id, @RequestBody MoveRequest input) {
+        return ChangeResponse.of(
+                management.move(digest(), id, input.expectedVersion(), input.parentId()));
     }
 
     /**
@@ -107,9 +107,9 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:manage")
     @PutMapping("/api/menus/{id}/state")
     @Operation(summary = "启停菜单项")
-    public ApiResponse<ChangeResponse> state(@PathVariable long id, @RequestBody StateRequest input) {
-        return ApiResponse.success(ChangeResponse.of(
-                management.state(digest(), id, input.expectedVersion(), input.enabled())));
+    public ChangeResponse state(@PathVariable long id, @RequestBody StateRequest input) {
+        return ChangeResponse.of(
+                management.state(digest(), id, input.expectedVersion(), input.enabled()));
     }
 
     /**
@@ -118,9 +118,9 @@ public final class MenuController {
     @SaCheckPermission("iam:menu:manage")
     @DeleteMapping("/api/menus/{id}")
     @Operation(summary = "删除菜单项")
-    public ApiResponse<Void> delete(@PathVariable long id, @RequestParam long expectedVersion) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id, @RequestParam long expectedVersion) {
         management.delete(digest(), id, expectedVersion);
-        return ApiResponse.success(null);
     }
 
     private String digest() {

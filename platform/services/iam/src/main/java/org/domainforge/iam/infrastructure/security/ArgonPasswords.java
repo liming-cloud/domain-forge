@@ -61,11 +61,7 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
      */
     @Override
     public String encode(String password) {
-        try {
-            policy.requireNew(password);
-        } catch (IllegalArgumentException rejected) {
-            throw new IamException(IamFailure.INVALID_REQUEST, rejected.getMessage());
-        }
+        policy.requireNew(password);
         return compute(() -> encoder.encode(password));
     }
 
@@ -74,11 +70,7 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
      */
     @Override
     public boolean matches(String password, String digest) {
-        try {
-            policy.requireInput(password);
-        } catch (IllegalArgumentException rejected) {
-            throw new IamException(IamFailure.INVALID_REQUEST, rejected.getMessage());
-        }
+        policy.requireInput(password);
         return compute(() -> encoder.matches(password, digest == null ? fakeDigest : digest))
                 && digest != null;
     }

@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.domainforge.web.api.Problems;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -62,10 +63,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
 
     private static void reject(HttpServletResponse response, int status, String code, String message)
             throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getOutputStream().write(utf8("{\"code\":\"" + code + "\",\"message\":\"" + message
-                + "\",\"data\":null}"));
+        Problems.write(response, status, code, message);
     }
 
     @Override

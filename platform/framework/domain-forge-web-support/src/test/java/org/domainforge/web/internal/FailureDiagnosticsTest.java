@@ -1,8 +1,8 @@
 package org.domainforge.web.internal;
 
 import jakarta.servlet.http.HttpServletResponse;
-import org.domainforge.shared.ApiResponse;
-import org.domainforge.web.api.BusinessRejectionMapping;
+import org.domainforge.shared.BusinessRuleViolation;
+import org.domainforge.web.api.Problems;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import java.util.logging.Logger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FailureDiagnosticsTest {
-    private final Logger logger = Logger.getLogger(PlatformExceptionAdvice.class.getName());
+    private final Logger logger = Logger.getLogger(Problems.class.getName());
     private final List<LogRecord> records = new ArrayList<>();
     private final Handler capture =
             new Handler() {
@@ -36,8 +36,8 @@ class FailureDiagnosticsTest {
     private Level previousLevel;
     private boolean previousParentHandlers;
 
-    private static PlatformExceptionAdvice advice(BusinessRejectionMapping<?>... mappings) {
-        return new PlatformExceptionAdvice(new RejectionMappings(List.of(mappings)));
+    private static PlatformExceptionAdvice advice() {
+        return new PlatformExceptionAdvice();
     }
 
     // 只替代 Servlet 响应是否已提交的边界，真实 HTTP 与日志接收另由两消费者验证。
@@ -75,7 +75,8 @@ class FailureDiagnosticsTest {
         failure.addSuppressed(new RuntimeException("suppressed-secret"));
         var result = advice().handle(failure, response(false));
         assertEquals(500, result.getStatusCode().value());
-        assertEquals(new ApiResponse<>("INTERNAL_ERROR", "服务处理失败", null), result.getBody());
+        assertEquals("INTERNAL_ERROR", result.getBody().getProperties().get("code"));
+        assertEquals("服务处理失败", result.getBody().getDetail());
         String diagnostic = onlyDiagnostic();
         assertTrue(diagnostic.contains("IllegalStateException"), diagnostic);
         assertTrue(diagnostic.contains("SensitiveFailure"), diagnostic);
@@ -84,34 +85,12 @@ class FailureDiagnosticsTest {
     }
 
     @Test
-    void throwingMappingRetainsItsFailureLocation() throws Exception {
-        var result =
-                advice(new BrokenMapping()).handle(new Declined("synthetic-secret"), response(false));
-        assertEquals(500, result.getStatusCode().value());
-        String diagnostic = onlyDiagnostic();
-        assertTrue(diagnostic.contains("UnsupportedOperationException"), diagnostic);
-        assertTrue(diagnostic.contains("BrokenMapping.map"), diagnostic);
-        assertTrue(diagnostic.contains("Declined"), diagnostic);
-    }
-
-    @Test
-    void invalidMappingRetainsValidationFailure() throws Exception {
-        var result =
-                advice(new NullMapping()).handle(new Declined("synthetic-secret"), response(false));
-        assertEquals(500, result.getStatusCode().value());
-        String diagnostic = onlyDiagnostic();
-        assertTrue(diagnostic.contains("IllegalArgumentException"), diagnostic);
-        assertTrue(diagnostic.contains("RejectionMappings.apply"), diagnostic);
-    }
-
-    @Test
     void expectedRejectionAndMalformedInputAreNotSystemFailures() throws Exception {
-        var rejection =
-                advice(new SafeMapping()).handle(new Declined("synthetic-secret"), response(false));
+        var rejection = advice().handle(new Declined("synthetic-secret"), response(false));
         var invalid =
                 advice().handle(new ServletRequestBindingException("synthetic-secret"), response(false));
-        assertEquals(200, rejection.getStatusCode().value());
-        assertEquals("DECLINED", rejection.getBody().code());
+        assertEquals(422, rejection.getStatusCode().value());
+        assertEquals("DECLINED", rejection.getBody().getProperties().get("code"));
         assertEquals(400, invalid.getStatusCode().value());
         assertTrue(records.isEmpty());
     }
@@ -163,31 +142,9 @@ class FailureDiagnosticsTest {
         }
     }
 
-    static class Declined extends RuntimeException {
+    static class Declined extends BusinessRuleViolation {
         Declined(String message) {
-            super(message);
-        }
-    }
-
-    static class SafeMapping implements BusinessRejectionMapping<Declined> {
-        public Class<Declined> exceptionType() {
-            return Declined.class;
-        }
-
-        public ApiResponse<Void> map(Declined exception) {
-            return ApiResponse.rejected("DECLINED", "明确拒绝");
-        }
-    }
-
-    static class BrokenMapping extends SafeMapping {
-        public ApiResponse<Void> map(Declined exception) {
-            throw new UnsupportedOperationException("mapping-secret");
-        }
-    }
-
-    static class NullMapping extends SafeMapping {
-        public ApiResponse<Void> map(Declined exception) {
-            return null;
+            super(Kind.UNPROCESSABLE, "DECLINED", message);
         }
     }
 }

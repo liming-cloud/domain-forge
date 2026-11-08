@@ -1,5 +1,6 @@
 package org.domainforge.iam.domain.model.account;
 
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.shared.ValueObject;
 
 /**
@@ -13,6 +14,6 @@ public record Membership(long unitId, boolean primary) implements ValueObject {
      * 组织 ID 必须为正数。
      */
     public Membership {
-        if (unitId <= 0) throw new IllegalArgumentException("组织 ID 无效");
+        if (unitId <= 0) throw IamRuleViolation.invalid("UNIT_ID_INVALID", "组织 ID 无效");
     }
 }

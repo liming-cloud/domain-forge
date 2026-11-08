@@ -4,7 +4,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import @@PACKAGE@@.application.command.note.ArchiveNote;
 import @@PACKAGE@@.application.command.note.NotePermissions;
 import @@PACKAGE@@.application.query.note.ReadNoteArchive;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,8 +32,8 @@ public class NoteArchiveController {
      */
     @SaCheckPermission(NotePermissions.WRITE)
     @PostMapping("/api/notes/{id}/archive")
-    public ApiResponse<ArchivedNoteResponse> archive(@PathVariable long id) {
-        return ApiResponse.success(ArchivedNoteResponse.of(archive.archive(id)));
+    public ArchivedNoteResponse archive(@PathVariable long id) {
+        return ArchivedNoteResponse.of(archive.archive(id));
     }
 
     /**
@@ -42,7 +41,7 @@ public class NoteArchiveController {
      */
     @SaCheckPermission(NotePermissions.READ)
     @GetMapping("/api/notes/{id}/archive")
-    public ApiResponse<ArchivedNoteResponse> read(@PathVariable long id) {
-        return ApiResponse.success(ArchivedNoteResponse.of(reads.read(id)));
+    public ArchivedNoteResponse read(@PathVariable long id) {
+        return ArchivedNoteResponse.of(reads.read(id));
     }
 }

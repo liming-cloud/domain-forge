@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
+import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -20,30 +21,27 @@ class RegistrationInvitationTest {
         long account = 3L;
         RegistrationInvitation consumed = invitation.consume(account, expires.minusSeconds(1));
         assertEquals(account, consumed.consumedBy());
-        assertThrows(
-                IllegalStateException.class, () -> consumed.consume(account, expires.minusSeconds(1)));
-        assertThrows(IllegalStateException.class, consumed::invalidate);
+        assertRule("INVITATION_UNUSABLE", () -> consumed.consume(account, expires.minusSeconds(1)));
+        assertRule("INVITATION_UNUSABLE", consumed::invalidate);
     }
 
     // 精确到期点即失效，重发产生的旧邀请失效事实同样阻断消费。
     @Test
     void expiryAndReissueRejectConsumption() {
-        assertThrows(IllegalStateException.class, () -> invitation.consume(3L, expires));
+        assertRule("INVITATION_UNUSABLE", () -> invitation.consume(3L, expires));
         RegistrationInvitation invalid = invitation.invalidate();
         assertTrue(invalid.invalidated());
-        assertThrows(
-                IllegalStateException.class,
-                () -> invalid.consume(3L, expires.minusSeconds(1)));
+        assertRule("INVITATION_UNUSABLE", () -> invalid.consume(3L, expires.minusSeconds(1)));
     }
 
     // 身份与消费者 ID 必须为正数，消费终态与失效终态互斥。
     @Test
     void invalidIdentitiesAndContradictoryStatesReject() {
-        assertThrows(IllegalArgumentException.class,
+        assertRule("INVITATION_STATE_INVALID",
                 () -> new RegistrationInvitation(0L, "invited.user", "a".repeat(64), expires, 2L, null, false));
-        assertThrows(IllegalArgumentException.class,
+        assertRule("INVITATION_STATE_INVALID",
                 () -> new RegistrationInvitation(1L, "invited.user", "a".repeat(64), expires, 2L, 0L, false));
-        assertThrows(IllegalArgumentException.class,
+        assertRule("INVITATION_STATE_INVALID",
                 () -> new RegistrationInvitation(1L, "invited.user", "a".repeat(64), expires, 2L, 3L, true));
     }
 }

@@ -13,7 +13,7 @@ public enum ServiceCallFailure {
      */
     FORBIDDEN,
     /**
-     * 被调方已作出业务拒绝或判定请求不合法：200 外壳中的非成功代码，或 4xx 响应；{@link ServiceCallException#code()} 为对方代码。
+     * 被调方已作出业务拒绝或判定请求不合法：4xx 响应；{@link ServiceCallException#code()} 为对方代码。
      */
     REJECTED,
     /**

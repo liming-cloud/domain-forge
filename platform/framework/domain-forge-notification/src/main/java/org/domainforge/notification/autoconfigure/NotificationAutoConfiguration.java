@@ -5,9 +5,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.domainforge.notification.api.SmsSender;
 import org.domainforge.notification.api.VerificationCodes;
 import org.domainforge.notification.internal.NotificationAssembly;
-import org.domainforge.notification.internal.NotificationFailureAdvice;
-import org.domainforge.notification.internal.SmsRejectionMapping;
-import org.domainforge.notification.internal.VerificationRejectionMapping;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -32,22 +29,6 @@ public class NotificationAutoConfiguration {
     }
 
     /**
-     * 服务商不可用、验证码存储不可用映射为 503。
-     */
-    @Bean
-    NotificationFailureAdvice notificationFailureAdvice() {
-        return new NotificationFailureAdvice();
-    }
-
-    /**
-     * 短信拒绝映射为业务拒绝。
-     */
-    @Bean
-    SmsRejectionMapping smsRejectionMapping() {
-        return new SmsRejectionMapping();
-    }
-
-    /**
      * 验证码。
      */
     @Configuration(proxyBeanMethods = false)
@@ -59,14 +40,6 @@ public class NotificationAutoConfiguration {
         @Bean
         VerificationCodes verificationCodes(Environment environment, RedissonClient redis, SmsSender sms) {
             return NotificationAssembly.verification(environment, redis, sms);
-        }
-
-        /**
-         * 发送受限映射为业务拒绝。
-         */
-        @Bean
-        VerificationRejectionMapping verificationRejectionMapping() {
-            return new VerificationRejectionMapping();
         }
     }
 }

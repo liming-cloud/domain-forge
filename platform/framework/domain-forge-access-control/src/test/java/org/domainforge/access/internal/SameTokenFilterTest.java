@@ -5,8 +5,7 @@ import cn.dev33.satoken.dao.SaTokenDao;
 import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.filter.SaTokenContextFilterForJakartaServlet;
 import cn.dev33.satoken.same.SaSameUtil;
-import org.domainforge.access.api.AccessException;
-import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.access.api.SameTokens;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -120,8 +119,7 @@ class SameTokenFilterTest {
             try {
                 SaManager.setSaTokenDao(outage(original));
                 assertEquals(503, call(mvc, token));
-                var failure = assertThrows(AccessException.class, SameTokens::current);
-                assertEquals(AccessFailure.UNAVAILABLE, failure.failure());
+                assertThrows(AccessUnavailableException.class, SameTokens::current);
             } finally {
                 SaManager.setSaTokenDao(original);
             }

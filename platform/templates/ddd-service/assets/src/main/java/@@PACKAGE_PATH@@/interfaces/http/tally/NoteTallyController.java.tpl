@@ -3,7 +3,6 @@ package @@PACKAGE@@.interfaces.http.tally;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import @@PACKAGE@@.application.query.tally.NoteTallyQueries;
 import org.domainforge.access.api.CurrentAccess;
-import org.domainforge.shared.ApiResponse;
 import org.domainforge.web.api.PlatformJsonApi;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,7 +29,7 @@ public class NoteTallyController {
      */
     @SaCheckLogin
     @GetMapping("/api/@@NAMESPACE@@/note-tally")
-    public ApiResponse<Long> tally() {
-        return ApiResponse.success(tallies.count(access.current().accountId()));
+    public Long tally() {
+        return tallies.count(access.current().accountId());
     }
 }

@@ -3,7 +3,6 @@ package org.domainforge.iam.interfaces.http.audit;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.iam.application.query.audit.AuditQueries;
-import org.domainforge.shared.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,8 +31,8 @@ public final class AuditController {
     @SaCheckPermission("iam:audit:read")
     @GetMapping("/api/audit")
     @Operation(summary = "分页查询审计事实")
-    public ApiResponse<List<AuditResponse>> list(
+    public List<AuditResponse> list(
             @RequestParam(defaultValue = "0") long after, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(queries.list(after, limit).stream().map(AuditResponse::of).toList());
+        return queries.list(after, limit).stream().map(AuditResponse::of).toList();
     }
 }

@@ -76,7 +76,7 @@ gateway:
 
 ### 登录前置校验
 
-- 按 Sa-Token 官方[网关统一鉴权](https://sa-token.cc/doc.html#/micro/gateway-auth)用法注册 `SaReactorFilter`：`setAuth` 中以 `SaRouter.match(不在任一路由的匿名清单中).check(StpUtil.checkLogin())` 校验，`setError` 返回平台外壳。缺少令牌或会话不存在返回 401（未路由的路径对未登录请求同样是 401）。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
+- 按 Sa-Token 官方[网关统一鉴权](https://sa-token.cc/doc.html#/micro/gateway-auth)用法注册 `SaReactorFilter`：`setAuth` 中以 `SaRouter.match(不在任一路由的匿名清单中).check(StpUtil.checkLogin())` 校验，`setError` 返回 Problem Details。缺少令牌或会话不存在返回 401（未路由的路径对未登录请求同样是 401）。这只是提前拒绝，后端仍做完整认证（含 SQL 许可与凭据版本），网关放行不代表已认证。
 - 原生过滤器在事件循环线程上同步读取 Redis（Sa-Token 响应式集成的既定方式），等待由 Redis 命令超时（300 毫秒）限定；建立连接的超时为 2 秒，只在启动与重连时生效（CI 上多个服务同时启动时，300 毫秒内曾建不起初始连接池，网关反复重启）。
 - 令牌只从 `Authorization` 头读取（[A-04](../../rules/07-安全与访问控制.md#a-04-令牌只从-authorization-头读取)），原样转发，不改写、不记录。
 - Redis 不可用时返回 503，不放行（[A-03](../../rules/07-安全与访问控制.md#a-03-依赖故障时拒绝不降级放行)）。
@@ -113,6 +113,6 @@ gateway:
 
 ### 错误响应
 
-网关自身产生的错误使用与 [Web 组件](web-support.md)相同的三字段外壳，后端响应原样返回、不改写；日志只记录异常类型。
+网关自身产生的错误使用与 [Web 组件](web-support.md)相同的 Problem Details（`application/problem+json`，错误码在 `code`），后端响应原样返回、不改写；日志只记录异常类型。
 
-各情况的状态码与 `code` 见[错误码](../错误码.md)；`RATE_LIMITED`、`GATEWAY_TIMEOUT` 是平台保留代码，由 `ApiResponse` 拒绝业务占用。超时：连接 2 秒、响应 15 秒（`GATEWAY_RESPONSE_TIMEOUT`）；Nginx 的读超时放宽到 20 秒，保证由网关先超时并给出 504。
+各情况的状态码与 `code` 见[错误码](../错误码.md)；`RATE_LIMITED`、`GATEWAY_TIMEOUT` 是平台保留代码，不得被业务占用。超时：连接 2 秒、响应 15 秒（`GATEWAY_RESPONSE_TIMEOUT`）；Nginx 的读超时放宽到 20 秒，保证由网关先超时并给出 504。

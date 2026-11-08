@@ -21,19 +21,19 @@ public record Note(long id, long ownerId, Long unitId, String title, String cont
      */
     public Note {
         if (id <= 0 || ownerId <= 0 || version < 1 || (unitId != null && unitId <= 0))
-            throw new IllegalArgumentException("便笺身份、归属或版本无效");
+            throw NoteRuleViolation.invalid("便笺身份、归属或版本无效");
         title = requireTitle(title);
         content = requireContent(content);
     }
 
     private static String requireTitle(String title) {
         if (title == null || title.isBlank() || title.strip().length() > 100)
-            throw new IllegalArgumentException("标题须为1至100个字符");
+            throw NoteRuleViolation.invalid("标题须为1至100个字符");
         return title.strip();
     }
 
     private static String requireContent(String content) {
-        if (content == null || content.length() > 2000) throw new IllegalArgumentException("内容最多2000个字符");
+        if (content == null || content.length() > 2000) throw NoteRuleViolation.invalid("内容最多2000个字符");
         return content;
     }
 

@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 独立验证真实密码规则；算法、线程池与数据库仍由各自原生测试覆盖。
@@ -19,7 +19,7 @@ class PasswordPolicyTest {
         var values = new HashSet<>(Set.of(blocked));
         var policy = new PasswordPolicy(values);
         values.clear();
-        assertThrows(IllegalArgumentException.class, () -> policy.requireNew(blocked));
+        assertRule("PASSWORD_COMMON", () -> policy.requireNew(blocked));
         assertDoesNotThrow(() -> policy.requireInput(blocked));
         assertDoesNotThrow(() -> policy.requireNew("   合法的密码内容保留所有空白   "));
     }
@@ -29,10 +29,9 @@ class PasswordPolicyTest {
     void rejectsMalformedAndOutOfRangeInput() {
         var policy = new PasswordPolicy(Set.of());
         assertDoesNotThrow(() -> policy.requireNew("😀".repeat(128)));
-        assertThrows(IllegalArgumentException.class, () -> policy.requireInput("x".repeat(14)));
-        assertThrows(IllegalArgumentException.class, () -> policy.requireInput("😀".repeat(129)));
-        assertThrows(
-                IllegalArgumentException.class, () -> policy.requireInput("x".repeat(15) + '\uD800'));
-        assertThrows(IllegalArgumentException.class, () -> policy.requireInput(null));
+        assertRule("PASSWORD_LENGTH_INVALID", () -> policy.requireInput("x".repeat(14)));
+        assertRule("PASSWORD_LENGTH_INVALID", () -> policy.requireInput("😀".repeat(129)));
+        assertRule("PASSWORD_LENGTH_INVALID", () -> policy.requireInput("x".repeat(15) + '\uD800'));
+        assertRule("PASSWORD_LENGTH_INVALID", () -> policy.requireInput(null));
     }
 }

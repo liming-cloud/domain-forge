@@ -83,10 +83,10 @@ class NoteTallyIT {
     private static void subject(HttpExchange exchange) throws IOException {
         String token = String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")).replace("Bearer ", "");
         Long account = ACCOUNTS.get(token);
-        byte[] bytes = (account == null ? "{\"code\":\"X\",\"message\":\"x\",\"data\":null}"
-                : "{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":{\"accountId\":\"" + account
-                        + "\",\"permissions\":[],\"roles\":[]}}").getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        byte[] bytes = (account == null ? "{\"type\":\"about:blank\",\"status\":401,\"detail\":\"x\",\"code\":\"X\"}"
+                : "{\"accountId\":\"" + account + "\",\"permissions\":[],\"roles\":[]}")
+                .getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", account == null ? "application/problem+json" : "application/json");
         exchange.sendResponseHeaders(account == null ? 401 : 200, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
@@ -124,8 +124,8 @@ class NoteTallyIT {
         deliver("NoteCreated", 1, 701);
         deliver("NoteCreated", 1, 702);
         deliver("NoteArchived", 1, 701);
-        assertEquals("{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":2}", tally(user(701)));
-        assertEquals("{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":0}", tally(user(703)));
+        assertEquals("2", tally(user(701)));
+        assertEquals("0", tally(user(703)));
     }
 
     // 不认识的合同版本不能被当作已处理：抛出异常，由消息组件重试并最终进入死信。

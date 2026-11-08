@@ -20,9 +20,9 @@
 | 未登录 | 照常交给入口，由登录校验拒绝（401）；幂等只用于已登录的接口 |
 | Redis 不可用 | 503 `SERVICE_UNAVAILABLE`，不执行；不退化为“不做幂等”，避免重复执行 |
 
-- 业务拒绝（HTTP 200＋稳定代码）与 4xx 也是“首次结果”，重复请求得到同样的拒绝。
+- 业务拒绝（4xx 的 Problem Details）也是“首次结果”，重复请求得到同样的拒绝。
 - 处理租期 60 秒：首次请求在租期内没有结束（如进程中断），记录过期后同一键可以重试。租期须长于入口的最长处理时间。
-- `IDEMPOTENCY_IN_PROGRESS`、`IDEMPOTENCY_KEY_REUSED` 是平台保留代码，业务拒绝不能使用（见 [Web 组件](web-support.md#结果映射)）。
+- `IDEMPOTENCY_IN_PROGRESS`、`IDEMPOTENCY_KEY_REUSED` 是平台保留代码，业务拒绝不能使用（见[错误码](../错误码.md)）。
 
 ## 组件
 
@@ -40,7 +40,7 @@
 @SaCheckPermission(NotePermissions.WRITE)
 @Idempotent
 @PostMapping("/api/notes")
-public ApiResponse<NoteChangeResponse> create(@RequestBody CreateNoteRequest input) { ... }
+public NoteChangeResponse create(@RequestBody CreateNoteRequest input) { ... }
 ```
 
 - 只给“重复执行会产生重复效果”的命令加（创建、支付、发送）；查询与天然幂等的修改（按版本更新）不需要。

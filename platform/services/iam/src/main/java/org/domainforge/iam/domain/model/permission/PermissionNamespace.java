@@ -1,5 +1,6 @@
 package org.domainforge.iam.domain.model.permission;
 
+import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.shared.AggregateRoot;
 
 import java.util.Objects;
@@ -24,17 +25,17 @@ public record PermissionNamespace(String namespace, Set<PermissionDefinition> pe
     public PermissionNamespace {
         PermissionDefinition.requireNamespace(namespace);
         if (PermissionDefinition.IAM_NAMESPACE.equals(namespace))
-            throw new IllegalArgumentException("IAM 命名空间由数据库基线维护");
+            throw IamRuleViolation.invalid("NAMESPACE_RESERVED", "IAM 命名空间由数据库基线维护");
         if (permissions == null
                 || permissions.stream().anyMatch(Objects::isNull)
                 || permissions.size() > MAX_PERMISSIONS)
-            throw new IllegalArgumentException("一个命名空间须包含至多200个权限");
+            throw IamRuleViolation.invalid("NAMESPACE_TOO_LARGE", "一个命名空间须包含至多200个权限");
         Set<String> codes = permissions.stream().map(PermissionDefinition::code).collect(Collectors.toSet());
-        if (codes.size() != permissions.size()) throw new IllegalArgumentException("权限码重复");
+        if (codes.size() != permissions.size()) throw IamRuleViolation.invalid("PERMISSION_CODE_DUPLICATE", "权限码重复");
         for (PermissionDefinition permission : permissions) {
             if (!permission.namespace().equals(namespace))
-                throw new IllegalArgumentException("权限码须属于本命名空间");
-            if (permission.systemOnly()) throw new IllegalArgumentException("外部命名空间不能声明系统专属权限");
+                throw IamRuleViolation.invalid("PERMISSION_NAMESPACE_MISMATCH", "权限码须属于本命名空间");
+            if (permission.systemOnly()) throw IamRuleViolation.invalid("PERMISSION_SYSTEM_ONLY", "外部命名空间不能声明系统专属权限");
         }
         permissions = Set.copyOf(permissions);
     }

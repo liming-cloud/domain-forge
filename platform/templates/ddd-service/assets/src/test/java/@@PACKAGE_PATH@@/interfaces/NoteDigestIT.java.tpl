@@ -95,11 +95,10 @@ class NoteDigestIT {
         if (behaviour.equals("slow")) sleep(1500);
         int status = behaviour.equals("ok") || behaviour.equals("slow") ? 200 : Integer.parseInt(behaviour);
         String body = status == 200
-                ? "{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":[{\"id\":\"1\",\"title\":\"甲\",\"version\":1},"
-                        + "{\"id\":\"2\",\"title\":\"乙\",\"version\":3}]}"
-                : "{\"code\":\"X\",\"message\":\"x\",\"data\":null}";
+                ? "[{\"id\":\"1\",\"title\":\"甲\",\"version\":1},{\"id\":\"2\",\"title\":\"乙\",\"version\":3}]"
+                : "{\"type\":\"about:blank\",\"status\":" + status + ",\"detail\":\"x\",\"code\":\"X\"}";
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.getResponseHeaders().add("Content-Type", status == 200 ? "application/json" : "application/problem+json");
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
@@ -111,10 +110,10 @@ class NoteDigestIT {
     private static void subject(HttpExchange exchange) throws IOException {
         String token = String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")).replace("Bearer ", "");
         Long account = ACCOUNTS.get(token);
-        byte[] bytes = (account == null ? "{\"code\":\"X\",\"message\":\"x\",\"data\":null}"
-                : "{\"code\":\"SUCCESS\",\"message\":\"成功\",\"data\":{\"accountId\":\"" + account
-                        + "\",\"permissions\":[],\"roles\":[]}}").getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        byte[] bytes = (account == null ? "{\"type\":\"about:blank\",\"status\":401,\"detail\":\"x\",\"code\":\"X\"}"
+                : "{\"accountId\":\"" + account + "\",\"permissions\":[],\"roles\":[]}")
+                .getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", account == null ? "application/problem+json" : "application/json");
         exchange.sendResponseHeaders(account == null ? 401 : 200, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();

@@ -8,6 +8,7 @@ import org.domainforge.iam.application.port.authentication.Passwords;
 import org.domainforge.iam.application.port.operation.AdministrationGuard;
 import org.domainforge.iam.application.port.operation.Identifiers;
 import org.domainforge.iam.domain.model.account.Account;
+import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
@@ -46,7 +47,7 @@ public final class InitializeAdministrator {
      * 首次创建唯一系统管理员并返回其账号 ID；重复和并发落败均拒绝，不更改已有凭据或权限。
      */
     public long execute(String loginName, String password) {
-        String name = Account.normalizeLoginName(loginName);
+        String name = new LoginName(loginName).value();
         String digest = passwords.encode(password);
         Long created = transactions.execute(status -> {
             if (guard.lock()) throw new IamException(IamFailure.CONFLICT, "项目已经初始化");

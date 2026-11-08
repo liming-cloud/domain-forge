@@ -10,9 +10,11 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.strategy.SaAnnotationStrategy;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.access.api.CurrentSubjectSource;
 import org.domainforge.shared.CurrentSubject;
+import org.domainforge.web.api.PlatformJsonApi;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -45,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NativeAccessIntegrationTest {
     private static final long ACCOUNT = 1_000_001L;
     private static final AtomicInteger READS = new AtomicInteger();
-    private static volatile AccessFailure failure;
+    private static volatile RuntimeException failure;
 
     // 明确匿名、仅登录与未声明入口分别验证，不让后续成功登录掩盖入口错误。
     private static void assertAnonymousAndDefaultDeny(MockMvc mvc) throws Exception {
@@ -71,9 +73,9 @@ class NativeAccessIntegrationTest {
 
     // 同一已签发会话的依赖故障、许可失效和原生退出保持不同失败语义。
     private static void assertFailuresAndRevocation(MockMvc mvc, StpLogic logic, String token) throws Exception {
-        failure = AccessFailure.UNAVAILABLE;
+        failure = new AccessUnavailableException();
         assertEquals(503, call(mvc, "/or", token));
-        failure = AccessFailure.UNAUTHENTICATED;
+        failure = new AccessException(AccessFailure.UNAUTHENTICATED);
         assertEquals(401, call(mvc, "/login", token));
         failure = null;
         logic.logoutByTokenValue(token);
@@ -103,8 +105,7 @@ class NativeAccessIntegrationTest {
     private static void assertSanitizedFailure(MvcResult result, String token, boolean outage) {
         assertEquals(outage ? 503 : 401, result.getResponse().getStatus());
         if (outage) {
-            var error = assertInstanceOf(AccessException.class, result.getResolvedException());
-            assertEquals(AccessFailure.UNAVAILABLE, error.failure());
+            assertInstanceOf(AccessUnavailableException.class, result.getResolvedException());
         } else {
             var error = assertInstanceOf(NotLoginException.class, result.getResolvedException());
             assertEquals("login", error.getLoginType());
@@ -312,7 +313,7 @@ class NativeAccessIntegrationTest {
         CurrentSubjectSource source(StpLogic logic) {
             return token -> {
                 READS.incrementAndGet();
-                if (failure != null) throw new AccessException(failure);
+                if (failure != null) throw failure;
                 Object id = logic.getLoginIdByToken(token);
                 if (id == null) throw new AccessException(AccessFailure.UNAUTHENTICATED);
                 return new CurrentSubject(
@@ -327,6 +328,7 @@ class NativeAccessIntegrationTest {
      * 固定原生机制端点覆盖，不包含真实组织或角色业务。
      */
     @RestController
+    @PlatformJsonApi
     static class Endpoints {
         private final CurrentAccess current;
 
@@ -452,6 +454,7 @@ class NativeAccessIntegrationTest {
      * 只有类声明的权限仍由原生执行，方法无需重复注解。
      */
     @RestController
+    @PlatformJsonApi
     @SaCheckPermission("account:read")
     static class ClassPermissionEndpoint {
         @GetMapping("/class-permission")
@@ -464,6 +467,7 @@ class NativeAccessIntegrationTest {
      * 纯类权限不足不能因方法没有重复声明而允许。
      */
     @RestController
+    @PlatformJsonApi
     @SaCheckPermission("missing")
     static class ClassDeniedPermissionEndpoint {
         @GetMapping("/class-permission-denied")
@@ -476,6 +480,7 @@ class NativeAccessIntegrationTest {
      * 纯类匿名声明覆盖本类普通方法，同时保留原生匿名布尔语义。
      */
     @RestController
+    @PlatformJsonApi
     @SaIgnore
     static class ClassAnonymousEndpoint {
         @GetMapping("/class-anonymous")
@@ -490,6 +495,7 @@ class NativeAccessIntegrationTest {
      * 服务专用接口：位于 /internal/** 的匿名声明，网关不路由，只能凭 Same-Token 从系统内调用。
      */
     @RestController
+    @PlatformJsonApi
     static class ServiceOnlyEndpoint {
         @SaIgnore
         @GetMapping("/internal/service-only")
@@ -513,6 +519,7 @@ class NativeAccessIntegrationTest {
      * 原生使用方法声明类，拒绝无法覆盖的子类独有策略。
      */
     @RestController
+    @PlatformJsonApi
     @SaCheckPermission("missing")
     static class InheritedProtected extends ParentEndpoint {
     }
@@ -521,6 +528,7 @@ class NativeAccessIntegrationTest {
      * 空权限不是登录声明。
      */
     @RestController
+    @PlatformJsonApi
     static class EmptyPermission {
         @SaCheckPermission({})
         @GetMapping("/empty")
@@ -533,6 +541,7 @@ class NativeAccessIntegrationTest {
      * 匿名和保护不能依赖隐式覆盖顺序。
      */
     @RestController
+    @PlatformJsonApi
     @SaIgnore
     static class AnonymousMixed {
         @SaCheckLogin
@@ -546,6 +555,7 @@ class NativeAccessIntegrationTest {
      * 首批不支持二级安全认证分支。
      */
     @RestController
+    @PlatformJsonApi
     static class UnsupportedSafe {
         @SaCheckSafe
         @GetMapping("/safe")
@@ -558,6 +568,7 @@ class NativeAccessIntegrationTest {
      * 未支持的Basic声明也不依赖宿主处理器是否登记。
      */
     @RestController
+    @PlatformJsonApi
     static class UnsupportedBasic {
         @SaCheckHttpBasic
         @GetMapping("/basic")
@@ -570,6 +581,7 @@ class NativeAccessIntegrationTest {
      * 未支持的Digest声明也不依赖宿主处理器是否登记。
      */
     @RestController
+    @PlatformJsonApi
     static class UnsupportedDigest {
         @SaCheckHttpDigest
         @GetMapping("/digest")
@@ -582,6 +594,7 @@ class NativeAccessIntegrationTest {
      * 未支持的服务封禁声明不能退化成普通登录声明。
      */
     @RestController
+    @PlatformJsonApi
     static class UnsupportedDisable {
         @SaCheckDisable("unsupported")
         @GetMapping("/disable")
@@ -594,6 +607,7 @@ class NativeAccessIntegrationTest {
      * 受支持权限与不支持声明混合也不能只执行前者。
      */
     @RestController
+    @PlatformJsonApi
     static class PermissionWithUnsupportedSafe {
         @SaCheckPermission("iam:account:read")
         @SaCheckSafe
@@ -607,6 +621,7 @@ class NativeAccessIntegrationTest {
      * 空OR不能构成任何真实访问策略。
      */
     @RestController
+    @PlatformJsonApi
     static class EmptyOr {
         @SaCheckOr
         @GetMapping("/empty-or")
@@ -619,6 +634,7 @@ class NativeAccessIntegrationTest {
      * 嵌套类型约束与直接声明完全一致。
      */
     @RestController
+    @PlatformJsonApi
     static class NestedOtherType {
         @SaCheckOr(login = @SaCheckLogin(type = "other"))
         @GetMapping("/other")

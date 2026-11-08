@@ -4,9 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.domainforge.files.api.FileStore;
 import org.domainforge.files.internal.FileCleanup;
-import org.domainforge.files.internal.FileFailureAdvice;
 import org.domainforge.files.internal.FileMapper;
-import org.domainforge.files.internal.FileRejectionMapping;
 import org.domainforge.files.internal.FileStorageAssembly;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.ObjectProvider;
@@ -49,21 +47,5 @@ public class FileStorageAutoConfiguration {
     @Bean
     FileCleanup fileStorageCleanup(FileStorageAssembly assembly) {
         return assembly.cleanup();
-    }
-
-    /**
-     * 存储不可用 503、上传过大 413。
-     */
-    @Bean
-    FileFailureAdvice fileFailureAdvice() {
-        return new FileFailureAdvice();
-    }
-
-    /**
-     * 上传策略拒绝映射为业务拒绝。
-     */
-    @Bean
-    FileRejectionMapping fileRejectionMapping() {
-        return new FileRejectionMapping();
     }
 }

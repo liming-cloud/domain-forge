@@ -1,9 +1,11 @@
 package org.domainforge.servicecall.api;
 
+import org.domainforge.shared.DependencyUnavailableException;
+
 /**
- * 跨服务调用的失败。消息为固定文本，不包含对方响应内容、地址或令牌。
+ * 跨服务调用的失败；调用方不翻译时，web-support 统一按依赖不可用返回 503。消息为固定文本，不包含对方响应内容、地址或令牌。
  */
-public final class ServiceCallException extends RuntimeException {
+public final class ServiceCallException extends DependencyUnavailableException {
     private final ServiceCallFailure failure;
     private final String code;
 

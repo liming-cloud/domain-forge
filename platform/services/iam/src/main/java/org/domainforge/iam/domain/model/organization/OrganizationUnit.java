@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.model.organization;
 
-import org.domainforge.iam.domain.model.role.Role;
+import org.domainforge.iam.domain.IamRuleViolation;
+import org.domainforge.iam.domain.model.shared.DisplayName;
 import org.domainforge.shared.AggregateRoot;
 
 import java.util.List;
@@ -22,15 +23,15 @@ public record OrganizationUnit(long id, Long parentId, String name, boolean enab
      */
     public OrganizationUnit {
         if (id <= 0 || version < 1 || (parentId == null) != (id == ROOT_ID) || (parentId != null && parentId == id))
-            throw new IllegalArgumentException("组织身份、父节点或版本无效");
-        name = Role.requireName(name);
+            throw IamRuleViolation.invalid("ORG_STATE_INVALID", "组织身份、父节点或版本无效");
+        name = new DisplayName(name).value();
     }
 
     /**
      * 在指定父节点下创建启用的组织。
      */
     public static OrganizationUnit create(long id, long parentId, String name) {
-        if (id == ROOT_ID) throw new IllegalArgumentException("不能创建根组织");
+        if (id == ROOT_ID) throw IamRuleViolation.invalid("ORG_ROOT_CREATE", "不能创建根组织");
         return new OrganizationUnit(id, parentId, name, true, 1);
     }
 
@@ -38,7 +39,7 @@ public record OrganizationUnit(long id, Long parentId, String name, boolean enab
      * 修改名称；同级重名由数据库唯一约束兜底。
      */
     public OrganizationUnit rename(String next) {
-        String value = Role.requireName(next);
+        String value = new DisplayName(next).value();
         if (name.equals(value)) return this;
         return new OrganizationUnit(id, parentId, value, enabled, version + 1);
     }
@@ -48,7 +49,7 @@ public record OrganizationUnit(long id, Long parentId, String name, boolean enab
      */
     public OrganizationUnit changeEnabled(boolean state) {
         if (enabled == state) return this;
-        if (id == ROOT_ID) throw new IllegalStateException("根组织不能停用");
+        if (id == ROOT_ID) throw IamRuleViolation.conflict("ORG_ROOT_DISABLE", "根组织不能停用");
         return new OrganizationUnit(id, parentId, name, state, version + 1);
     }
 
@@ -59,8 +60,8 @@ public record OrganizationUnit(long id, Long parentId, String name, boolean enab
      * @param ancestorsOfParent  新父节点自身及其全部祖先 ID
      */
     public OrganizationUnit moveTo(long newParent, List<Long> ancestorsOfParent) {
-        if (id == ROOT_ID) throw new IllegalStateException("根组织不能移动");
-        if (ancestorsOfParent.contains(id)) throw new IllegalStateException("不能移到自身或下级之下");
+        if (id == ROOT_ID) throw IamRuleViolation.conflict("ORG_ROOT_MOVE", "根组织不能移动");
+        if (ancestorsOfParent.contains(id)) throw IamRuleViolation.conflict("ORG_MOVE_CYCLE", "不能移到自身或下级之下");
         if (parentId == newParent) return this;
         return new OrganizationUnit(id, newParent, name, enabled, version + 1);
     }
@@ -69,6 +70,6 @@ public record OrganizationUnit(long id, Long parentId, String name, boolean enab
      * 根不能删除；子节点、成员与范围引用由调用方在组织协调锁内核对。
      */
     public void requireDeletable() {
-        if (id == ROOT_ID) throw new IllegalStateException("根组织不能删除");
+        if (id == ROOT_ID) throw IamRuleViolation.conflict("ORG_ROOT_DELETE", "根组织不能删除");
     }
 }

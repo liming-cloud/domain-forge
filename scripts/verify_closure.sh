@@ -128,14 +128,14 @@ expect 403 "未分配角色的账号读取便笺"
 tally_is() {
     local attempt value
     for attempt in $(seq 1 60); do
-        value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"])')
+        value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin))')
         [ "$value" = "$1" ] && break
         sleep 1
     done
     [ "$value" = "$1" ] || fail "便笺统计应为 $1，实际 $value"
     [ "${2:-}" = "stable" ] || return 0
     sleep 5
-    value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"])')
+    value=$(get /api/board/note-tally "$alice_token" | python3 -I -c 'import json, sys; print(json.load(sys.stdin))')
     [ "$value" = "$1" ] || fail "便笺统计应稳定在 $1（疑有重复投递），5 秒后为 $value"
 }
 
@@ -214,7 +214,7 @@ done
 step "跨服务调用：board-service 以同一用户身份读取 note-service"
 digest=$(get /api/board/note-digest "$alice_token")
 expect 200 "调用方读取被调方便笺"
-[ "$(python3 -I -c 'import json, sys; print(json.load(sys.stdin)["data"]["count"])' <<< "$digest")" = "1" ] \
+[ "$(python3 -I -c 'import json, sys; print(json.load(sys.stdin)["count"])' <<< "$digest")" = "1" ] \
     || fail "调用方应按 alice 的本人范围得到 1 条便笺：$digest"
 get /api/board/note-digest "$bob_token" > /dev/null
 expect 403 "被调方的无权限判定应原样到达调用方"
@@ -277,7 +277,7 @@ grep -q '"code":"RATE_LIMITED"' "$work/body" || fail "限流响应应为 RATE_LI
 small_id=$(upload "$note_id" "$work/small.pdf" "$alice_token" | field id)
 expect 200 "其他账号的附件上传不受 bob 的限流影响"
 call DELETE "/api/notes/$note_id/files/$small_id" "" "$alice_token" > /dev/null
-expect 200 "删除用于验证的附件"
+expect 204 "删除用于验证的附件"
 
 step "多数据源：便笺归档到第二个库"
 post "/api/notes/$note_id/archive" "" "$alice_token" > /dev/null

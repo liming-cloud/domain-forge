@@ -2,7 +2,7 @@ package org.domainforge.iam.application.command.menu;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.command.DomainRules;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
@@ -55,14 +55,14 @@ public class ManageMenu {
         menus.lockStructure();
         catalog.lock(false);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
-        MenuItem item = DomainRules.apply(() -> MenuItem.create(
+        MenuItem item = MenuItem.create(
                 identifiers.next(), input.parentId(), input.type(), input.code(), input.name(), input.path(),
-                input.sortOrder(), input.permission()));
+                input.sortOrder(), input.permission());
         requirePermission(item.permission());
         if (menus.codeTaken(item.code())) throw new IamException(IamFailure.CONFLICT, "菜单代码已存在");
         MenuItem parent = input.parentId() == null ? null : menus.lock(input.parentId());
         if (input.parentId() != null && parent == null) throw new IamException(IamFailure.CONFLICT, "父菜单不存在");
-        DomainRules.check(() -> item.requireParent(parent));
+        item.requireParent(parent);
         menus.insert(item);
         record(actor, item.id(), "menu.create");
         return new CommandResult(item.id(), item.version());
@@ -74,12 +74,12 @@ public class ManageMenu {
     @Transactional
     public CommandResult update(
             String tokenDigest, long id, long version, String name, String path, int sortOrder, String permission) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         menus.lockStructure();
         catalog.lock(false);
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         MenuItem current = lock(id, version);
-        MenuItem changed = DomainRules.apply(() -> current.update(name, path, sortOrder, permission));
+        MenuItem changed = current.update(name, path, sortOrder, permission);
         requirePermission(changed.permission());
         return save(actor, current, changed, "menu.update");
     }
@@ -89,15 +89,15 @@ public class ManageMenu {
      */
     @Transactional
     public CommandResult move(String tokenDigest, long id, long version, Long parentId) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         menus.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         MenuItem current = lock(id, version);
         MenuItem parent = parentId == null ? null : menus.lock(parentId);
         if (parentId != null && parent == null) throw new IamException(IamFailure.CONFLICT, "父菜单不存在");
-        DomainRules.check(() -> current.requireParent(parent));
+        current.requireParent(parent);
         List<Long> ancestors = parentId == null ? List.of() : menus.ancestors(parentId);
-        return save(actor, current, DomainRules.apply(() -> current.moveTo(parentId, ancestors)), "menu.move");
+        return save(actor, current, current.moveTo(parentId, ancestors), "menu.move");
     }
 
     /**
@@ -105,7 +105,7 @@ public class ManageMenu {
      */
     @Transactional
     public CommandResult state(String tokenDigest, long id, long version, boolean enabled) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         menus.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         MenuItem current = lock(id, version);
@@ -117,7 +117,7 @@ public class ManageMenu {
      */
     @Transactional
     public void delete(String tokenDigest, long id, long version) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         menus.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         lock(id, version);
@@ -133,7 +133,7 @@ public class ManageMenu {
 
     private MenuItem lock(long id, long version) {
         MenuItem item = menus.lock(id);
-        return DomainRules.requireCurrent(item, item == null ? 0 : item.version(), version);
+        return ExpectedVersion.current(item, item == null ? 0 : item.version(), version);
     }
 
     private CommandResult save(CurrentIdentity actor, MenuItem current, MenuItem changed, String action) {

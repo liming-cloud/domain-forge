@@ -60,11 +60,7 @@ public class SqlAccessScopes implements AccessScopes {
     private static List<String> validated(List<String> permissions) {
         if (permissions == null || permissions.isEmpty() || permissions.size() > MAX_BATCH)
             throw new IamException(IamFailure.INVALID_REQUEST, "一次须查询1至32个权限");
-        try {
-            permissions.forEach(PermissionDefinition::requireCode);
-        } catch (IllegalArgumentException | NullPointerException rejected) {
-            throw new IamException(IamFailure.INVALID_REQUEST, "权限码格式无效");
-        }
+        permissions.forEach(PermissionDefinition::requireCode);
         return permissions;
     }
 

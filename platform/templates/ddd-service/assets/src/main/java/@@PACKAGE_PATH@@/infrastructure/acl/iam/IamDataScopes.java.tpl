@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpLogic;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import org.domainforge.access.api.AccessException;
 import org.domainforge.access.api.AccessFailure;
+import org.domainforge.access.api.AccessUnavailableException;
 import org.domainforge.shared.CurrentScope;
 import org.springframework.stereotype.Component;
 
@@ -32,7 +33,7 @@ public class IamDataScopes implements DataScopes {
         try {
             var scopes = IamFailures.data(client.scopes("Bearer " + token, List.of(permission)));
             CurrentScope scope = scopes.get(permission);
-            if (scope == null) throw new AccessException(AccessFailure.UNAVAILABLE);
+            if (scope == null) throw new AccessUnavailableException();
             return scope;
         } catch (RuntimeException failure) {
             throw IamFailures.translate(failure);

@@ -39,7 +39,7 @@ public class ReadNoteArchive {
         CurrentScope scope = scopes.scope(NotePermissions.READ);
         Note note = notes.find(noteId);
         if (note == null || !note.within(account, scope.all(), scope.self(), scope.unitIds()))
-            throw new NoteRejected("NOTE_NOT_FOUND", "便笺不存在");
-        return archive.find(noteId).orElseThrow(() -> new NoteRejected("NOTE_NOT_ARCHIVED", "便笺尚未归档"));
+            throw NoteRejected.notFound("NOTE_NOT_FOUND", "便笺不存在");
+        return archive.find(noteId).orElseThrow(() -> NoteRejected.conflict("NOTE_NOT_ARCHIVED", "便笺尚未归档"));
     }
 }

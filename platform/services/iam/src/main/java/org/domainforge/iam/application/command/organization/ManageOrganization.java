@@ -2,7 +2,7 @@ package org.domainforge.iam.application.command.organization;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.command.DomainRules;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
@@ -49,7 +49,7 @@ public class ManageOrganization {
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         if (units.lock(parentId) == null) throw new IamException(IamFailure.CONFLICT, "父组织不存在");
-        OrganizationUnit unit = DomainRules.apply(() -> OrganizationUnit.create(identifiers.next(), parentId, name));
+        OrganizationUnit unit = OrganizationUnit.create(identifiers.next(), parentId, name);
         requireUniqueName(unit);
         units.insert(unit);
         record(actor, unit.id(), "org.create");
@@ -61,11 +61,11 @@ public class ManageOrganization {
      */
     @Transactional
     public CommandResult rename(String tokenDigest, long id, long version, String name) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
-        OrganizationUnit changed = DomainRules.apply(() -> current.rename(name));
+        OrganizationUnit changed = current.rename(name);
         requireUniqueName(changed);
         return save(actor, current, changed, "org.update");
     }
@@ -75,13 +75,13 @@ public class ManageOrganization {
      */
     @Transactional
     public CommandResult move(String tokenDigest, long id, long version, long parentId) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
         var ancestors = units.ancestors(parentId);
         if (ancestors.isEmpty()) throw new IamException(IamFailure.CONFLICT, "父组织不存在");
-        OrganizationUnit changed = DomainRules.apply(() -> current.moveTo(parentId, ancestors));
+        OrganizationUnit changed = current.moveTo(parentId, ancestors);
         requireUniqueName(changed);
         return save(actor, current, changed, "org.move");
     }
@@ -91,11 +91,11 @@ public class ManageOrganization {
      */
     @Transactional
     public CommandResult state(String tokenDigest, long id, long version, boolean enabled) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
-        return save(actor, current, DomainRules.apply(() -> current.changeEnabled(enabled)), "org.state");
+        return save(actor, current, current.changeEnabled(enabled), "org.state");
     }
 
     /**
@@ -103,11 +103,11 @@ public class ManageOrganization {
      */
     @Transactional
     public void delete(String tokenDigest, long id, long version) {
-        DomainRules.requireVersion(id, version);
+        ExpectedVersion.require(id, version);
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
-        DomainRules.check(current::requireDeletable);
+        current.requireDeletable();
         if (units.referenced(id)) throw new IamException(IamFailure.CONFLICT, "组织仍有下级、成员或范围引用");
         units.delete(id);
         record(actor, id, "org.delete");
@@ -120,7 +120,7 @@ public class ManageOrganization {
 
     private OrganizationUnit lock(long id, long version) {
         OrganizationUnit unit = units.lock(id);
-        return DomainRules.requireCurrent(unit, unit == null ? 0 : unit.version(), version);
+        return ExpectedVersion.current(unit, unit == null ? 0 : unit.version(), version);
     }
 
     private CommandResult save(
