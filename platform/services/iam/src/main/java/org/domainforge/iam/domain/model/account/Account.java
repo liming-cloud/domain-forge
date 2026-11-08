@@ -3,7 +3,8 @@ package org.domainforge.iam.domain.model.account;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.shared.LoginName;
 import org.domainforge.iam.domain.model.shared.SystemRole;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.Objects;
 import java.util.Set;
@@ -14,16 +15,16 @@ import java.util.Set;
  * <p>账号 ID 为应用分配的雪花 long，创建前即确定，便于同一事务内关联邀请与审计。
  * 角色与成员归属只持 ID；角色、组织是否存在由应用在同一事务内核对。
  */
+@AggregateRoot
 public record Account(
-        long id,
+        @Identity long id,
         String loginName,
         String credentialDigest,
         long credentialVersion,
         long version,
         boolean enabled,
         Set<Long> roleIds,
-        Set<Membership> memberships)
-        implements AggregateRoot {
+        Set<Membership> memberships) {
     /**
      * 一个账号最多分配的角色数，与当前主体合同的上限一致。
      */

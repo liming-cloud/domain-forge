@@ -117,6 +117,55 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    void domainCannotThrowGenericException() {
+        assertViolation("fixture.bad.domainexc", "[领域异常]");
+    }
+
+    @Test
+    void applicationCannotCatchDomainException() {
+        assertViolation("fixture.bad.catchdomain", "[领域异常]");
+    }
+
+    @Test
+    void aggregateMustReferOtherAggregateById() {
+        assertViolation("fixture.bad.aggref", "[DDD 模型]");
+    }
+
+    @Test
+    void repositoryCannotExposeNonRootEntity() {
+        assertViolation("fixture.bad.repoentity", "[仓储]");
+    }
+
+    @Test
+    void repositoryMustInvolveAggregateRoot() {
+        assertViolation("fixture.bad.repoplain", "[仓储]");
+    }
+
+    @Test
+    void domainCannotUseTransportTypeFromShared() {
+        assertViolation("fixture.bad.domainshared", "[技术边界]");
+    }
+
+    @Test
+    void infrastructureCannotDependOnInterfaces() {
+        assertViolation("fixture.bad.infraiface", "[依赖方向]");
+    }
+
+    @Test
+    void interfacesCannotDependOnDomain() {
+        assertViolation("fixture.bad.ifacedomain", "[依赖方向]");
+    }
+
+    @Test
+    void oneUseCaseMethodMustWriteOneAggregate() {
+        List<String> violations = check("fixture.bad.multiwrite");
+        assertTrue(violations.stream().anyMatch(item -> item.startsWith("[单聚合事务]") && item.contains(".place ")),
+                violations.toString());
+        assertTrue(violations.stream().anyMatch(item -> item.startsWith("[单聚合事务]") && item.contains(".viaLambda ")),
+                violations.toString());
+    }
+
+    @Test
     void metricsReportListsEveryComponent() {
         String report = ComponentRules.report(new ClassFileImporter().importPackages("org.domainforge.fixture.stab"));
         assertTrue(report.contains("org.domainforge.fixture.stab:api\t"), report);

@@ -3,15 +3,17 @@ package org.domainforge.iam.domain.model.menu;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
 import org.domainforge.iam.domain.model.shared.DisplayName;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.List;
 
 /**
  * 菜单树节点；受保护页面和按钮关联真实权限。可见投影只服务展示，不授予 API 权限。
  */
+@AggregateRoot
 public record MenuItem(
-        long id,
+        @Identity long id,
         Long parentId,
         MenuType type,
         String code,
@@ -20,8 +22,7 @@ public record MenuItem(
         int sortOrder,
         String permission,
         boolean enabled,
-        long version)
-        implements AggregateRoot {
+        long version) {
     /**
      * 校验代码、名称、路径与权限关联。
      */

@@ -38,6 +38,17 @@
             </dependency>
 
             <dependency>
+                <groupId>org.jmolecules</groupId>
+                <artifactId>jmolecules-ddd</artifactId>
+                <version>1.10.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jmolecules.integrations</groupId>
+                <artifactId>jmolecules-archunit</artifactId>
+                <!-- 不得升到 1.6.0：它按 ArchUnit 0.23 编译，与 1.x 二进制不兼容。 -->
+                <version>0.33.0</version>
+            </dependency>
+            <dependency>
                 <groupId>org.domainforge</groupId>
                 <artifactId>shared</artifactId>
                 <version>${project.version}</version>

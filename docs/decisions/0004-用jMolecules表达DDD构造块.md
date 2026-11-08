@@ -17,9 +17,11 @@ DDD 规则（聚合按 ID 引用、仓储只针对聚合根等）需要构建门
 
 由 [#107](https://github.com/liming-cloud/domain-forge/issues/107) 修订：
 
-- [R-09](../rules/01-需求与领域建模.md#r-09-用-shared-中的三个角色标识)：角色标识由 `shared` 的标记接口改为 jMolecules 类型。
+- [R-09](../rules/01-需求与领域建模.md#r-09-用-jmolecules-标识领域角色)：角色标识由 `shared` 的标记接口改为 jMolecules 类型。
 - [S-02](../rules/02-系统设计.md#s-02-领域层不依赖框架)：领域层允许依赖 `org.jmolecules.ddd`。
 - [R-13](../rules/01-需求与领域建模.md#r-13-聚合要小按-id-引用聚合之外最终一致)、[R-14](../rules/01-需求与领域建模.md#r-14-仓储只针对聚合根) 的自动检查。
+
+角色标识采用 jMolecules 注解（`@AggregateRoot`、`@Entity`、`@ValueObject`、`@Identity`）而不是 `AggregateRoot<T, ID>` 接口：IAM 与模板的聚合是 record，接口要求 `getId()` 返回 `Identifier` 类型，会迫使每个聚合新增标识类型并改动全部映射；注解满足同一套 `JMoleculesDddRules`。已由 #107 完成，`shared` 中的三个标记接口已删除。
 
 ## 参考来源
 

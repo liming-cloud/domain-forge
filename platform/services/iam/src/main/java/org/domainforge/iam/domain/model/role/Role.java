@@ -3,7 +3,8 @@ package org.domainforge.iam.domain.model.role;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.shared.DisplayName;
 import org.domainforge.iam.domain.model.shared.SystemRole;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.Objects;
 import java.util.Set;
@@ -14,9 +15,10 @@ import java.util.stream.Collectors;
  *
  * <p>SYSTEM_ADMIN 为受保护系统角色：只显式拥有 IAM 管理权限，不能停用、删除、改码或修改授予。
  */
+@AggregateRoot
 public record Role(
-        long id, String code, String name, boolean enabled, boolean system, long version, Set<PermissionGrant> grants)
-        implements AggregateRoot {
+        @Identity long id, String code, String name, boolean enabled, boolean system, long version,
+        Set<PermissionGrant> grants) {
     /**
      * 系统管理员角色的固定代码，ID 见 {@link SystemRole#ADMIN_ID}，由数据库基线创建。
      */

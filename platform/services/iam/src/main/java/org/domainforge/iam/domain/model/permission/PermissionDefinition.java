@@ -1,7 +1,7 @@
 package org.domainforge.iam.domain.model.permission;
 
 import org.domainforge.iam.domain.IamRuleViolation;
-import org.domainforge.shared.ValueObject;
+import org.jmolecules.ddd.annotation.ValueObject;
 
 /**
  * 权限目录中的一个精确操作码；只有目录中的权限可以授予，不存在通配符。
@@ -11,8 +11,8 @@ import org.domainforge.shared.ValueObject;
  * @param scoped     授予时是否需要数据范围
  * @param systemOnly 是否只能授予系统角色（仅 IAM 自身管理权限）
  */
-public record PermissionDefinition(String code, String name, boolean scoped, boolean systemOnly)
-        implements ValueObject {
+@ValueObject
+public record PermissionDefinition(String code, String name, boolean scoped, boolean systemOnly) {
     /**
      * IAM 自身命名空间由数据库基线维护，不能通过安装接口修改。
      */

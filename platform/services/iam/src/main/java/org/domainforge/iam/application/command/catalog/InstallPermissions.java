@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,7 +41,11 @@ public class InstallPermissions {
      * 整体替换命名空间内容，返回安装后的权限数；内容不变时不写入也不审计。
      */
     @Transactional
-    public int install(String tokenDigest, PermissionNamespace next) {
+    public int install(String tokenDigest, String namespace, List<PermissionInput> inputs) {
+        Set<PermissionDefinition> definitions = new HashSet<>();
+        for (PermissionInput input : inputs)
+            definitions.add(new PermissionDefinition(input.code(), input.name(), input.scoped(), input.systemOnly()));
+        PermissionNamespace next = new PermissionNamespace(namespace, definitions);
         catalog.lock(true);
         var actor = authorization.requireSystem(tokenDigest, "iam:catalog:manage");
         PermissionNamespace current = catalog.namespace(next.namespace());

@@ -1,7 +1,7 @@
 package org.domainforge.iam.domain.model.shared;
 
 import org.domainforge.iam.domain.IamRuleViolation;
-import org.domainforge.shared.ValueObject;
+import org.jmolecules.ddd.annotation.ValueObject;
 
 import java.util.Locale;
 
@@ -10,7 +10,8 @@ import java.util.Locale;
  *
  * @param value 规范化后的登录名
  */
-public record LoginName(String value) implements ValueObject {
+@ValueObject
+public record LoginName(String value) {
     /**
      * 校验并规范化大小写。
      */

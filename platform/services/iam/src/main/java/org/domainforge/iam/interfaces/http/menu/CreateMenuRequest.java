@@ -1,7 +1,6 @@
 package org.domainforge.iam.interfaces.http.menu;
 
 import org.domainforge.iam.application.command.menu.MenuInput;
-import org.domainforge.iam.domain.model.menu.MenuType;
 
 /**
  * 创建菜单项。
@@ -17,6 +16,6 @@ public record CreateMenuRequest(
     }
 
     MenuInput toInput() {
-        return new MenuInput(parentId, MenuType.valueOf(type), code, name, path, sortOrder, permission);
+        return new MenuInput(parentId, type, code, name, path, sortOrder, permission);
     }
 }

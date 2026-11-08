@@ -2,21 +2,22 @@ package org.domainforge.iam.domain.model.invitation;
 
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.shared.LoginName;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.time.Instant;
 
 /**
  * 注册邀请是绑定登录名、有效期内可用的一次性凭据；秘密仅以摘要保存。是否已被使用由账号记录的邀请摘要推导，不在本聚合中保存。
  */
+@AggregateRoot
 public record RegistrationInvitation(
-        long id,
+        @Identity long id,
         String loginName,
         String secretDigest,
         Instant expiresAt,
         long createdBy,
-        boolean invalidated)
-        implements AggregateRoot {
+        boolean invalidated) {
     /**
      * 恢复状态也校验必要身份、秘密摘要和互斥的终态。
      */

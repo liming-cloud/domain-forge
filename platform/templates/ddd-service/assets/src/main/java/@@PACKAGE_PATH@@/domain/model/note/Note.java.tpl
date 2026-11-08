@@ -1,7 +1,8 @@
 package @@PACKAGE@@.domain.model.note;
 
-import org.domainforge.shared.AggregateRoot;
 
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 import java.util.Set;
 
 /**
@@ -9,8 +10,8 @@ import java.util.Set;
  *
  * <p>范围事实由应用从 IAM 取得后以纯值传入，领域不依赖 IAM 或传输类型。
  */
-public record Note(long id, long ownerId, Long unitId, String title, String content, long version)
-        implements AggregateRoot {
+@AggregateRoot
+public record Note(@Identity long id, long ownerId, Long unitId, String title, String content, long version) {
     /**
      * 一条便笺最多的附件数。
      */

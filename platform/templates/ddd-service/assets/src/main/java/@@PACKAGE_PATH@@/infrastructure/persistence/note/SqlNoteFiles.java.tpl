@@ -1,6 +1,6 @@
 package @@PACKAGE@@.infrastructure.persistence.note;
 
-import @@PACKAGE@@.domain.repository.NoteFileRepository;
+import @@PACKAGE@@.application.port.attachment.NoteAttachments;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -9,7 +9,7 @@ import java.util.List;
  * MyBatis 便笺附件关联。
  */
 @Repository
-public class SqlNoteFiles implements NoteFileRepository {
+public class SqlNoteFiles implements NoteAttachments {
     private final NoteFileMapper mapper;
 
     /**

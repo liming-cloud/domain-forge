@@ -1,11 +1,9 @@
 package org.domainforge.iam.interfaces.http.role;
 
-import org.domainforge.iam.domain.model.role.PermissionGrant;
+import org.domainforge.iam.application.command.role.GrantInput;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * 整体替换角色授予。
@@ -23,9 +21,7 @@ public record GrantsRequest(long expectedVersion, List<GrantBody> grants) {
         grants = List.copyOf(grants);
     }
 
-    Set<PermissionGrant> toDomain() {
-        Set<PermissionGrant> values = new HashSet<>();
-        for (GrantBody grant : grants) values.add(grant.toDomain());
-        return values;
+    List<GrantInput> toInput() {
+        return grants.stream().map(GrantBody::toInput).toList();
     }
 }

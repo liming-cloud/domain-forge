@@ -2,7 +2,8 @@ package org.domainforge.iam.domain.model.organization;
 
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.shared.DisplayName;
-import org.domainforge.shared.AggregateRoot;
+import org.jmolecules.ddd.annotation.AggregateRoot;
+import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.List;
 
@@ -11,8 +12,8 @@ import java.util.List;
  *
  * <p>节点本身及全部祖先启用时才是有效部门；有效性由查询按当前结构计算，不在节点上冗余保存。
  */
-public record OrganizationUnit(long id, Long parentId, String name, boolean enabled, long version)
-        implements AggregateRoot {
+@AggregateRoot
+public record OrganizationUnit(@Identity long id, Long parentId, String name, boolean enabled, long version) {
     /**
      * 根组织的固定 ID，由数据库基线创建。
      */

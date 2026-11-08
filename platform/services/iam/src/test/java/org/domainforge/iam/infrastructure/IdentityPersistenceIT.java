@@ -10,6 +10,7 @@ import org.domainforge.iam.application.command.authentication.Logout;
 import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.command.registration.InvitationIssued;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
+import org.domainforge.iam.application.command.role.GrantInput;
 import org.domainforge.iam.application.command.role.ManageRole;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
@@ -25,7 +26,6 @@ import org.domainforge.iam.bootstrap.IamApplication;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.role.DataScope;
-import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
@@ -424,8 +424,8 @@ class IdentityPersistenceIT {
         register(admin, "target.member");
         String adminDigest = identity(admin).tokenDigest();
         long role = bean(ManageRole.class).create(adminDigest, "ACCOUNT_STATE", "账号状态").targetId();
-        bean(ManageRole.class).grants(adminDigest, role, 1, Set.of(
-                new PermissionGrant("iam:account:state", DataScope.NOT_APPLICABLE, Set.of())));
+        bean(ManageRole.class).grants(adminDigest, role, 1, List.of(
+                new GrantInput("iam:account:state", DataScope.NOT_APPLICABLE.name(), Set.of())));
         Account limited = account("limited.admin");
         var manage = bean(ManageAccount.class);
         manage.roles(adminDigest, limited.id(), limited.version(), Set.of(role));

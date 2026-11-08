@@ -109,6 +109,6 @@ public final class AccountController {
     @Operation(summary = "变更成员归属")
     public ChangeResponse memberships(@PathVariable long id, @RequestBody MembershipsRequest input) {
         return ChangeResponse.of(management.memberships(
-                identity.current().tokenDigest(), id, input.expectedVersion(), input.toDomain()));
+                identity.current().tokenDigest(), id, input.expectedVersion(), input.toInput()));
     }
 }
