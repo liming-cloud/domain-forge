@@ -22,6 +22,16 @@ public interface AccountRepository {
     void insert(Account account);
 
     /**
+     * 创建受邀账号并记录所用邀请的摘要；同一摘要至多一个账号，由数据库唯一约束兜底。
+     */
+    void insertInvited(Account account, String invitationDigest);
+
+    /**
+     * 该邀请摘要是否已创建过账号。
+     */
+    boolean invitationUsed(String invitationDigest);
+
+    /**
      * 仅按原版本保存转换结果（含角色与成员归属），零行必须报告冲突。
      */
     void update(Account account, long expectedVersion);

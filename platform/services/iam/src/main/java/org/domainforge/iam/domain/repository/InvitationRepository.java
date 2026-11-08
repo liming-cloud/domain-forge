@@ -3,11 +3,11 @@ package org.domainforge.iam.domain.repository;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 
 /**
- * 注册邀请仓储；消费邀请与创建账号必须参与同一业务事务。
+ * 注册邀请仓储；邀请只作为一次性凭据被读取，使用事实记录在账号上。
  */
 public interface InvitationRepository {
     /**
-     * 按高熵秘密的摘要锁定邀请，不存在返回null。
+     * 按高熵秘密的摘要锁定邀请（与重发互斥），不存在返回null。
      */
     RegistrationInvitation lockByDigest(String digest);
 
@@ -22,7 +22,7 @@ public interface InvitationRepository {
     void insert(RegistrationInvitation invitation);
 
     /**
-     * 保存消费或失效终态；调用方必须先锁定仍有效的原状态。
+     * 保存失效终态；调用方必须先锁定仍有效的原状态。
      */
-    void finish(RegistrationInvitation invitation);
+    void invalidate(RegistrationInvitation invitation);
 }

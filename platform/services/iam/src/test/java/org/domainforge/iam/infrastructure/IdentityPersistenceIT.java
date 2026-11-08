@@ -547,6 +547,20 @@ class IdentityPersistenceIT {
         assertEquals(accepted ? 1 : 2, sql.auditCount("invitation.issue"));
     }
 
+    // 已使用的邀请（由账号上的邀请摘要推导）不能再次注册，也不能被重发。
+    @Test
+    void usedInvitationCannotBeReusedOrReissued() {
+        String admin = login(ADMIN, PASSWORD);
+        InvitationIssued issued = invite(admin, "used.member");
+        bean(AcceptInvitation.class).execute(issued.secret(), "used.member", PASSWORD);
+        var accept = bean(AcceptInvitation.class);
+        assertThrows(RuntimeException.class, () -> accept.execute(issued.secret(), "used.member", PASSWORD));
+        String digest = identity(admin).tokenDigest();
+        assertThrows(RuntimeException.class,
+                () -> bean(IssueInvitation.class).execute(digest, "used.member", issued.invitationId()));
+        assertEquals(1, sql.accountCount("used.member"));
+    }
+
     // 保留期清理每批有界，过期审计分批删除，新审计保留。
     @Test
     void retentionDeletesInBoundedBatches() {

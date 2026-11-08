@@ -25,6 +25,16 @@ public interface AccountMapper {
     int insert(AccountRow row);
 
     /**
+     * 同时写入所用邀请的摘要；唯一键保证一份邀请至多创建一个账号。
+     */
+    int insertInvited(@Param("row") AccountRow row, @Param("invitationDigest") String invitationDigest);
+
+    /**
+     * 邀请摘要是否已记录在某个账号上。
+     */
+    boolean invitationUsed(String invitationDigest);
+
+    /**
      * 乐观版本条件同时保护意外漏锁调用。
      */
     int update(@Param("row") AccountRow row, @Param("expected") long expected);

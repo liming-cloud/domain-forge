@@ -13,7 +13,6 @@ public record InvitationRow(
         String secretDigest,
         Instant expiresAt,
         long createdBy,
-        Long consumedBy,
         boolean invalidated) {
     /**
      * 将领域邀请转换为存储表示。
@@ -25,12 +24,11 @@ public record InvitationRow(
                 invitation.secretDigest(),
                 invitation.expiresAt(),
                 invitation.createdBy(),
-                invitation.consumedBy(),
                 invitation.invalidated());
     }
 
     /**
-     * 恢复领域状态，消费身份为空表示尚未消费。
+     * 恢复领域状态。
      */
     RegistrationInvitation toDomain() {
         return new RegistrationInvitation(
@@ -39,7 +37,6 @@ public record InvitationRow(
                 secretDigest,
                 expiresAt,
                 createdBy,
-                consumedBy,
                 invalidated);
     }
 

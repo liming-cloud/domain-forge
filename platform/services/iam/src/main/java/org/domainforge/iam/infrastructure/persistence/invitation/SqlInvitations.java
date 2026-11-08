@@ -43,8 +43,8 @@ public class SqlInvitations implements InvitationRepository {
      * 已结束的邀请不能被第二次写入覆盖。
      */
     @Override
-    public void finish(RegistrationInvitation invitation) {
-        if (mapper.finish(InvitationRow.from(invitation)) != 1) {
+    public void invalidate(RegistrationInvitation invitation) {
+        if (mapper.invalidate(InvitationRow.from(invitation)) != 1) {
             throw new IamException(IamFailure.CONFLICT, "邀请状态已变化");
         }
     }

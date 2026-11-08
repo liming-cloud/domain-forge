@@ -16,6 +16,14 @@
         INSERT INTO iam_account (id, login_name, credential_digest, credential_version, version, enabled)
         VALUES (#{id}, #{loginName}, #{credentialDigest}, #{credentialVersion}, #{version}, #{enabled})
     </insert>
+    <insert id="insertInvited">
+        INSERT INTO iam_account (id, login_name, credential_digest, credential_version, version, enabled, invitation_digest)
+        VALUES (#{row.id}, #{row.loginName}, #{row.credentialDigest}, #{row.credentialVersion}, #{row.version},
+                #{row.enabled}, #{invitationDigest})
+    </insert>
+    <select id="invitationUsed" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM iam_account WHERE invitation_digest = #{invitationDigest})
+    </select>
     <update id="update">
         UPDATE iam_account
         SET credential_digest  = #{row.credentialDigest},
