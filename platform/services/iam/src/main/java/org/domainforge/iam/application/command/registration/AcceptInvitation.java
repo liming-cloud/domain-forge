@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
- * 邀请消费与新账号创建原子提交；同一邀请只能成功一次，重复提交返回冲突。
+ * 注册只新建账号一个聚合；邀请是一次性凭据，使用事实记录在账号上，同一邀请只能成功一次，重复提交返回冲突。
  */
 @Service
 public final class AcceptInvitation {
@@ -55,7 +55,7 @@ public final class AcceptInvitation {
     }
 
     /**
-     * 注册密码不做规范化；密码摘要在事务外计算，邀请消费、建号与审计在同一事务提交。
+     * 注册密码不做规范化；密码摘要在事务外计算，建号与审计在同一事务提交。
      */
     public CommandResult execute(String secret, String loginName, String password) {
         if (secret == null || !secret.matches("[A-Za-z0-9_-]{43}"))
@@ -67,16 +67,15 @@ public final class AcceptInvitation {
     }
 
     /**
-     * 锁定邀请后消费；任一步失败都同时回滚账号、邀请和审计。
+     * 锁定邀请（与重发互斥）后校验并建号；邀请本身不被修改，任一步失败都回滚账号与审计。
      */
     private CommandResult register(String invitationDigest, String name, String digest) {
         RegistrationInvitation invitation = invitations.lockByDigest(invitationDigest);
-        if (invitation == null || !invitation.loginName().equals(name))
+        if (invitation == null || !invitation.loginName().equals(name) || accounts.invitationUsed(invitationDigest))
             throw IamRuleViolation.conflict("INVITATION_UNUSABLE", "邀请无效或已失效");
+        invitation.requireUsable(clock.now());
         Account account = Account.register(identifiers.next(), name, digest);
-        RegistrationInvitation consumed = invitation.consume(account.id(), clock.now());
-        accounts.insert(account);
-        invitations.finish(consumed);
+        accounts.insertInvited(account, invitationDigest);
         audit.record(new AuditEvent("invitation-holder", account.id(), "invitation.accept"));
         return new CommandResult(account.id(), account.version());
     }

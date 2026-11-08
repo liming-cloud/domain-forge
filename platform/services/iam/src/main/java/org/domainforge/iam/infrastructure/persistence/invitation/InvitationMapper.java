@@ -23,5 +23,5 @@ public interface InvitationMapper {
     /**
      * 仅未消费未失效邀请可转换，零行表示状态冲突。
      */
-    int finish(InvitationRow row);
+    int invalidate(InvitationRow row);
 }

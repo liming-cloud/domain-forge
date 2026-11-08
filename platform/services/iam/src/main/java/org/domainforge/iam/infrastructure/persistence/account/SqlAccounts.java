@@ -51,6 +51,17 @@ public class SqlAccounts implements AccountRepository {
         writeChildren(account);
     }
 
+    @Override
+    public void insertInvited(Account account, String invitationDigest) {
+        mapper.insertInvited(AccountRow.from(account), invitationDigest);
+        writeChildren(account);
+    }
+
+    @Override
+    public boolean invitationUsed(String invitationDigest) {
+        return mapper.invitationUsed(invitationDigest);
+    }
+
     /**
      * 零行写入是版本冲突，不能默认为已完成；子表整体替换。
      */

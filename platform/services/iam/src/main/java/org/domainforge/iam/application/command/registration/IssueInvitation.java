@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 
 /**
- * 创建或显式重发注册邀请；已消费的邀请不能借重发重置账号。
+ * 创建或显式重发注册邀请；已被使用的邀请不能借重发重置账号。
  */
 @Service
 public class IssueInvitation {
@@ -67,7 +67,6 @@ public class IssueInvitation {
                 secrets.digest(secret),
                 clock.now().plus(VALIDITY),
                 actor.accountId(),
-                null,
                 false);
         invitations.insert(invitation);
         audit.record(new AuditEvent(Long.toString(actor.accountId()), invitation.id(), "invitation.issue"));
@@ -75,12 +74,13 @@ public class IssueInvitation {
     }
 
     /**
-     * 重发不能换绑登录名；消费与重发竞争同一行锁，只有一个转换可提交。
+     * 重发不能换绑登录名；注册与重发竞争同一邀请行锁，锁内再确认邀请未被使用。
      */
     private void invalidate(long id, String name) {
         RegistrationInvitation original = invitations.lock(id);
         if (original == null || !original.loginName().equals(name))
             throw new IamException(IamFailure.CONFLICT, "原邀请不可重发");
-        invitations.finish(original.invalidate());
+        if (accounts.invitationUsed(original.secretDigest())) throw new IamException(IamFailure.CONFLICT, "原邀请已被使用");
+        invitations.invalidate(original.invalidate());
     }
 }
