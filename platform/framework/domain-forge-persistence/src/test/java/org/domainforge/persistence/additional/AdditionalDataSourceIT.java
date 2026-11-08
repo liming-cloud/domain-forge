@@ -3,6 +3,7 @@ package org.domainforge.persistence.additional;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.domainforge.persistence.api.AdditionalDataSource;
 import org.domainforge.persistence.api.AdditionalMapper;
+import org.domainforge.persistence.autoconfigure.AdditionalDataSources;
 import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -137,8 +138,8 @@ class AdditionalDataSourceIT {
     @Test
     void invalidDeclarationFailsFast() {
         var environment = application.getBean(Environment.class);
-        assertThrows(IllegalStateException.class, () -> AdditionalDataSource.create("missing", environment));
-        assertThrows(IllegalArgumentException.class, () -> AdditionalDataSource.create("Bad-Name", environment));
+        assertThrows(IllegalStateException.class, () -> AdditionalDataSources.create("missing", environment));
+        assertThrows(IllegalArgumentException.class, () -> AdditionalDataSources.create("Bad-Name", environment));
     }
 
     private static String rootMessage(Throwable failure) {
@@ -195,7 +196,7 @@ class AdditionalDataSourceIT {
     static class Application {
         @Bean(destroyMethod = "close")
         AdditionalDataSource extra(Environment environment) {
-            return AdditionalDataSource.create("extra", environment);
+            return AdditionalDataSources.create("extra", environment);
         }
 
         @Bean(defaultCandidate = false)

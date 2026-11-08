@@ -314,8 +314,8 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteFiles.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteFiles.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteFiles.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteFiles.java",
       "example": true
     },
     {
@@ -374,8 +374,8 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteArchive.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/query/note/ReadNoteArchive.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteArchive.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/usecase/note/ReadNoteArchive.java",
       "example": true
     },
     {
