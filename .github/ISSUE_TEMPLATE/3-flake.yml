@@ -1,13 +1,13 @@
 name: 不稳定测试
-description: 同一代码时而通过时而失败的测试；先搜索已有 issue，有则追加记录
-title: "[Flaky test] "
+description: 同一代码时而通过时而失败的测试；先搜索已有 Issue，有就追加记录。评测指标的波动不用这个模板
+title: ""
 labels: ["kind/flake"]
 body:
   - type: input
     id: test
     attributes:
       label: 测试
-      description: 类名与方法名
+      description: 类名和方法名
     validations:
       required: true
   - type: textarea
@@ -21,7 +21,7 @@ body:
     id: log
     attributes:
       label: 日志
-      description: 失败测试的完整日志，不只是断言行
+      description: 失败测试的完整日志（CI 的测试报告产物），不只是断言行
       render: text
     validations:
       required: true
@@ -29,7 +29,7 @@ body:
     id: plan
     attributes:
       label: 处理
-      description: 再次出现且未修复时先隔离（禁用并在注释中链接本 issue），再定位根因
       value: |
+        - [ ] 再次出现且没修好时，先禁用该测试并在注释里链接本 Issue
         - [ ] 定位根因
-        - [ ] 修复（产品代码问题同时加 kind/bug）
+        - [ ] 修复并恢复测试（根因在产品代码时同时加 `kind/bug`）
