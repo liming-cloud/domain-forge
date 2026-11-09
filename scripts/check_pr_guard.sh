@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# PR 过程守卫：标题前缀必须是 feat/fix/build/docs，且 PR 内不含以 wip 开头的提交。# 用法：check_pr_guard.sh <PR 标题> <base 提交> <head 提交>
+# PR 过程守卫：标题前缀必须是 feat/fix/build/docs，且 PR 内不含以 wip 开头的提交。
+# 用法：check_pr_guard.sh <PR 标题> <base 提交> <head 提交>
 set -euo pipefail
 
 title=$1
