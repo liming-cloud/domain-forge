@@ -4,7 +4,7 @@
 
 ## 开工前
 
-1. 任务来自 `status/ready`、且依赖（blocked by）已全部关闭的任务 issue，编号小的优先（流程见[开发流程](docs/workflow/01-开发流程.md#任务与-issue)）。issue 描述是唯一依据，任务不在其范围内时先问人。没有就绪的任务时，先把未决问题写进对应 issue，不自行开工。
+1. 任务来自 `status/ready`、且依赖（blocked by）已全部关闭的结果 issue，编号小的优先（流程见[开发流程](docs/workflow/01-开发流程.md#任务与-issue)）。issue 描述是唯一依据，任务不在其范围内时先问人。没有就绪的任务时，先把未决问题写进对应 issue，不自行开工。
 2. 执行 `git config core.hooksPath .githooks`，启用钩子（拦截在 `main` 上的提交）；从最新 `main` 新建功能分支再动手。WIP 提交只放功能分支，暂停时推送功能分支；PR 含以 `wip` 开头的提交会被 CI 拒绝，评审前整理掉。
 3. 读[总体架构](docs/explanation/总体架构.md)：模块划分、依赖方向、DDD 分层和查询短路径。
 4. 按任务类型读规则卡和参考页（卡号连续的一段写成范围，只读相关的卡；参考页只读用到的组件）：
@@ -58,4 +58,4 @@ scripts/smoke_service.sh <服务>                          # 单服务冒烟，�
 
 ## 交付
 
-按[开发流程](docs/workflow/01-开发流程.md#pr-要求)开 PR：一个 PR 解决一个任务 issue，描述写 `Closes #n` 与闭合的验收场景；没做完的部分建后续 issue，由人同意；行为变化要有测试，文档在同一 PR 中更新。
+按[开发流程](docs/workflow/01-开发流程.md#pr-要求)开 PR：标题和提交前缀只用 `feat:`、`fix:`、`build:`、`docs:`；一个 PR 解决一个结果 issue，按 PR 模板写 `Closes #n` 与验收标准对照；没做完的部分建后续 issue，由人同意；行为变化要有测试，文档在同一 PR 中更新。

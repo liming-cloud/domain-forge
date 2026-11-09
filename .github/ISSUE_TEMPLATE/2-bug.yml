@@ -1,31 +1,31 @@
 name: 缺陷
-description: 行为与合同或文档不符
-title: "[缺陷] "
+description: main 变红，或行为与合同、文档、验收标准不符
+title: ""
 labels: ["kind/bug"]
 body:
   - type: textarea
     id: actual
     attributes:
       label: 现象
-      description: 原样粘贴错误信息、日志或响应，不要转述
+      description: 原样粘贴错误信息、日志、CI 运行链接或接口响应，不要转述；不贴客户数据和密钥
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
       label: 期望
-      description: 依据的合同或文档链接
+      description: 依据的合同、文档、决定或验收标准（链接）
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
       label: 复现
-      description: 可以执行的命令、测试或请求
+      description: 能执行的命令、测试或请求
     validations:
       required: true
   - type: textarea
     id: cause
     attributes:
       label: 怀疑原因
-      description: 可选；未证实的写明是猜测
+      description: 可选；没证实的写明是猜测
