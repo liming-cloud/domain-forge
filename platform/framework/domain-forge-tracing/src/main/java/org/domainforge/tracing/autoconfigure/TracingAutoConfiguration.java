@@ -9,6 +9,7 @@ import org.domainforge.tracing.internal.TraceIdServletFilter;
 import org.domainforge.tracing.internal.TraceIdWebFilter;
 import org.domainforge.tracing.internal.TracingSettings;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,7 @@ public class TracingAutoConfiguration {
      * 有上游上下文时沿用上游的采样决定，根 span 按当前配置的比例采样。
      */
     @Bean
+    @ConditionalOnMissingBean
     Sampler domainforgeSampler(DynamicSettingsBinder binder) {
         return Sampler.parentBased(new DynamicRatioSampler(binder.bind("domainforge.tracing", TracingSettings.class)));
     }
@@ -35,11 +37,13 @@ public class TracingAutoConfiguration {
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     static class Servlet {
         @Bean
+        @ConditionalOnMissingBean
         TraceIdServletFilter traceIdServletFilter(Tracer tracer) {
             return new TraceIdServletFilter(tracer);
         }
 
         @Bean
+        @ConditionalOnMissingBean
         AccessLogServletFilter accessLogServletFilter() {
             return new AccessLogServletFilter();
         }
@@ -52,6 +56,7 @@ public class TracingAutoConfiguration {
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
     static class Reactive {
         @Bean
+        @ConditionalOnMissingBean
         TraceIdWebFilter traceIdWebFilter() {
             return new TraceIdWebFilter();
         }

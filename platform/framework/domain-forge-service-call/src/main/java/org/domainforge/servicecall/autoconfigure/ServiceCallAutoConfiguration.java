@@ -10,6 +10,7 @@ import org.domainforge.servicecall.internal.ResponseClassifier;
 import org.domainforge.servicecall.internal.TransportFailures;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -22,6 +23,7 @@ public class ServiceCallAutoConfiguration {
      * Same-Token 与用户令牌（链路上下文由 OpenFeign 的 Micrometer 观测传递）。
      */
     @Bean
+    @ConditionalOnMissingBean(name = "serviceCallIdentity")
     RequestInterceptor serviceCallIdentity() {
         return new IdentityPropagation();
     }
@@ -30,6 +32,7 @@ public class ServiceCallAutoConfiguration {
      * 非 2xx 响应的分类。
      */
     @Bean
+    @ConditionalOnMissingBean
     ErrorDecoder serviceCallErrors() {
         return new ResponseClassifier();
     }
@@ -38,6 +41,7 @@ public class ServiceCallAutoConfiguration {
      * 传输层异常的分类。
      */
     @Bean
+    @ConditionalOnMissingBean(name = "serviceCallTransport")
     Capability serviceCallTransport() {
         return new TransportFailures();
     }
@@ -46,6 +50,7 @@ public class ServiceCallAutoConfiguration {
      * 默认不重试：结果未知的请求重放可能重复执行副作用，是否重试由调用方按接口幂等合同决定。
      */
     @Bean
+    @ConditionalOnMissingBean
     Retryer serviceCallRetryer() {
         return Retryer.NEVER_RETRY;
     }

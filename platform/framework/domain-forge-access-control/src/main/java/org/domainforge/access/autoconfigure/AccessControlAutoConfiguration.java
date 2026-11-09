@@ -64,6 +64,7 @@ public class AccessControlAutoConfiguration {
          * 每个应用必须提供唯一事实源，缺失时启动失败。
          */
         @Bean
+        @ConditionalOnMissingBean
         RequestCurrentSubject requestCurrentSubject(CurrentSubjectSource source) {
             return new RequestCurrentSubject(source);
         }
@@ -72,6 +73,7 @@ public class AccessControlAutoConfiguration {
          * 当前主体只从原生实际读取的令牌建立。
          */
         @Bean
+        @ConditionalOnMissingBean
         CurrentAccess currentAccess(RequestCurrentSubject subjects, StpLogic logic) {
             return () -> subjects.current(logic.getTokenValue());
         }
@@ -80,6 +82,7 @@ public class AccessControlAutoConfiguration {
          * 原生权限与角色数据只来自本请求已验证的主体。
          */
         @Bean
+        @ConditionalOnMissingBean
         StpInterface accessStpInterface(CurrentAccess current, StpLogic logic) {
             return new CurrentSubjectPermissions(current, logic);
         }

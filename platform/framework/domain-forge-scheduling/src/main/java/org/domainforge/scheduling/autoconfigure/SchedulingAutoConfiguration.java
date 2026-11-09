@@ -9,6 +9,7 @@ import org.domainforge.scheduling.internal.TaskRegistrar;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -34,6 +35,7 @@ public class SchedulingAutoConfiguration {
          * PowerJob 按 Bean 名找到的处理器。
          */
         @Bean(TaskDispatcher.BEAN)
+        @ConditionalOnMissingBean
         TaskDispatcher domainforgeTaskDispatcher(ObjectProvider<ScheduledTask> tasks,
                 ObjectProvider<MeterRegistry> metrics,
                 ObjectProvider<Tracer> tracer) {
@@ -45,6 +47,7 @@ public class SchedulingAutoConfiguration {
          * 启动完成后登记任务；失败使启动失败。
          */
         @Bean
+        @ConditionalOnMissingBean(name = "scheduledTaskRegistration")
         ApplicationRunner scheduledTaskRegistration(ObjectProvider<ScheduledTask> tasks, Environment environment) {
             return arguments -> {
                 List<ScheduledTask> all = tasks.orderedStream().toList();

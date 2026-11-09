@@ -5,6 +5,7 @@ import org.domainforge.web.internal.MultipartExceptionAdvice;
 import org.domainforge.web.internal.PlatformExceptionAdvice;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,7 @@ public class WebSupportAutoConfiguration {
      * @return 平台内部 Advice
      */
     @Bean
+    @ConditionalOnMissingBean
     PlatformExceptionAdvice platformExceptionAdvice() {
         return new PlatformExceptionAdvice();
     }
@@ -36,6 +38,7 @@ public class WebSupportAutoConfiguration {
      * @return 平台内部 Advice
      */
     @Bean
+    @ConditionalOnMissingBean
     MultipartExceptionAdvice multipartExceptionAdvice() {
         return new MultipartExceptionAdvice();
     }

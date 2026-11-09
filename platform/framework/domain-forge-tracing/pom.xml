@@ -10,6 +10,11 @@
     <artifactId>domain-forge-tracing</artifactId>
     <dependencies>
         <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>domain-forge-config</artifactId>
             <version>${project.version}</version>

@@ -9,6 +9,11 @@
     </parent>
     <artifactId>domain-forge-idempotency</artifactId>
     <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- 账号取自 Sa-Token 原生会话（access-control 装配），记录存放在 cache 组件的 Redisson 客户端。 -->
         <dependency>
             <groupId>org.domainforge</groupId>
