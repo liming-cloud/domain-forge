@@ -48,13 +48,13 @@ class OverridableBeansTest {
 
     @Test
     void userBeansReplaceDefaults() {
-        var context = start(User.class, DomainForgePersistenceConfiguration.class);
+        var context = start(User.class, PersistenceAutoConfiguration.class);
         TYPES.forEach(type -> assertProvidedBy(context, type, User.class));
     }
 
     @Test
     void defaultsApplyWithoutUserBeans() {
-        var context = start(DomainForgePersistenceConfiguration.class);
+        var context = start(PersistenceAutoConfiguration.class);
         TYPES.forEach(type -> assertTrue(context.getBeanFactory().getBeanNamesForType(type, true, false).length > 0,
                 type.toString()));
         assertEquals(0, context.getBeanFactory().getBeanNamesForType(User.class, true, false).length);

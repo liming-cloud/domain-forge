@@ -3,6 +3,7 @@ package org.domainforge.persistence.autoconfigure;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.domainforge.persistence.api.PersistenceProperties;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanCreationException;
@@ -53,7 +54,7 @@ class PersistenceConfigurationTest {
         if (hostConfigurations.length > 0) {
             context.register(hostConfigurations);
         }
-        context.register(DomainForgePersistenceConfiguration.class, NativeConfiguration.class);
+        context.register(PersistenceAutoConfiguration.class, NativeConfiguration.class);
         try {
             context.refresh();
             return context;
@@ -68,7 +69,7 @@ class PersistenceConfigurationTest {
      */
     @Test
     void paginationUsesPostgresAndFiniteLimit() {
-        var interceptor = new DomainForgePersistenceConfiguration().domainForgePagination(20);
+        var interceptor = new PersistenceAutoConfiguration().domainForgePagination(new PersistenceProperties(20));
         var pagination = (PaginationInnerInterceptor) interceptor.getInterceptors().getFirst();
         assertEquals(DbType.POSTGRE_SQL, pagination.getDbType());
         assertEquals(20L, pagination.getMaxLimit());
@@ -79,9 +80,11 @@ class PersistenceConfigurationTest {
      */
     @Test
     void invalidPaginationLimitsFail() {
-        var configuration = new DomainForgePersistenceConfiguration();
-        assertThrows(IllegalArgumentException.class, () -> configuration.domainForgePagination(0));
-        assertThrows(IllegalArgumentException.class, () -> configuration.domainForgePagination(1001));
+        var configuration = new PersistenceAutoConfiguration();
+        assertThrows(IllegalArgumentException.class,
+                () -> configuration.domainForgePagination(new PersistenceProperties(0)));
+        assertThrows(IllegalArgumentException.class,
+                () -> configuration.domainForgePagination(new PersistenceProperties(1001)));
     }
 
     /**
@@ -90,7 +93,7 @@ class PersistenceConfigurationTest {
     @Test
     void missingResourcesCannotBecomeReady() {
         try (var context = new AnnotationConfigApplicationContext()) {
-            context.register(DomainForgePersistenceConfiguration.class);
+            context.register(PersistenceAutoConfiguration.class);
             assertThrows(BeanCreationException.class, context::refresh);
         }
     }
@@ -116,7 +119,7 @@ class PersistenceConfigurationTest {
         var source = new DriverManagerDataSource();
         var other = new DriverManagerDataSource();
         var flyway = Flyway.configure().dataSource(other).load();
-        var strategy = new DomainForgePersistenceConfiguration().domainForgeMigrationStrategy(source);
+        var strategy = new PersistenceAutoConfiguration().domainForgeMigrationStrategy(source);
         assertThrows(IllegalStateException.class, () -> strategy.migrate(flyway));
     }
 
@@ -147,7 +150,7 @@ class PersistenceConfigurationTest {
         var session = new org.apache.ibatis.session.SqlSessionFactoryBuilder().build(configuration);
         var flyway = org.flywaydb.core.Flyway.configure().dataSource(source).load();
         var guard =
-                new DomainForgePersistenceConfiguration()
+                new PersistenceAutoConfiguration()
                         .domainForgePersistenceResources(
                                 source,
                                 transaction,

@@ -7,7 +7,6 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -119,7 +118,6 @@ class BootResourceBindingIT {
 
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @Import(DomainForgePersistenceConfiguration.class)
     static class Application {
     }
 }
