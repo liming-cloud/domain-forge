@@ -19,6 +19,7 @@ import org.domainforge.messaging.internal.TraceContexts;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.transaction.support.TransactionOperations;
@@ -48,6 +49,7 @@ public class MessagingAutoConfiguration {
      * 连接 RocketMQ Proxy 的客户端配置；未配置地址时为空。
      */
     @Bean
+    @ConditionalOnMissingBean
     MessagingClient messagingClient(Environment environment) {
         String endpoints = environment.getProperty("domainforge.messaging.endpoints", "");
         if (endpoints.isBlank()) return new MessagingClient(null);
@@ -63,6 +65,7 @@ public class MessagingAutoConfiguration {
      * 发布接口：只在启用 Outbox 的服务中存在。
      */
     @Bean
+    @ConditionalOnMissingBean
     EventPublisher eventPublisher(Environment environment, OutboxMapper outbox, ObjectProvider<OutboxRelay> relay,
             TraceContexts traces) {
         if (!flag(environment, "domainforge.messaging.outbox.enabled", false))
@@ -76,6 +79,7 @@ public class MessagingAutoConfiguration {
      * 中继与清理：发布方发送 Outbox、清理已发送记录；消费方清理去重记录。
      */
     @Bean
+    @ConditionalOnMissingBean
     OutboxRelay outboxRelay(Environment environment, MessagingClient client, OutboxMapper outbox, InboxMapper inbox,
             TransactionOperations transactions, ObjectProvider<EventHandler> handlers,
             ObjectProvider<MeterRegistry> metrics, TraceContexts traces) throws ClientException {
@@ -99,6 +103,7 @@ public class MessagingAutoConfiguration {
      * 每个处理者一个消费组；没有处理者时不连接。
      */
     @Bean
+    @ConditionalOnMissingBean
     EventConsumers eventConsumers(Environment environment, MessagingClient client,
             ObjectProvider<EventHandler> handlers, InboxMapper inbox,
             TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics,
@@ -114,6 +119,7 @@ public class MessagingAutoConfiguration {
      * 链路上下文：服务启用了链路追踪时使用其 Tracer 与 Propagator，否则为空实现。
      */
     @Bean
+    @ConditionalOnMissingBean
     TraceContexts messagingTraceContexts(ObjectProvider<Tracer> tracer, ObjectProvider<Propagator> propagator) {
         return new TraceContexts(tracer.getIfAvailable(() -> Tracer.NOOP),
                 propagator.getIfAvailable(() -> Propagator.NOOP));

@@ -41,6 +41,7 @@ public class NotificationAutoConfiguration {
          * 验证码存取。
          */
         @Bean
+        @ConditionalOnMissingBean
         VerificationCodes verificationCodes(Environment environment, RedissonClient redis, SmsSender sms) {
             return NotificationAssembly.verification(environment, redis, sms);
         }

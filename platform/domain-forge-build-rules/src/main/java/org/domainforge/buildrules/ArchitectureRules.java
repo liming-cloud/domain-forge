@@ -108,6 +108,7 @@ public final class ArchitectureRules {
         }
         ComponentRules.check(classes, violations);
         DddRules.check(classes, violations);
+        AutoConfigurationRules.check(classes, violations);
         return violations.stream().distinct().sorted().toList();
     }
 

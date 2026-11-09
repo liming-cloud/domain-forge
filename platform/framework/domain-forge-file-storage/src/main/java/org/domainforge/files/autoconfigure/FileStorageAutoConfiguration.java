@@ -50,6 +50,7 @@ public class FileStorageAutoConfiguration {
      * 清理任务，由调度组件登记到 PowerJob。
      */
     @Bean
+    @ConditionalOnMissingBean
     FileCleanup fileStorageCleanup(Environment environment, FileMapper files, ObjectStorage storage,
             ObjectProvider<MeterRegistry> metrics) {
         return FileStorageAssembly.cleanup(environment, files, storage,

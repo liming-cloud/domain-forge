@@ -5,6 +5,7 @@ import org.domainforge.config.api.DynamicSettingsBinder;
 import org.domainforge.config.internal.EnvironmentSettingsBinder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 
@@ -23,6 +24,7 @@ public class ConfigConfiguration {
      * 不检查就会以本地默认值启动。
      */
     @Bean
+    @ConditionalOnMissingBean
     DynamicSettingsBinder domainForgeDynamicSettings(Environment environment, ObjectProvider<MeterRegistry> metrics) {
         String expected = environment.getProperty(EXPECTED_SOURCE);
         if (expected != null && !expected.equals(environment.getProperty(SOURCE))) {

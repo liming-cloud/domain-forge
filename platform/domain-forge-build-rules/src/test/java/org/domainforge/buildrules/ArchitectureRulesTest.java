@@ -166,6 +166,16 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    void autoConfigurationBeansAreOverridable() {
+        assertEquals(List.of(), check("org.domainforge.fixture.beans.good"));
+    }
+
+    @Test
+    void autoConfigurationBeanWithoutConditionRejected() {
+        assertViolation("org.domainforge.fixture.beans.bad", "[Bean 可覆盖]");
+    }
+
+    @Test
     void metricsReportListsEveryComponent() {
         String report = ComponentRules.report(new ClassFileImporter().importPackages("org.domainforge.fixture.stab"));
         assertTrue(report.contains("org.domainforge.fixture.stab:api\t"), report);

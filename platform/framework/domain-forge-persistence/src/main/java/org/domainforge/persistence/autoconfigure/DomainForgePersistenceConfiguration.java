@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.springframework.boot.transaction.autoconfigure.TransactionProperties;
 import org.springframework.context.annotation.Bean;
@@ -58,6 +59,7 @@ public class DomainForgePersistenceConfiguration {
      * 设置 PostgreSQL 分页上限；服务仍须校验查询输入和任意自定义 SQL。
      */
     @Bean
+    @ConditionalOnMissingBean
     MybatisPlusInterceptor domainForgePagination(
             @Value("${domainforge.persistence.max-page-size:200}") long maximum) {
         if (maximum < 1 || maximum > 1000) {
@@ -74,6 +76,7 @@ public class DomainForgePersistenceConfiguration {
      * 迁移前核对明确绑定的数据源，防止失败启动已改动错误数据库。
      */
     @Bean
+    @ConditionalOnMissingBean
     FlywayMigrationStrategy domainForgeMigrationStrategy(@Qualifier("dataSource") DataSource source) {
         return flyway -> {
             if (flyway.getConfiguration().getDataSource() != source) {
