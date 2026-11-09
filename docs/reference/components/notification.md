@@ -29,7 +29,7 @@
 domainforge:
   sms:
     enabled: true
-    provider: aliyun                       # 目前只有阿里云实现
+    provider: aliyun                       # 默认实现；其他服务商见下
     sign-name: ${SERVICE_SMS_SIGN_NAME}
     aliyun:
       access-key-id: ${SERVICE_SMS_ACCESS_KEY_ID}
@@ -47,6 +47,10 @@ domainforge:
 ```
 
 启用验证码需要服务接入 cache 组件（会话 Redis）。缺少必需配置时启动失败。
+
+### 接入其他短信服务商
+
+业务提供自己的 `SmsSender` Bean（`org.domainforge.notification.api`，一个方法 `send`；失败分类遵守接口说明：号码无效与频控抛 `SmsRejected`，其余抛 `NotificationUnavailableException`），默认的阿里云实现随之让位，不再需要 `domainforge.sms.provider`、`aliyun.*`、`sign-name`、`templates`；验证码同样经它发送。去掉该 Bean 即回归阿里云实现（`NotificationIT`）。
 
 ## 服务中的写法
 

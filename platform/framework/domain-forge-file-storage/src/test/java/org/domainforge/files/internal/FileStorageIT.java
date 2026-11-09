@@ -6,6 +6,7 @@ import org.domainforge.files.api.FileRejected;
 import org.domainforge.files.api.FileStorageUnavailableException;
 import org.domainforge.files.api.FileStore;
 import org.domainforge.files.api.FileUpload;
+import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.files.api.StoredFile;
 import org.domainforge.files.api.UploadPolicy;
 import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
@@ -120,6 +121,10 @@ class FileStorageIT {
     }
 
     private static ConfigurableApplicationContext start(String... storage) {
+        return start(new Class<?>[]{Application.class}, storage);
+    }
+
+    private static ConfigurableApplicationContext start(Class<?>[] sources, String... storage) {
         var arguments = new java.util.ArrayList<>(List.of(
                 "--spring.main.banner-mode=off",
                 "--logging.level.root=WARN",
@@ -136,7 +141,7 @@ class FileStorageIT {
                 "--domainforge.files.max-size=64KB",
                 "--domainforge.files.grace=PT1S"));
         arguments.addAll(List.of(storage));
-        return new SpringApplicationBuilder(Application.class).web(WebApplicationType.NONE)
+        return new SpringApplicationBuilder(sources).web(WebApplicationType.NONE)
                 .run(arguments.toArray(String[]::new));
     }
 
@@ -158,7 +163,7 @@ class FileStorageIT {
     }
 
     private static ObjectStorage storage(ConfigurableApplicationContext context) {
-        return context.getBean(FileStorageAssembly.class).storage();
+        return context.getBean(ObjectStorage.class);
     }
 
     private static JdbcTemplate jdbc() {
@@ -320,6 +325,20 @@ class FileStorageIT {
         assertEquals("恢复", read(s3.getBean(FileStore.class).open(stored.id()).orElseThrow()));
     }
 
+    // 提供方接入：业务的 ObjectStorage Bean 让位默认后端（无需存储配置），同一 FileStore 合同可存取与删除；
+    // 本类其余场景使用默认的本地与 S3 后端，覆盖“回归默认实现”。
+    @Test
+    void customBackendReplacesDefault() throws Exception {
+        try (var custom = start(new Class<?>[]{Application.class, MemoryBackendConfiguration.class})) {
+            assertSame(MemoryBackend.INSTANCE, custom.getBean(ObjectStorage.class));
+            StoredFile stored = store(custom, "memory.txt", "内存");
+            assertEquals("内存", read(custom.getBean(FileStore.class).open(stored.id()).orElseThrow()));
+            assertTrue(MemoryBackend.INSTANCE.objects.containsKey(key(stored.id())));
+            inTransaction(custom, () -> custom.getBean(FileStore.class).delete(stored.id()));
+            assertTrue(custom.getBean(FileStore.class).find(stored.id()).isEmpty());
+        }
+    }
+
     // 启动检查：桶不存在或本地目录不可写时启动失败，而不是在第一次上传时才暴露。
     @Test
     void unusableStorageFailsStartup() throws Exception {
@@ -333,6 +352,54 @@ class FileStorageIT {
         var process = new ProcessBuilder("docker", command, env("SEAWEEDFS_CONTAINER"))
                 .redirectErrorStream(true).start();
         assertEquals(0, process.waitFor(), "docker " + command + " 失败");
+    }
+
+    /**
+     * 业务提供的内存存储后端。
+     */
+    @Configuration(proxyBeanMethods = false)
+    static class MemoryBackendConfiguration {
+        @Bean
+        ObjectStorage memoryStorage() {
+            return MemoryBackend.INSTANCE;
+        }
+    }
+
+    /**
+     * 内存存储后端。
+     */
+    static class MemoryBackend implements ObjectStorage {
+        static final MemoryBackend INSTANCE = new MemoryBackend();
+        final java.util.Map<String, byte[]> objects = new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public void check() {
+        }
+
+        @Override
+        public void write(String key, Path source, long size) {
+            try {
+                objects.put(key, Files.readAllBytes(source));
+            } catch (java.io.IOException failure) {
+                throw new FileStorageUnavailableException("内存存储写入失败", failure);
+            }
+        }
+
+        @Override
+        public InputStream read(String key) {
+            byte[] content = objects.get(key);
+            return content == null ? null : new ByteArrayInputStream(content);
+        }
+
+        @Override
+        public void delete(String key) {
+            objects.remove(key);
+        }
+
+        @Override
+        public List<StoredObject> list(String dayPrefix) {
+            return List.of();
+        }
     }
 
     /**

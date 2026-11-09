@@ -2,6 +2,7 @@ package org.domainforge.files.internal;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.domainforge.files.api.FileStore;
+import org.domainforge.files.api.ObjectStorage;
 import org.springframework.core.env.Environment;
 import org.springframework.util.unit.DataSize;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -21,54 +22,48 @@ import java.time.Clock;
 import java.time.Duration;
 
 /**
- * 按配置组装存储后端、存取实现与清理任务；持有 S3 客户端以便关闭。
+ * 按配置组装默认存储后端、存取实现与清理任务。
  */
-public final class FileStorageAssembly implements AutoCloseable {
+public final class FileStorageAssembly {
     private static final String PREFIX = "domainforge.files.";
-    private final ObjectStorage storage;
-    private final SqlFileStore store;
-    private final FileCleanup cleanup;
-    private final AutoCloseable resource;
 
-    private FileStorageAssembly(ObjectStorage storage, SqlFileStore store, FileCleanup cleanup,
-            AutoCloseable resource) {
-        this.storage = storage;
-        this.store = store;
-        this.cleanup = cleanup;
-        this.resource = resource;
+    private FileStorageAssembly() {
     }
 
     /**
-     * 读取配置、建立后端并检查可用。
+     * 默认存储后端：{@code domainforge.files.storage} 选择本地目录或 S3；业务提供自己的 {@link ObjectStorage} Bean 时不会调用。
      */
-    public static FileStorageAssembly create(Environment environment, FileMapper files, MeterRegistry metrics) {
+    public static ObjectStorage storage(Environment environment) {
         String kind = environment.getProperty(PREFIX + "storage", "local");
-        S3Client client = null;
-        ObjectStorage storage;
-        switch (kind) {
-            case "local" -> storage = new LocalObjectStorage(Path.of(required(environment, "local.root")));
-            case "s3" -> {
-                client = s3(environment);
-                storage = new S3ObjectStorage(client, required(environment, "s3.bucket"),
-                        environment.getProperty(PREFIX + "s3.prefix",
-                                environment.getProperty("spring.application.name", "app") + "/"));
-            }
+        return switch (kind) {
+            case "local" -> new LocalObjectStorage(Path.of(required(environment, "local.root")));
+            case "s3" -> new S3ObjectStorage(s3(environment), required(environment, "s3.bucket"),
+                    environment.getProperty(PREFIX + "s3.prefix",
+                            environment.getProperty("spring.application.name", "app") + "/"));
             default -> throw new IllegalStateException("domainforge.files.storage 只能是 local 或 s3：" + kind);
-        }
-        try {
-            storage.check();
-        } catch (RuntimeException unusable) {
-            if (client != null) client.close();
-            throw unusable;
-        }
-        Clock clock = Clock.systemUTC();
+        };
+    }
+
+    /**
+     * 文件存取实现；先检查后端可用。
+     */
+    public static FileStore store(Environment environment, FileMapper files, ObjectStorage storage,
+            MeterRegistry metrics) {
+        storage.check();
         long maxBytes = DataSize.parse(environment.getProperty(PREFIX + "max-size", "20MB")).toBytes();
         Path spool = Path.of(environment.getProperty(PREFIX + "spool-dir",
                 System.getProperty("java.io.tmpdir") + "/domainforge-files"));
+        return new SqlFileStore(files, storage, new SqlFileStore.Settings(maxBytes, spool), metrics,
+                Clock.systemUTC());
+    }
+
+    /**
+     * 清理任务。
+     */
+    public static FileCleanup cleanup(Environment environment, FileMapper files, ObjectStorage storage,
+            MeterRegistry metrics) {
         Duration grace = environment.getProperty(PREFIX + "grace", Duration.class, Duration.ofHours(24));
-        var store = new SqlFileStore(files, storage, new SqlFileStore.Settings(maxBytes, spool), metrics, clock);
-        var cleanup = new FileCleanup(files, storage, grace, metrics, clock);
-        return new FileStorageAssembly(storage, store, cleanup, client);
+        return new FileCleanup(files, storage, grace, metrics, Clock.systemUTC());
     }
 
     private static String required(Environment environment, String name) {
@@ -108,31 +103,5 @@ public final class FileStorageAssembly implements AutoCloseable {
         if (accessKey.isBlank()) return DefaultCredentialsProvider.builder().build();
         return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, required(environment,
                 "s3.secret-key")));
-    }
-
-    /**
-     * 存储后端，供本包内的测试直接核对对象。
-     */
-    ObjectStorage storage() {
-        return storage;
-    }
-
-    /**
-     * 文件存取实现。
-     */
-    public FileStore store() {
-        return store;
-    }
-
-    /**
-     * 清理任务。
-     */
-    public FileCleanup cleanup() {
-        return cleanup;
-    }
-
-    @Override
-    public void close() throws Exception {
-        if (resource != null) resource.close();
     }
 }

@@ -1,6 +1,7 @@
 package org.domainforge.files.internal;
 
 import org.domainforge.files.api.FileStorageUnavailableException;
+import org.domainforge.files.api.ObjectStorage;
 
 import java.io.IOException;
 import java.io.InputStream;

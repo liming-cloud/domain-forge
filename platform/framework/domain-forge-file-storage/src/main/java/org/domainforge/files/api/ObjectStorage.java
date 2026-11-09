@@ -1,4 +1,4 @@
-package org.domainforge.files.internal;
+package org.domainforge.files.api;
 
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -6,11 +6,12 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 对象存储的最小操作集：本地目录与 S3 兼容服务各一个实现。键由组件生成（{@code yyyy/MM/dd/<uuid>}），不含客户端输入。
+ * 对象存储的最小操作集，也是存储后端的提供方接口：默认提供本地目录与 S3 兼容服务两个实现；业务提供自己的 {@code ObjectStorage} Bean 即可接入其他后端，
+ * 默认实现随之让位。键由组件生成（{@code yyyy/MM/dd/<uuid>}），不含客户端输入。
  *
- * <p>失败统一抛出 {@link org.domainforge.files.api.FileStorageUnavailableException}。
+ * <p>失败统一抛出 {@link FileStorageUnavailableException}。
  */
-interface ObjectStorage {
+public interface ObjectStorage {
     /**
      * 启动检查：本地目录可写或桶可访问，否则启动失败。
      */

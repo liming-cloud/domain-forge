@@ -26,7 +26,7 @@ public final class NotificationAssembly {
     }
 
     /**
-     * 短信发送：目前只有阿里云实现（{@code domainforge.sms.provider=aliyun}）。
+     * 短信发送：默认实现为阿里云（{@code domainforge.sms.provider=aliyun}）；其他服务商经 {@link SmsSender} Bean 接入。
      */
     public static SmsSender sms(Environment environment, MeterRegistry metrics) {
         String provider = environment.getProperty(SMS + "provider", "aliyun");

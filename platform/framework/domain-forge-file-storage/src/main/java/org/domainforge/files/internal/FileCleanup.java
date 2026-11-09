@@ -1,6 +1,7 @@
 package org.domainforge.files.internal;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.scheduling.api.ScheduledTask;
 import org.domainforge.scheduling.api.TaskRun;
 import org.slf4j.Logger;
