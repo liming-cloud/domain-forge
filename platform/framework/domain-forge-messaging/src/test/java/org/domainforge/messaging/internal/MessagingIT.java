@@ -6,7 +6,6 @@ import org.domainforge.messaging.api.EventHandler;
 import org.domainforge.messaging.api.EventPublisher;
 import org.domainforge.messaging.api.OutgoingEvent;
 import org.domainforge.messaging.api.ReceivedEvent;
-import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -19,7 +18,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -292,7 +290,6 @@ class MessagingIT {
      */
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @Import(DomainForgePersistenceConfiguration.class)
     static class Application {
         @Bean
         NormalHandler normalHandler(JdbcTemplate jdbc) {

@@ -11,6 +11,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.domainforge.persistence.api.AdditionalDataSource;
 import org.flywaydb.core.Flyway;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -66,12 +68,14 @@ public final class PooledAdditionalDataSource implements AdditionalDataSource {
 
     private static HikariDataSource pool(String name, Environment environment) {
         String prefix = "domainforge.datasources." + name + ".";
+        var settings = Binder.get(environment).bind(prefix.substring(0, prefix.length() - 1), Settings.class)
+                .orElseGet(() -> new Settings("", "", "", 5));
         var config = new HikariConfig();
         config.setPoolName(name);
-        config.setJdbcUrl(required(environment, prefix + "url"));
-        config.setUsername(required(environment, prefix + "username"));
-        config.setPassword(required(environment, prefix + "password"));
-        config.setMaximumPoolSize(environment.getProperty(prefix + "maximum-pool-size", Integer.class, 5));
+        config.setJdbcUrl(required(settings.url(), prefix + "url"));
+        config.setUsername(required(settings.username(), prefix + "username"));
+        config.setPassword(required(settings.password(), prefix + "password"));
+        config.setMaximumPoolSize(settings.maximumPoolSize());
         config.setMinimumIdle(0);
         config.setConnectionTimeout(3000);
         config.setValidationTimeout(1000);
@@ -107,8 +111,14 @@ public final class PooledAdditionalDataSource implements AdditionalDataSource {
         }
     }
 
-    private static String required(Environment environment, String key) {
-        String value = environment.getProperty(key, "");
+    /**
+     * 附加数据源的连接配置（前缀 {@code domainforge.datasources.<名称>}）。
+     */
+    record Settings(@DefaultValue("") String url, @DefaultValue("") String username,
+            @DefaultValue("") String password, @DefaultValue("5") int maximumPoolSize) {
+    }
+
+    private static String required(String value, String key) {
         if (value.isBlank()) throw new IllegalStateException("附加数据源缺少配置 " + key);
         return value;
     }

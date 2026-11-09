@@ -2,6 +2,7 @@ package org.domainforge.files.autoconfigure;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.domainforge.files.api.FileStorageProperties;
 import org.domainforge.files.api.FileStore;
 import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.files.internal.FileCleanup;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 
@@ -25,6 +27,7 @@ import org.springframework.core.env.Environment;
  */
 @AutoConfiguration
 @ConditionalOnProperty(name = "domainforge.files.enabled", havingValue = "true")
+@EnableConfigurationProperties(FileStorageProperties.class)
 @MapperScan(basePackageClasses = FileMapper.class, annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class FileStorageAutoConfiguration {
     /**
@@ -32,8 +35,8 @@ public class FileStorageAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(ObjectStorage.class)
-    ObjectStorage objectStorage(Environment environment) {
-        return FileStorageAssembly.storage(environment);
+    ObjectStorage objectStorage(FileStorageProperties properties, Environment environment) {
+        return FileStorageAssembly.storage(properties, environment.getProperty("spring.application.name", "app"));
     }
 
     /**
@@ -41,9 +44,9 @@ public class FileStorageAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(FileStore.class)
-    FileStore fileStore(Environment environment, FileMapper files, ObjectStorage storage,
+    FileStore fileStore(FileStorageProperties properties, FileMapper files, ObjectStorage storage,
             ObjectProvider<MeterRegistry> metrics) {
-        return FileStorageAssembly.store(environment, files, storage, metrics.getIfAvailable(SimpleMeterRegistry::new));
+        return FileStorageAssembly.store(properties, files, storage, metrics.getIfAvailable(SimpleMeterRegistry::new));
     }
 
     /**
@@ -51,9 +54,9 @@ public class FileStorageAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    FileCleanup fileStorageCleanup(Environment environment, FileMapper files, ObjectStorage storage,
+    FileCleanup fileStorageCleanup(FileStorageProperties properties, FileMapper files, ObjectStorage storage,
             ObjectProvider<MeterRegistry> metrics) {
-        return FileStorageAssembly.cleanup(environment, files, storage,
+        return FileStorageAssembly.cleanup(properties, files, storage,
                 metrics.getIfAvailable(SimpleMeterRegistry::new));
     }
 }

@@ -9,7 +9,6 @@ import org.domainforge.files.api.FileUpload;
 import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.files.api.StoredFile;
 import org.domainforge.files.api.UploadPolicy;
-import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -22,7 +21,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -407,7 +405,6 @@ class FileStorageIT {
      */
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @Import(DomainForgePersistenceConfiguration.class)
     static class Application {
         @Bean
         SimpleMeterRegistry meterRegistry() {

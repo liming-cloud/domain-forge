@@ -5,17 +5,18 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.domainforge.persistence.api.AdditionalDataSource;
+import org.domainforge.persistence.api.PersistenceProperties;
 import org.domainforge.persistence.internal.TransactionBoundaryGuard;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.springframework.boot.transaction.autoconfigure.TransactionProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,12 +28,15 @@ import javax.sql.DataSource;
 import java.time.Duration;
 
 /**
- * 由服务显式导入的主数据源装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。附加数据源见
- * {@link AdditionalDataSource}。
+ * 主数据源装配：事务、Mapper 与迁移须绑定同一资源，不扫描业务包。排在 MyBatis-Plus 自动配置之前，
+ * 使默认分页拦截器先于其内置拦截器登记。附加数据源见 {@link AdditionalDataSource}。
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(beforeName = {
+        "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration",
+        "com.baomidou.mybatisplus.autoconfigure.MybatisPlusInnerInterceptorAutoConfiguration"})
+@EnableConfigurationProperties(PersistenceProperties.class)
 @EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)
-public class DomainForgePersistenceConfiguration {
+public class PersistenceAutoConfiguration {
     /**
      * 只补齐绑定管理器的有限超时，不改变其他事务资源。
      */
@@ -60,8 +64,8 @@ public class DomainForgePersistenceConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    MybatisPlusInterceptor domainForgePagination(
-            @Value("${domainforge.persistence.max-page-size:200}") long maximum) {
+    MybatisPlusInterceptor domainForgePagination(PersistenceProperties properties) {
+        long maximum = properties.maxPageSize();
         if (maximum < 1 || maximum > 1000) {
             throw new IllegalArgumentException("持久化分页上限须在 1 至 1000 之间");
         }

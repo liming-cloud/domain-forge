@@ -30,7 +30,7 @@ class LocalResourceBindingTest {
         context.registerBean(
                 "flyway", Flyway.class, () -> Flyway.configure().dataSource(source).load());
         context.registerBean(TransactionProperties.class);
-        context.register(DomainForgePersistenceConfiguration.class);
+        context.register(PersistenceAutoConfiguration.class);
         return context;
     }
 

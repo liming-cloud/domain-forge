@@ -1,11 +1,14 @@
 package org.domainforge.idempotency.autoconfigure;
 
+import org.domainforge.idempotency.api.IdempotencyProperties;
 import org.domainforge.idempotency.internal.IdempotencyAssembly;
 import org.domainforge.idempotency.internal.IdempotencyFilter;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.Ordered;
@@ -20,15 +23,19 @@ import java.util.List;
  */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnProperty(prefix = "domainforge.idempotency", name = "enabled", matchIfMissing = true)
+@EnableConfigurationProperties(IdempotencyProperties.class)
 public class IdempotencyAutoConfiguration {
     /**
      * 幂等过滤器；只对标了 {@code @Idempotent} 的入口生效。
      */
     @Bean
     @ConditionalOnMissingBean(name = "idempotencyFilter")
-    FilterRegistrationBean<IdempotencyFilter> idempotencyFilter(Environment environment, RedissonClient redis,
+    FilterRegistrationBean<IdempotencyFilter> idempotencyFilter(Environment environment,
+            IdempotencyProperties properties, RedissonClient redis,
             List<RequestMappingHandlerMapping> mappings) {
-        var registration = new FilterRegistrationBean<>(IdempotencyAssembly.filter(environment, redis, mappings));
+        var registration = new FilterRegistrationBean<>(IdempotencyAssembly.filter(
+                environment.getProperty("spring.application.name", "app"), properties, redis, mappings));
         registration.setOrder(Ordered.LOWEST_PRECEDENCE - 100);
         return registration;
     }

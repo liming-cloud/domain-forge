@@ -1,18 +1,15 @@
 package org.domainforge.iam.bootstrap;
 
 import org.domainforge.iam.interfaces.cli.AdministratorCommand;
-import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.context.annotation.Import;
 
 /**
  * 一套系统一个 IAM 服务；服务实现不作为其他上下文的运行依赖。
  */
 @SpringBootApplication(scanBasePackages = "org.domainforge.iam")
-@Import(DomainForgePersistenceConfiguration.class)
 public class IamApplication {
     /**
      * 启动需要明确数据库、Redis及安全配置，不提供默认凭据。

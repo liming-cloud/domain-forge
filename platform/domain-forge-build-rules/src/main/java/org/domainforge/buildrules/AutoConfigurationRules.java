@@ -27,7 +27,7 @@ final class AutoConfigurationRules {
                     Map.entry("AccessControlAutoConfiguration.WebAccess#sameTokenDisabled",
                             "由 domainforge.access.same-token.enabled 开关决定的启动期检查"),
                     Map.entry("CacheConfiguration#domainForgeRedisson", "Redisson 定制器，本就允许多个并存，不是被替换的对象"),
-                    Map.entry("DomainForgePersistenceConfiguration#domainForgePersistenceResources",
+                    Map.entry("PersistenceAutoConfiguration#domainForgePersistenceResources",
                             "启动期校验事务、会话与迁移绑定同一数据源"),
                     Map.entry("SchedulingAutoConfiguration#schedulingDisabled", "未启用调度时的启动期检查"),
                     Map.entry("WebSupportAutoConfiguration#adviceConflicts", "启动期校验错误处理器冲突"));

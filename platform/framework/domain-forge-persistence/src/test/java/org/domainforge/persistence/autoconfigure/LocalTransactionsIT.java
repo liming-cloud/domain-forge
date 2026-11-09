@@ -59,7 +59,7 @@ class LocalTransactionsIT {
                         .schemas(schema)
                         .locations("classpath:local-binding")
                         .load();
-        new DomainForgePersistenceConfiguration()
+        new PersistenceAutoConfiguration()
                 .domainForgeMigrationStrategy(source)
                 .migrate(migration);
         var factory = new SqlSessionFactoryBean();
@@ -82,7 +82,7 @@ class LocalTransactionsIT {
         context.registerBean("flyway", Flyway.class, () -> migration);
         context.registerBean(TransactionProperties.class);
         context.registerBean(TransactionProbeMapper.class, () -> rows);
-        context.register(DomainForgePersistenceConfiguration.class, Writes.class, JoinedWrite.class);
+        context.register(PersistenceAutoConfiguration.class, Writes.class, JoinedWrite.class);
         context.refresh();
     }
 
@@ -151,7 +151,7 @@ class LocalTransactionsIT {
                         .schemas(otherSchema)
                         .locations("classpath:local-binding")
                         .load();
-        var strategy = new DomainForgePersistenceConfiguration().domainForgeMigrationStrategy(source);
+        var strategy = new PersistenceAutoConfiguration().domainForgeMigrationStrategy(source);
         assertEquals(0, rows.schemaExists(otherSchema));
         assertThrows(IllegalStateException.class, () -> strategy.migrate(other));
         assertEquals(0, rows.schemaExists(otherSchema));

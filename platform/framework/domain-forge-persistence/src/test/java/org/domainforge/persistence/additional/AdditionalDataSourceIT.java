@@ -4,7 +4,6 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.domainforge.persistence.api.AdditionalDataSource;
 import org.domainforge.persistence.api.AdditionalMapper;
 import org.domainforge.persistence.autoconfigure.AdditionalDataSources;
-import org.domainforge.persistence.autoconfigure.DomainForgePersistenceConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -15,7 +14,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -188,7 +186,6 @@ class AdditionalDataSourceIT {
      */
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @Import(DomainForgePersistenceConfiguration.class)
     @MapperScan(basePackageClasses = PrimaryRowMapper.class,
             annotationClass = org.apache.ibatis.annotations.Mapper.class)
     @MapperScan(basePackageClasses = ExtraRowMapper.class, annotationClass = AdditionalMapper.class,

@@ -11,10 +11,8 @@ import org.redisson.api.RedissonClient;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.env.Environment;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,19 +22,17 @@ import java.util.Map;
  */
 @AutoConfiguration(afterName = "org.redisson.spring.starter.RedissonAutoConfigurationV4")
 @ConditionalOnBean(RedissonClient.class)
+@EnableConfigurationProperties(CacheProperties.class)
 public class CacheOperationsConfiguration {
     /**
      * 按配置创建全部区域；未声明区域时为空集合，调用 region 会被拒绝。
      */
     @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(CacheOperations.class)
-    public RedissonCacheOperations cacheOperations(RedissonClient client, Environment environment) {
+    public RedissonCacheOperations cacheOperations(RedissonClient client, CacheProperties properties) {
         Map<String, RegionSettings> settings = new LinkedHashMap<>();
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        Binder.get(environment)
-                .bind("domainforge.cache.regions", Bindable.mapOf(String.class, CacheRegionProperties.class))
-                .orElse(Map.of())
-                .forEach((name, properties) -> settings.put(name, properties.settings(loader)));
+        properties.regions().forEach((name, region) -> settings.put(name, region.settings(loader)));
         return new RedissonCacheOperations(client, settings);
     }
 

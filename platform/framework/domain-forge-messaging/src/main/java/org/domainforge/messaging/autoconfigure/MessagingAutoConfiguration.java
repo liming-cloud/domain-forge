@@ -10,6 +10,7 @@ import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.producer.Producer;
 import org.domainforge.messaging.api.EventHandler;
 import org.domainforge.messaging.api.EventPublisher;
+import org.domainforge.messaging.api.MessagingProperties;
 import org.domainforge.messaging.internal.EventConsumers;
 import org.domainforge.messaging.internal.InboxMapper;
 import org.domainforge.messaging.internal.OutboxMapper;
@@ -19,12 +20,12 @@ import org.domainforge.messaging.internal.TraceContexts;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.env.Environment;
 import org.springframework.transaction.support.TransactionOperations;
 
-import java.time.Duration;
 import java.util.List;
 
 /**
@@ -35,29 +36,22 @@ import java.util.List;
  * {@code domainforge.messaging.consumer.enabled=false} 只装配处理者不连接消费组。
  */
 @AutoConfiguration
+@ConditionalOnClass(ClientServiceProvider.class)
+@EnableConfigurationProperties(MessagingProperties.class)
 @MapperScan(basePackageClasses = OutboxMapper.class, annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class MessagingAutoConfiguration {
-    private static boolean flag(Environment environment, String name, boolean fallback) {
-        return environment.getProperty(name, Boolean.class, fallback);
-    }
-
-    private static Duration duration(Environment environment, String name, Duration fallback) {
-        return environment.getProperty(name, Duration.class, fallback);
-    }
-
     /**
      * 连接 RocketMQ Proxy 的客户端配置；未配置地址时为空。
      */
     @Bean
     @ConditionalOnMissingBean
-    MessagingClient messagingClient(Environment environment) {
-        String endpoints = environment.getProperty("domainforge.messaging.endpoints", "");
+    MessagingClient messagingClient(MessagingProperties properties) {
+        String endpoints = properties.endpoints();
         if (endpoints.isBlank()) return new MessagingClient(null);
         return new MessagingClient(ClientConfiguration.newBuilder()
                 .setEndpoints(endpoints)
                 .enableSsl(false)
-                .setRequestTimeout(
-                        duration(environment, "domainforge.messaging.request-timeout", Duration.ofSeconds(3)))
+                .setRequestTimeout(properties.requestTimeout())
                 .build());
     }
 
@@ -66,9 +60,10 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    EventPublisher eventPublisher(Environment environment, OutboxMapper outbox, ObjectProvider<OutboxRelay> relay,
+    EventPublisher eventPublisher(MessagingProperties properties, OutboxMapper outbox,
+            ObjectProvider<OutboxRelay> relay,
             TraceContexts traces) {
-        if (!flag(environment, "domainforge.messaging.outbox.enabled", false))
+        if (!properties.outbox().enabled())
             return event -> {
                 throw new IllegalStateException("未启用 Outbox（domainforge.messaging.outbox.enabled）");
             };
@@ -80,20 +75,18 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    OutboxRelay outboxRelay(Environment environment, MessagingClient client, OutboxMapper outbox, InboxMapper inbox,
+    OutboxRelay outboxRelay(MessagingProperties properties, MessagingClient client, OutboxMapper outbox,
+            InboxMapper inbox,
             TransactionOperations transactions, ObjectProvider<EventHandler> handlers,
             ObjectProvider<MeterRegistry> metrics, TraceContexts traces) throws ClientException {
-        boolean publishing = flag(environment, "domainforge.messaging.outbox.enabled", false)
-                && flag(environment, "domainforge.messaging.relay.enabled", true);
+        boolean publishing = properties.outbox().enabled() && properties.relay().enabled();
         boolean consuming = handlers.stream().findAny().isPresent();
         Producer producer = publishing
                 ? ClientServiceProvider.loadService().newProducerBuilder()
                         .setClientConfiguration(client.require()).build()
                 : null;
         var settings = new OutboxRelay.Settings(
-                duration(environment, "domainforge.messaging.relay.interval", Duration.ofSeconds(1)),
-                environment.getProperty("domainforge.messaging.relay.batch-size", Integer.class, 50),
-                environment.getProperty("domainforge.messaging.retention-hours", Long.class, 168L),
+                properties.relay().interval(), properties.relay().batchSize(), properties.retentionHours(),
                 publishing, consuming);
         return new OutboxRelay(outbox, inbox, transactions, producer, settings,
                 metrics.getIfAvailable(SimpleMeterRegistry::new), traces);
@@ -104,14 +97,14 @@ public class MessagingAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    EventConsumers eventConsumers(Environment environment, MessagingClient client,
+    EventConsumers eventConsumers(MessagingProperties properties, MessagingClient client,
             ObjectProvider<EventHandler> handlers, InboxMapper inbox,
             TransactionOperations transactions, ObjectProvider<MeterRegistry> metrics,
             TraceContexts traces) {
-        List<EventHandler> all = flag(environment, "domainforge.messaging.consumer.enabled", true)
+        List<EventHandler> all = properties.consumer().enabled()
                 ? handlers.orderedStream().toList() : List.of();
         return new EventConsumers(all, all.isEmpty() ? null : client.require(), inbox, transactions,
-                environment.getProperty("domainforge.messaging.consumer.max-attempts", Integer.class, 5),
+                properties.consumer().maxAttempts(),
                 metrics.getIfAvailable(SimpleMeterRegistry::new), traces);
     }
 

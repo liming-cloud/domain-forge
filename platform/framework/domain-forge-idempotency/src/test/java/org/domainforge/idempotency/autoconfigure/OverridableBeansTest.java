@@ -23,8 +23,13 @@ class OverridableBeansTest {
 
     // 只解析配置类、不刷新上下文：条件注解已经求值，Bean 不会被创建，也就不需要它们的依赖。
     private static AnnotationConfigApplicationContext start(Class<?>... configurations) {
+        return start(Map.of(), configurations);
+    }
+
+    private static AnnotationConfigApplicationContext start(Map<String, Object> properties,
+            Class<?>... configurations) {
         var context = new AnnotationConfigApplicationContext();
-        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test", Map.of()));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test", properties));
         context.getBeanFactory().registerScope("session", new SimpleThreadScope());
         context.register(configurations);
         var processor = new ConfigurationClassPostProcessor();
@@ -59,6 +64,12 @@ class OverridableBeansTest {
         TYPES.forEach(type -> assertTrue(context.getBeanFactory().getBeanNamesForType(type, true, false).length > 0,
                 type.toString()));
         assertEquals(0, context.getBeanFactory().getBeanNamesForType(User.class, true, false).length);
+    }
+
+    @Test
+    void switchPropertyTurnsFilterOff() {
+        var context = start(Map.of("domainforge.idempotency.enabled", "false"), IdempotencyAutoConfiguration.class);
+        assertEquals(0, context.getBeanFactory().getBeanNamesForType(FilterRegistrationBean.class, true, false).length);
     }
 
     /**

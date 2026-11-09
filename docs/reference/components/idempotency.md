@@ -32,7 +32,7 @@
 | 过滤器 | Servlet 过滤器，排在会话与 Same-Token 等安全过滤器之后、进入 MVC 之前；读出请求体计算指纹后交还后续处理 |
 | 账号 | 取自 Sa-Token 原生会话（一次 Redis 读取，不调用 IAM） |
 | 记录 | 服务的会话 Redis 中，键为 `domainforge:idempotency:<摘要>`（摘要含服务名、账号、方法、路径与键，不暴露原值），字段为状态、请求指纹与首次结果；开始、保存、放弃各为一次 Lua 原子操作，多实例共享 |
-| 配置 | `domainforge.idempotency.ttl`（24h）、`lease`（60s）、`max-request-size`（1MB）、`max-response-size`（1MB） |
+| 配置 | `domainforge.idempotency.enabled`（true，设为 false 不注册过滤器）、`ttl`（24h）、`lease`（60s）、`max-request-size`（1MB）、`max-response-size`（1MB） |
 
 ## 服务中的写法
 

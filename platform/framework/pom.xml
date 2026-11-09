@@ -23,4 +23,22 @@
         <module>domain-forge-notification</module>
         <module>domain-forge-idempotency</module>
     </modules>
+    <build>
+        <plugins>
+            <!-- 配置属性类生成 spring-configuration-metadata.json，供 IDE 补全与配置文档使用。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${spring-boot.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

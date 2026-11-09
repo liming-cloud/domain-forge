@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -24,6 +25,7 @@ import java.util.List;
  */
 @AutoConfiguration
 @ConditionalOnWebApplication
+@EnableConfigurationProperties(SchedulingProperties.class)
 public class SchedulingAutoConfiguration {
     /**
      * 启用调度时的装配。
@@ -48,19 +50,26 @@ public class SchedulingAutoConfiguration {
          */
         @Bean
         @ConditionalOnMissingBean(name = "scheduledTaskRegistration")
-        ApplicationRunner scheduledTaskRegistration(ObjectProvider<ScheduledTask> tasks, Environment environment) {
+        ApplicationRunner scheduledTaskRegistration(ObjectProvider<ScheduledTask> tasks,
+                SchedulingProperties properties,
+                Environment environment) {
             return arguments -> {
                 List<ScheduledTask> all = tasks.orderedStream().toList();
                 if (all.isEmpty()) return;
                 try (var client = new PowerJobClient(
-                        environment.getRequiredProperty("domainforge.scheduling.server-address"),
-                        environment.getProperty("domainforge.scheduling.app-name",
-                                environment.getRequiredProperty("spring.application.name")),
-                        environment.getRequiredProperty("domainforge.scheduling.app-password"))) {
+                        required(properties.serverAddress(), "domainforge.scheduling.server-address"),
+                        properties.appName() != null ? properties.appName()
+                                : environment.getRequiredProperty("spring.application.name"),
+                        required(properties.appPassword(), "domainforge.scheduling.app-password"))) {
                     new TaskRegistrar(all, client).register();
                 }
             };
         }
+    }
+
+    private static String required(String value, String name) {
+        if (value == null) throw new IllegalStateException("调度组件缺少配置 " + name);
+        return value;
     }
 
     /**
