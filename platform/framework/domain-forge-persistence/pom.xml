@@ -100,7 +100,7 @@
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-core</artifactId>
-            <version>3.5.17</version>
+            <version>3.5.18.1</version>
         </dependency>
         <!-- 附加数据源的连接池（主数据源由 Spring Boot 自动装配同一实现）。 -->
         <dependency>
