@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.domainforge.notification.api.NotificationUnavailableException;
 import org.domainforge.notification.api.SmsMessage;
+import org.domainforge.notification.api.SmsReceipt;
 import org.domainforge.notification.api.SmsRejected;
 import org.domainforge.notification.api.SmsSender;
 import org.domainforge.notification.api.VerificationCodes;
@@ -284,6 +285,44 @@ class NotificationIT {
         var process = new ProcessBuilder("docker", command, System.getenv("REDIS_CONTAINER"))
                 .redirectErrorStream(true).start();
         assertEquals(0, process.waitFor(), "docker " + command + " 失败");
+    }
+
+    // 提供方接入：业务的 SmsSender Bean 让位默认的阿里云实现（不需要阿里云配置），验证码经它发送；
+    // 本类其余场景使用默认实现，覆盖“回归默认实现”。
+    @Test
+    void customProviderReplacesDefault() {
+        CustomProvider.SENT.clear();
+        try (var context = new SpringApplicationBuilder(Application.class, CustomProvider.class)
+                .web(WebApplicationType.NONE).run(
+                        "--spring.main.banner-mode=off",
+                        "--logging.level.root=WARN",
+                        "--spring.data.redis.port=" + System.getenv("REDIS_PORT"),
+                        "--spring.data.redis.password=" + System.getenv("REDIS_PASSWORD"),
+                        "--domainforge.sms.enabled=true",
+                        "--domainforge.verification.enabled=true",
+                        "--domainforge.verification.key=" + Base64.getEncoder().encodeToString(new byte[32]),
+                        "--domainforge.verification.purposes.login.template=login-code")) {
+            assertEquals(1, context.getBeansOfType(SmsSender.class).size());
+            context.getBean(VerificationCodes.class).issue("login", "13800138000");
+            assertEquals(1, CustomProvider.SENT.size());
+            assertEquals("login-code", CustomProvider.SENT.getFirst().template());
+        }
+    }
+
+    /**
+     * 业务提供的短信服务商。
+     */
+    @Configuration(proxyBeanMethods = false)
+    static class CustomProvider {
+        static final List<SmsMessage> SENT = new CopyOnWriteArrayList<>();
+
+        @org.springframework.context.annotation.Bean
+        SmsSender customSmsSender() {
+            return message -> {
+                SENT.add(message);
+                return new SmsReceipt("custom-1");
+            };
+        }
     }
 
     /**

@@ -5,6 +5,7 @@ import org.domainforge.files.api.FileContent;
 import org.domainforge.files.api.FileRejected;
 import org.domainforge.files.api.FileStore;
 import org.domainforge.files.api.FileUpload;
+import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.files.api.StoredFile;
 import org.domainforge.files.api.UploadPolicy;
 import org.slf4j.Logger;

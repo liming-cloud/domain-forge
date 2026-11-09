@@ -38,7 +38,8 @@
 | 表 `domainforge_file` | 服务在自己的迁移中创建（结构见组件 `domain-forge/files/schema.sql`）；业务关联表引用其 `id` |
 | 本地存储 | `domainforge.files.storage=local`（默认），根目录 `domainforge.files.local.root`；写入根目录下的 `.incoming`、落盘后原子改名，读者不会看到写了一半的文件 |
 | S3 存储 | `domainforge.files.storage=s3`：`s3.endpoint`（空为 AWS）、`s3.region`（默认 `us-east-1`）、`s3.bucket`、`s3.prefix`（默认 `<服务名>/`，多个服务可共用一个桶）、`s3.access-key`／`s3.secret-key`（空时使用 AWS 默认凭据链）、`s3.path-style`（默认 true）。桶由运维创建，组件不自动创建。只在服务要求时计算校验和，避免部分兼容实现不支持新的校验头 |
-| 启动检查 | 本地目录不可写或桶不可访问时启动失败 |
+| 其他后端 | 业务提供自己的 `ObjectStorage` Bean（`org.domainforge.files.api`，五个操作：`check`、`write`、`read`、`delete`、`list`；失败抛 `FileStorageUnavailableException`），默认的本地与 S3 后端随之让位，不再需要 `domainforge.files.storage` 等配置；存取合同、一致性与清理任务不变。去掉该 Bean 即回归默认后端（`FileStorageIT`） |
+| 启动检查 | 后端的 `check` 失败（本地目录不可写、桶不可访问等）时启动失败 |
 | 清理任务 | `file-storage-cleanup`（经[定时任务](scheduling.md)登记，初始每小时一次）：删除标记早于保留期的对象与记录；删除最近 3 天目录中早于保留期且没有记录的对象。手动触发时参数 `days=N` 指定检查最近多少天，恢复较早的备份后使用 |
 | 指标 | `domainforge.files.stored`、`domainforge.files.rejected{reason}`、`domainforge.files.purged`、`domainforge.files.orphans` |
 

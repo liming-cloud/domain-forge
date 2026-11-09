@@ -1,6 +1,7 @@
 package org.domainforge.files.internal;
 
 import org.domainforge.files.api.FileStorageUnavailableException;
+import org.domainforge.files.api.ObjectStorage;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -15,7 +16,7 @@ import java.util.List;
 /**
  * S3 兼容存储：对象键为 {@code <前缀><组件键>}，多个服务可共用一个桶。桶由运维创建，组件不自动创建。
  */
-final class S3ObjectStorage implements ObjectStorage {
+final class S3ObjectStorage implements ObjectStorage, AutoCloseable {
     private final S3Client client;
     private final String bucket;
     private final String prefix;
@@ -24,6 +25,11 @@ final class S3ObjectStorage implements ObjectStorage {
         this.client = client;
         this.bucket = bucket;
         this.prefix = prefix;
+    }
+
+    @Override
+    public void close() {
+        client.close();
     }
 
     private static FileStorageUnavailableException failed(String action, SdkException cause) {
