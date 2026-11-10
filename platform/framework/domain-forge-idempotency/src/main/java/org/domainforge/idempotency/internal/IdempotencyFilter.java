@@ -17,12 +17,18 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
  * 幂等请求：带 {@code Idempotency-Key} 的已登录请求命中幂等入口时，按“账号＋方法＋路径＋键”占用 Redis 记录，
- * 以“方法＋路径＋请求体”的摘要识别同一请求；首次结果（非 5xx）保存后重复请求原样返回。
+ * 以“方法＋路径＋请求体”的摘要识别同一请求；首次结果（非 5xx）的状态码、内容类型、Location 与响应体保存后，
+ * 重复请求原样返回。首次请求处理期间每隔三分之一租期续租，处理再久也不会被同一键第二次执行。
  *
  * <p>Redis 不可用时拒绝（503），不退化为不做幂等，避免重复执行。
  */
@@ -35,6 +41,8 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
     private final IdempotencyRecords records;
     private final Supplier<Object> accounts;
     private final Settings settings;
+    private final ScheduledExecutorService renewals = Executors.newSingleThreadScheduledExecutor(
+            Thread.ofPlatform().name("idempotency-renewal").daemon().factory());
 
     IdempotencyFilter(IdempotentEndpoints endpoints, IdempotencyRecords records, Supplier<Object> accounts,
             Settings settings) {
@@ -117,24 +125,32 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
     private void first(HttpServletRequest request, HttpServletResponse response, FilterChain chain, String record,
             String fingerprint) throws ServletException, IOException {
         var captured = new ContentCachingResponseWrapper(response);
+        long period = Math.max(1, settings.lease().toMillis() / 3);
+        ScheduledFuture<?> renewal = renewals.scheduleAtFixedRate(
+                () -> quietly(() -> records.renew(record, fingerprint, settings.lease())), period, period,
+                TimeUnit.MILLISECONDS);
         try {
             chain.doFilter(request, captured);
         } catch (IOException | ServletException | RuntimeException failure) {
             quietly(() -> records.release(record, fingerprint));
             throw failure;
+        } finally {
+            renewal.cancel(false);
         }
         byte[] out = captured.getContentAsByteArray();
         if (captured.getStatus() >= 500 || out.length > settings.maxResponseBytes())
             quietly(() -> records.release(record, fingerprint));
         else
             quietly(() -> records.complete(record, fingerprint, captured.getStatus(),
-                    String.valueOf(captured.getContentType()), out, settings.ttl()));
+                    Objects.toString(captured.getContentType(), ""), out,
+                    Objects.toString(captured.getHeader("Location"), ""), settings.ttl()));
         captured.copyBodyToResponse();
     }
 
     private static void replay(HttpServletResponse response, IdempotencyRecords.Outcome outcome) throws IOException {
         response.setStatus(outcome.status());
-        if (!outcome.type().isEmpty() && !outcome.type().equals("null")) response.setContentType(outcome.type());
+        if (!outcome.type().isEmpty()) response.setContentType(outcome.type());
+        if (!outcome.location().isEmpty()) response.setHeader("Location", outcome.location());
         response.setHeader(REPLAYED, "true");
         response.getOutputStream().write(outcome.body());
     }
@@ -150,6 +166,14 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * 停止续租线程；未结束的处理不再续租，记录在租期后过期。
+     */
+    @Override
+    public void destroy() {
+        renewals.shutdownNow();
+    }
+
     private byte[] body(InputStream in) throws IOException {
         byte[] read = in.readNBytes(settings.maxRequestBytes() + 1);
         return read.length > settings.maxRequestBytes() ? null : read;
@@ -160,7 +184,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
      *
      * @param application      服务名，记录键的一部分
      * @param ttl              首次结果的保存时长
-     * @param lease            处理租期：首次请求在此期间未结束（如进程中断）时记录过期，可以重试
+     * @param lease            处理租期：处理期间每隔三分之一租期续租；进程中断、不再续租时记录在租期后过期，可以重试
      * @param maxRequestBytes  参与幂等的请求体上限
      * @param maxResponseBytes 保存的响应体上限，超过时不保存
      */

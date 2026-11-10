@@ -15,10 +15,9 @@ import org.springframework.transaction.support.TransactionOperations;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Outbox 中继：定时（以及事务提交后被唤醒时）抢占到期记录、发送、在同一短事务中记录结果。
  *
  * <ul>
- *   <li>多实例以 {@code FOR UPDATE SKIP LOCKED} 分担；有顺序键的记录只取该键最早一条，失败时同键后续不发，保持顺序。</li>
+ *   <li>多实例以 {@code FOR UPDATE SKIP LOCKED} 分担；有顺序键的记录只取该键最早一条（由抢占 SQL 保证），失败时同键后续不发，保持顺序。</li>
  *   <li>一批中出现发送失败即停止本批：多半是 RocketMQ 不可用，不在持有行锁的事务里逐条等超时。</li>
  *   <li>失败按 2 的幂退避（上限 5 分钟），永不丢弃；积压以指标 {@code domainforge.messaging.outbox.pending} 观察。</li>
  *   <li>发送成功、记录结果之前中断会重发同一事件 ID：至少一次，由消费方去重。</li>
@@ -46,7 +45,7 @@ public final class OutboxRelay implements SmartLifecycle {
     private final Counter sent;
     private final Counter failed;
     private final AtomicBoolean waking = new AtomicBoolean();
-    private ScheduledExecutorService executor;
+    private volatile ScheduledExecutorService executor;
 
     /**
      * 中继参数。
@@ -79,10 +78,16 @@ public final class OutboxRelay implements SmartLifecycle {
     }
 
     /**
-     * 提交后唤醒：合并多次唤醒为一次立即执行。
+     * 提交后唤醒：合并多次唤醒为一次立即执行；未启动或正在停止时忽略，记录由下次定时扫描发送。
      */
     public void wake() {
-        if (executor != null && waking.compareAndSet(false, true)) executor.execute(this::relayFromWake);
+        ScheduledExecutorService current = executor;
+        if (current == null || !waking.compareAndSet(false, true)) return;
+        try {
+            current.execute(this::relayFromWake);
+        } catch (RejectedExecutionException stopping) {
+            waking.set(false);
+        }
     }
 
     /**
@@ -99,10 +104,8 @@ public final class OutboxRelay implements SmartLifecycle {
     }
 
     private Batch sendBatch(List<OutboxRow> rows) {
-        Set<String> blocked = new HashSet<>();
         int delivered = 0;
         for (OutboxRow row : rows) {
-            if (row.orderKey() != null && blocked.contains(row.orderKey())) continue;
             Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
             try (Tracer.SpanInScope ignored = traces.scope(span)) {
                 producer.send(message(row, traces.inject(span)));
@@ -179,15 +182,16 @@ public final class OutboxRelay implements SmartLifecycle {
 
     @Override
     public void stop() {
-        if (executor == null) return;
-        executor.shutdown();
+        ScheduledExecutorService current = executor;
+        if (current == null) return;
+        executor = null;
+        current.shutdown();
         try {
-            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) executor.shutdownNow();
+            if (!current.awaitTermination(10, TimeUnit.SECONDS)) current.shutdownNow();
         } catch (InterruptedException interrupted) {
-            executor.shutdownNow();
+            current.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        executor = null;
     }
 
     @Override

@@ -13,7 +13,7 @@ import java.util.Objects;
  * @param localCapacity     L1 容量，0 为关闭
  * @param localTtl          L1 TTL，至多 1 天
  * @param loadConcurrency   每实例本区域同时回源的上限
- * @param loadWait          等待回源许可、合并结果与跨实例锁的上限
+ * @param loadWait          等待回源许可、跨实例锁各自的上限；合并等待者按 leader 的预算等
  * @param crossInstanceLock 是否用跨实例锁合并回源
  * @param fallbackOnFailure Redis 故障时 getOrLoad 是否直接回源（仅限可丢弃的缓存）
  */

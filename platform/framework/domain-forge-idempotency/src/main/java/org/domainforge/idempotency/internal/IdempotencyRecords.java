@@ -13,10 +13,11 @@ import java.util.Base64;
 import java.util.List;
 
 /**
- * Redis 中的幂等记录：开始、保存结果、放弃都由 Lua 原子完成；Redis 故障时抛出异常，由调用方拒绝请求。
+ * Redis 中的幂等记录：开始、续租、保存结果、放弃都由 Lua 原子完成；Redis 故障时抛出异常，由调用方拒绝请求。
  */
 class IdempotencyRecords {
     private static final String BEGIN = load("idempotency-begin.lua");
+    private static final String RENEW = load("idempotency-renew.lua");
     private static final String COMPLETE = load("idempotency-complete.lua");
     private static final String RELEASE = load("idempotency-release.lua");
     private final RedissonClient redis;
@@ -40,21 +41,31 @@ class IdempotencyRecords {
         List<Object> result = redis.getScript(StringCodec.INSTANCE).eval(RScript.Mode.READ_WRITE, BEGIN,
                 RScript.ReturnType.LIST, List.of(key), fingerprint, Long.toString(lease.toMillis()));
         return switch (String.valueOf(result.getFirst())) {
-            case "new" -> new Outcome(Outcome.State.NEW, 0, null, null);
-            case "mismatch" -> new Outcome(Outcome.State.MISMATCH, 0, null, null);
-            case "processing" -> new Outcome(Outcome.State.PROCESSING, 0, null, null);
+            case "new" -> new Outcome(Outcome.State.NEW, 0, null, null, null);
+            case "mismatch" -> new Outcome(Outcome.State.MISMATCH, 0, null, null, null);
+            case "processing" -> new Outcome(Outcome.State.PROCESSING, 0, null, null, null);
             default -> new Outcome(Outcome.State.DONE, Integer.parseInt(String.valueOf(result.get(1))),
-                    String.valueOf(result.get(2)), Base64.getDecoder().decode(String.valueOf(result.get(3))));
+                    String.valueOf(result.get(2)), Base64.getDecoder().decode(String.valueOf(result.get(3))),
+                    String.valueOf(result.get(4)));
         };
+    }
+
+    /**
+     * 处理期间续租：记录仍是本次处理时把租期重新设为 lease。
+     */
+    void renew(String key, String fingerprint, Duration lease) {
+        redis.getScript(StringCodec.INSTANCE).eval(RScript.Mode.READ_WRITE, RENEW, RScript.ReturnType.LONG,
+                List.of(key), fingerprint, Long.toString(lease.toMillis()));
     }
 
     /**
      * 保存首次结果。
      */
-    void complete(String key, String fingerprint, int status, String type, byte[] body, Duration ttl) {
+    void complete(String key, String fingerprint, int status, String type, byte[] body, String location,
+            Duration ttl) {
         redis.getScript(StringCodec.INSTANCE).eval(RScript.Mode.READ_WRITE, COMPLETE, RScript.ReturnType.LONG,
                 List.of(key), fingerprint, Integer.toString(status), type, Base64.getEncoder().encodeToString(body),
-                Long.toString(ttl.toMillis()));
+                Long.toString(ttl.toMillis()), location);
     }
 
     /**
@@ -68,12 +79,13 @@ class IdempotencyRecords {
     /**
      * 开始处理的结果。
      *
-     * @param state  状态
-     * @param status 已完成时的状态码
-     * @param type   已完成时的内容类型（可能为空串）
-     * @param body   已完成时的响应体
+     * @param state    状态
+     * @param status   已完成时的状态码
+     * @param type     已完成时的内容类型（没有时为空串）
+     * @param body     已完成时的响应体
+     * @param location 已完成时的 Location 响应头（没有时为空串）
      */
-    record Outcome(State state, int status, String type, byte[] body) {
+    record Outcome(State state, int status, String type, byte[] body, String location) {
         /**
          * 记录状态。
          */

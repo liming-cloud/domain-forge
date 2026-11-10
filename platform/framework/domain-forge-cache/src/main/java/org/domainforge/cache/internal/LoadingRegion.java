@@ -1,11 +1,11 @@
 package org.domainforge.cache.internal;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.domainforge.cache.api.CacheRegion;
 import org.domainforge.cache.api.CacheUnavailableException;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -23,10 +23,11 @@ import java.util.function.Supplier;
 /**
  * 区域的公开行为：在 L1／L2 读写之上提供回源合并、并发上限、可选跨实例锁、空值短期缓存与事务规则。
  *
- * <p>回源在调用线程执行，不新建线程池；合并记录在加载结束或异常时移除。
+ * <p>回源在调用线程执行，不新建线程池；合并记录在加载结束或异常时移除。写事务里的回源不参与合并、不写入，
+ * 读到的值可能随事务回滚，不交给其他线程。
  */
 final class LoadingRegion<T> implements CacheRegion<T> {
-    private static final Log LOG = LogFactory.getLog(LoadingRegion.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LoadingRegion.class);
     private final RedissonClient client;
     private final String name;
     private final RedisCacheRegion<T> storage;
@@ -83,8 +84,8 @@ final class LoadingRegion<T> implements CacheRegion<T> {
                     remove(key);
                 } catch (RuntimeException failure) {
                     // 已提交的数据库事务不能因缓存删除失败而回滚或重试；旧值在 TTL 内可能被读到。
-                    LOG.warn("cache_evict_after_commit_failed region=" + name + " type="
-                            + failure.getClass().getSimpleName());
+                    LOG.warn("cache_evict_after_commit_failed region={} type={}", name,
+                            failure.getClass().getSimpleName());
                 }
             }
         });
@@ -106,6 +107,7 @@ final class LoadingRegion<T> implements CacheRegion<T> {
         Cached<T> cached = cached(key);
         if (cached.hit()) return cached.value();
         if (cached.failed()) return settings.fallbackOnFailure() ? bounded(loader) : throwUnavailable(cached);
+        if (writeTransaction()) return bounded(loader);
         CompletableFuture<T> mine = new CompletableFuture<>();
         CompletableFuture<T> leader = inflight.putIfAbsent(key, mine);
         if (leader != null) return await(leader);
@@ -145,12 +147,11 @@ final class LoadingRegion<T> implements CacheRegion<T> {
 
     private T loadAndStore(String key, Supplier<T> loader) {
         T value = loader.get();
-        if (writeTransaction()) return value;
         try {
             if (value != null) storage.put(key, value, ttl());
             else if (!settings.nullTtl().isZero()) marker(key).set("1", settings.nullTtl());
         } catch (RuntimeException failure) {
-            LOG.warn("cache_fill_failed region=" + name + " type=" + failure.getClass().getSimpleName());
+            LOG.warn("cache_fill_failed region={} type={}", name, failure.getClass().getSimpleName());
         }
         return value;
     }
@@ -171,9 +172,13 @@ final class LoadingRegion<T> implements CacheRegion<T> {
         }
     }
 
+    /**
+     * 等待同键的 leader：leader 先等许可、再等跨实例锁（各至多 load-wait），之后回源，回源本身再给一个 load-wait。
+     */
     private T await(CompletableFuture<T> leader) {
+        long budget = settings.loadWait().toMillis() * (settings.crossInstanceLock() ? 3 : 2);
         try {
-            return leader.get(settings.loadWait().toMillis(), TimeUnit.MILLISECONDS);
+            return leader.get(budget, TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new CacheUnavailableException("等待回源被中断", interrupted);
