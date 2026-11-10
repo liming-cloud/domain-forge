@@ -5,7 +5,8 @@ import { sleep } from 'k6';
 export const BASE = __ENV.BASE || 'http://nginx';
 export const PASSWORD = __ENV.PASSWORD;
 export const ACCOUNTS = Number(__ENV.ACCOUNTS || 10000);
-export const VUS = Number(__ENV.VUS || 1000);
+// 虚拟用户数不超过 k6.sh 的 480 个源地址。
+export const VUS = Number(__ENV.VUS || 480);
 
 // 第 i 个压测账号的登录名（1 起）。
 export function accountName(i) {
@@ -18,9 +19,10 @@ export function orderLine(n) {
 }
 
 // 固定速率下每次迭代至少持续的秒数。k6 总是复用刚空闲的虚拟用户，响应快时少数几个虚拟用户（即少数源地址）
-// 就能接住全部请求；拉长迭代（不足部分休眠，不计入请求耗时）让同时在用的虚拟用户约为 VUS 的八成。
+// 就能接住全部请求；拉长迭代（不足部分休眠，不计入请求耗时）让同时在用的虚拟用户约为 VUS 的 95%。
+// 默认 480 个虚拟用户、每秒 200 次时约 2.3 秒，每个源地址每分钟约 26 次，低于按地址的登录保护（每分钟 30 次）。
 export function pacing(rate, vus = VUS) {
-    return (0.8 * vus) / rate;
+    return (0.95 * vus) / rate;
 }
 
 // 执行 body，再休眠到本次迭代满 seconds 秒。

@@ -6,7 +6,7 @@
 //   digest 跨服务读取订单摘要：board-service 以同一用户身份调用 order-service 的 GET /api/orders
 // 除 login 外，每个虚拟用户固定使用一个账号，令牌取自灌数（TOKENS 文件）。
 // 环境变量：SCENARIO、PASSWORD、TOKENS，可选 RATE（每秒迭代数，默认 200）、WARMUP（默认 2m）、DURATION（默认 3m）、
-// P95_MS 与 ERROR_RATE（门槛，默认 200 与 0.001）、VUS（默认 1000，不超过 k6 的源地址数）。
+// P95_MS 与 ERROR_RATE（门槛，默认 200 与 0.001）、VUS（默认 480，不超过 k6 的源地址数）。
 import exec from 'k6/execution';
 import { check } from 'k6';
 import { Counter } from 'k6/metrics';

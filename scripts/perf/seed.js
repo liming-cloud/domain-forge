@@ -11,7 +11,7 @@ import { ACCOUNTS, PASSWORD, VUS, accountName, must, orderLine, paced, pacing } 
 
 const ORDERS = Number(__ENV.ORDERS_PER_ACCOUNT || 10);
 const RATE = Number(__ENV.SEED_RATE || 12);
-// 灌数的虚拟用户数：迭代节拍（0.8 × 虚拟用户数 ÷ 速率，约 17 秒）须短于 Nginx 的长连接超时（约 65 秒），
+// 灌数的虚拟用户数：迭代节拍（0.95 × 虚拟用户数 ÷ 速率，约 20 秒）须短于 Nginx 的长连接超时（约 65 秒），
 // 否则每次迭代都从闲置已久的源地址重新建连，邻居表项已过期，连接常常失败。
 const SEED_VUS = Math.min(256, VUS);
 const seeded = new Counter('seeded');
