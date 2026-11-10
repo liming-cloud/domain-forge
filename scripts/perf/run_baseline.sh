@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # 性能基线（手动执行，不进 CI；口径与复现说明见 docs/platform/性能基线.md）：
 # 在仓库的干净副本中生成 order-service 与调用它的 board-service，按部署参考（加 scripts/perf/compose.perf.yml 的压测网络）
-# 启动整套服务（内存配额合计 8064m），全部健康后施加 CPU 配额（合计 4 核）；经 Nginx 与网关灌入 1 万个账号、10 万张订单，再用 k6 依次压
-# 登录、带范围的订单查询、提交订单、跨服务读取订单摘要，k6 汇总与容器资源采样写入结果目录。不修改当前工作区。
+# 启动整套服务（内存配额合计 8064m），经 Nginx 与网关灌入 1 万个账号、10 万张订单，施加 CPU 配额（合计 4 核）后用 k6 依次压
+# 带范围的订单查询、提交订单、跨服务读取订单摘要、登录，k6 汇总与容器资源采样写入结果目录。不修改当前工作区。
 #
 # 用法：scripts/perf/run_baseline.sh <结果目录> [场景...]
-#   场景默认 login query submit digest；RATE、WARMUP、DURATION、VUS、ACCOUNTS、ORDERS_PER_ACCOUNT 经环境变量传给 k6。
+#   场景默认 query submit digest login（登录最后：超过密码计算能力时失败的登录会锁住部分账号 10 分钟，影响其后场景取令牌）；
+#   RATE、WARMUP、DURATION、VUS、ACCOUNTS、ORDERS_PER_ACCOUNT、SEED_RATE 经环境变量传给 k6。
 #   KEEP=1 时结束后保留整套服务供排查，并打印清理命令。
 set -euo pipefail
 
@@ -14,7 +15,7 @@ repo="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$1"
 results="$(cd "$1" && pwd)"
 shift
-if [ $# -gt 0 ]; then scenarios=("$@"); else scenarios=(login query submit digest); fi
+if [ $# -gt 0 ]; then scenarios=("$@"); else scenarios=(query submit digest login); fi
 work="$(mktemp -d)"
 copy="$work/repo"
 export COMPOSE_PROJECT_NAME="dfperf$$"
@@ -28,8 +29,8 @@ tag="perf$$"
 k6_image=grafana/k6:2.3.0@sha256:3e4186aea62e11a45560bfc51e19eeafe82fc07ce069c78aff44b7ff893d9a5e
 compose() { docker compose --env-file "$env_file" "$@"; }
 # 常驻容器的 CPU 配额（服务=核数），合计 4 核；内存配额（合计 8064m）在 compose.perf.yml 中，二者模拟 4 核 8G 的单机。
-# CPU 配额在全部健康后施加：逐容器的静态配额下 PowerJob 等 JVM 启动超过健康检查时限，而真实单机启动时各容器共享 CPU。
-# 一次性初始化任务在施加配额前已退出。
+# CPU 配额在启动与灌数之后、压测之前施加：逐容器的静态配额下 PowerJob 等 JVM 启动超过健康检查时限（真实单机启动时
+# 各容器共享 CPU），灌数也会因 IAM 的密码计算太慢而拖到一小时以上；二者都不是计量对象。一次性初始化任务此前已退出。
 cpu_quotas=(postgres=0.8 redis=0.2 nacos=0.2 rocketmq-namesrv=0.1 rocketmq-broker=0.2 powerjob-server=0.1
     iam=0.8 gateway=0.6 order-service=0.6 board-service=0.2 nginx=0.2)
 cleanup() {
@@ -45,15 +46,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# k6 <脚本> <汇总文件名> [环境变量...]：在压测网络中运行 k6，汇总写入结果目录
+# k6 <脚本> <汇总文件名> [环境变量...]：在压测网络中运行 k6，汇总写入结果目录。灌数的控制台输出（含账号令牌）
+# 写到工作目录的 tokens/seed.log，压测时经 TOKENS 读取；令牌不进入结果目录。
 k6() {
-    local script=$1 summary=$2 envs=()
+    local script=$1 summary=$2 envs=() args=()
     shift 2
-    for kv in BASE=http://nginx "PASSWORD=$password" "$@"; do envs+=(-e "$kv"); done
-    for kv in ACCOUNTS ORDERS_PER_ACCOUNT RATE WARMUP DURATION VUS; do [ -n "${!kv:-}" ] && envs+=(-e "$kv=${!kv}"); done
+    for kv in BASE=http://nginx "PASSWORD=$password" TOKENS=/tokens/seed.log "$@"; do envs+=(-e "$kv"); done
+    for kv in ACCOUNTS ORDERS_PER_ACCOUNT SEED_RATE RATE WARMUP DURATION VUS; do [ -n "${!kv:-}" ] && envs+=(-e "$kv=${!kv}"); done
+    [ "$script" = seed.js ] && args+=(--console-output /tokens/seed.log)
+    mkdir -p "$work/tokens"
     docker run --rm --network "${COMPOSE_PROJECT_NAME}_loadgen" --cap-add NET_ADMIN --user root \
-        -v "$copy/scripts/perf:/perf:ro" -v "$results:/results" --entrypoint /perf/k6.sh "${envs[@]}" "$k6_image" \
-        --quiet --summary-export "/results/$summary" "/perf/$script"
+        -v "$copy/scripts/perf:/perf:ro" -v "$results:/results" -v "$work/tokens:/tokens" --entrypoint /perf/k6.sh \
+        "${envs[@]}" "$k6_image" --quiet --summary-export "/results/$summary" ${args[@]+"${args[@]}"} "/perf/$script"
 }
 
 # sample <文件>：每 15 秒记录一次各容器的 CPU 与内存，直到被结束
@@ -81,22 +85,10 @@ step "构建 IAM、网关、order-service 与 board-service"
 "$copy/platform/mvnw" -f "$copy/platform/pom.xml" -B -ntp -q clean package \
     -DskipTests -Ddocker.skip=true -pl services/iam,services/gateway,services/order-service,services/board-service -am
 
-step "启动整套服务并施加资源配额"
+step "启动整套服务"
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "ORDER_SERVICE_IMAGE_TAG=$tag" \
     "ORDER_SERVICE_DB_PASSWORD=$(secret)" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
 up_wait --build --quiet-pull > "$results/compose-up.log" 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
-for quota in "${cpu_quotas[@]}"; do
-    docker update --cpus "${quota#*=}" "$(compose ps -q "${quota%%=*}")" > /dev/null
-done
-{
-    echo "commit $(git -C "$repo" rev-parse HEAD)$(git -C "$repo" diff --quiet HEAD || echo '（含未提交修改）')"
-    echo "date $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "host $(uname -sm) $(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"
-    echo "docker $(docker info --format '{{.ServerVersion}} {{.NCPU}} CPU {{.MemTotal}} B')"
-    echo "k6 $k6_image"
-    docker inspect --format '{{.Name}} cpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}' \
-        $(compose ps -q) | sed "s#^/$COMPOSE_PROJECT_NAME-##"
-} > "$results/environment.txt"
 
 step "初始化管理员、安装订单权限目录、建订单角色（本人范围读写）"
 admin_pw="Admin-$(secret)"
@@ -118,11 +110,24 @@ expect 200 "角色授予"
 step "灌数：账号与订单"
 started=$(date +%s)
 k6 seed.js seed.json "ADMIN_TOKEN=$admin_token" "ROLE_ID=$role_id"
+seeded="seed_seconds $(($(date +%s) - started))
+accounts $(sql 'select count(*) from public.iam_account')
+orders $(sql 'select count(*) from order_service.orders')"
+
+step "施加 CPU 配额"
+for quota in "${cpu_quotas[@]}"; do
+    docker update --cpus "${quota#*=}" "$(compose ps -q "${quota%%=*}")" > /dev/null
+done
 {
-    echo "seed_seconds $(($(date +%s) - started))"
-    echo "accounts $(sql 'select count(*) from public.iam_account')"
-    echo "orders $(sql 'select count(*) from order_service.orders')"
-} >> "$results/environment.txt"
+    echo "commit $(git -C "$repo" rev-parse HEAD)$(git -C "$repo" diff --quiet HEAD || echo '（含未提交修改）')"
+    echo "date $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "host $(uname -sm) $(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"
+    echo "docker $(docker info --format '{{.ServerVersion}} {{.NCPU}} CPU {{.MemTotal}} B')"
+    echo "k6 $k6_image"
+    docker inspect --format '{{.Name}} cpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}' \
+        $(compose ps -q) | sed "s#^/$COMPOSE_PROJECT_NAME-##"
+} > "$results/environment.txt"
+echo "$seeded" >> "$results/environment.txt"
 
 for scenario in "${scenarios[@]}"; do
     step "压测：$scenario"

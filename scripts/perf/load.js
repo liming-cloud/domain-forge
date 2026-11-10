@@ -4,19 +4,18 @@
 //   query  带数据范围的订单查询：GET /api/orders（本人范围，每个账号 10 张）
 //   submit 提交订单：新建草稿（create）后带 Idempotency-Key 提交（submit，同事务写 Outbox）；每次迭代两次请求
 //   digest 跨服务读取订单摘要：board-service 以同一用户身份调用 order-service 的 GET /api/orders
-// 除 login 外，每个虚拟用户固定使用一个账号，首次迭代登录后复用令牌（登录不计入该场景）。
-// 环境变量：SCENARIO、PASSWORD，可选 RATE（每秒迭代数，默认 200）、WARMUP（默认 2m）、DURATION（默认 3m）、
+// 除 login 外，每个虚拟用户固定使用一个账号，令牌取自灌数（TOKENS 文件）。
+// 环境变量：SCENARIO、PASSWORD、TOKENS，可选 RATE（每秒迭代数，默认 200）、WARMUP（默认 2m）、DURATION（默认 3m）、
 // P95_MS 与 ERROR_RATE（门槛，默认 200 与 0.001）、VUS（默认 1000，不超过 k6 的源地址数）。
 import exec from 'k6/execution';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { Counter } from 'k6/metrics';
-import { ACCOUNTS, PASSWORD, accountName, orderLine, request } from './common.js';
+import { ACCOUNTS, PASSWORD, VUS, accountName, orderLine, paced, pacing, request } from './common.js';
 
 const SCENARIO = __ENV.SCENARIO;
 const RATE = Number(__ENV.RATE || 200);
 const WARMUP = __ENV.WARMUP || '2m';
 const DURATION = __ENV.DURATION || '3m';
-const VUS = Number(__ENV.VUS || 1000);
 const ENDPOINTS = { login: ['login'], query: ['query'], submit: ['create', 'submit'], digest: ['digest'] };
 if (!ENDPOINTS[SCENARIO]) throw new Error(`SCENARIO 须为 ${Object.keys(ENDPOINTS).join('、')} 之一`);
 
@@ -51,45 +50,42 @@ export const options = {
 };
 
 const sessionless = new Counter('sessionless');
+// 灌数时的控制台输出（k6 --console-output，logfmt），其中 msg="token <账号序号> <令牌>" 为账号令牌。
+const TOKENS = {};
+for (const [, i, value] of open(__ENV.TOKENS).matchAll(/msg="token (\d+) ([^"\s]+)"/g)) TOKENS[i] = value;
 let token;
 
-// 每次迭代至少持续 PACE 秒（不足部分 sleep，不计入请求耗时）。k6 总是复用刚空闲的虚拟用户，响应快时少数几个
-// 虚拟用户（即少数源地址）就能接住全部请求；拉长迭代让同时在用的虚拟用户约为 VUS 的八成，每个源地址每 PACE 秒一次。
-const PACE = (0.8 * VUS) / RATE;
+const PACE = pacing(RATE);
 
 // 包装场景函数：按已运行时间给本次迭代的全部指标打上阶段标签，并补足节拍。
-function paced(body) {
+function phased(body) {
     return () => {
-        const started = Date.now();
-        exec.vu.metrics.tags.phase = started - exec.scenario.startTime < WARMUP_MS ? 'warmup' : 'measure';
-        body();
-        sleep(Math.max(0, PACE - (Date.now() - started) / 1000));
+        const elapsed = Date.now() - exec.scenario.startTime;
+        exec.vu.metrics.tags.phase = elapsed < WARMUP_MS ? 'warmup' : 'measure';
+        paced(PACE, body);
     };
 }
 
-// 本虚拟用户的账号令牌：首次调用时登录（失败则本次迭代放弃，下次再试）。
+// 本虚拟用户的账号令牌：取自灌数时的控制台输出（见 seed.js），不在压测时登录，免得与负载争用 IAM 的密码计算。
 function session() {
-    if (token) return token;
-    const loginName = accountName(((exec.vu.idInTest - 1) % ACCOUNTS) + 1);
-    const res = request('POST', '/api/auth/login', { loginName, password: PASSWORD }, null, 'session');
-    if (res.status === 200) token = res.json('token');
-    else sessionless.add(1);
+    if (!token) token = TOKENS[((exec.vu.idInTest - 1) % ACCOUNTS) + 1];
+    if (!token) sessionless.add(1);
     return token;
 }
 
-export const login = paced(() => {
+export const login = phased(() => {
     const loginName = accountName(Math.floor(Math.random() * ACCOUNTS) + 1);
     const res = request('POST', '/api/auth/login', { loginName, password: PASSWORD }, null, 'login');
     check(res, { 'login 200': (r) => r.status === 200 });
 });
 
-export const query = paced(() => {
+export const query = phased(() => {
     if (!session()) return;
     const res = request('GET', '/api/orders?limit=20', undefined, token, 'query');
     check(res, { 'query 200': (r) => r.status === 200 });
 });
 
-export const submit = paced(() => {
+export const submit = phased(() => {
     if (!session()) return;
     const created = request('POST', '/api/orders', { lines: [orderLine(0)] }, token, 'create');
     if (!check(created, { 'create 200': (r) => r.status === 200 })) return;
@@ -99,7 +95,7 @@ export const submit = paced(() => {
     check(res, { 'submit 200': (r) => r.status === 200 });
 });
 
-export const digest = paced(() => {
+export const digest = phased(() => {
     if (!session()) return;
     const res = request('GET', '/api/board/order-digest', undefined, token, 'digest');
     check(res, { 'digest 200': (r) => r.status === 200 });
