@@ -1,3 +1,1 @@
-org.springframework.boot.EnvironmentPostProcessor=\
-org.domainforge.config.autoconfigure.NacosClientDefaults,\
-org.domainforge.config.autoconfigure.ConfigDefaults
+org.springframework.boot.EnvironmentPostProcessor=org.domainforge.config.autoconfigure.NacosClientDefaults

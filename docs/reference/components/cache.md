@@ -6,7 +6,7 @@
 
 access-control 直接依赖 cache，官方 SaTokenDaoForRedisson 与普通缓存共用同一个客户端；安全状态不走 L1、空值缓存或降级，禁止并存第二套 Lettuce／DAO。业务调用组件公开接口，Lua 与 SDK 仅在基础设施职责使用。
 
-cache 的 META-INF/domain-forge/cache-defaults.yml 管唯一 Redis 连接及客户端资源，access-defaults.yml 只管 sa-token。原生 EnvironmentPostProcessor＋YamlPropertySourceLoader 加到最低优先级；服务 YAML、profile、环境、启动参数可覆盖，组件不使用 application.yml，不再维护第二套默认值或配置框架。
+cache 的 META-INF/domain-forge/cache-defaults.yml 管唯一 Redis 连接及客户端资源，access-defaults.yml 只管 sa-token。由 [defaults](defaults.md) 组件并入最低优先级的 `defaultProperties`；服务 YAML、profile、环境、启动参数可覆盖，组件不使用 application.yml，不再维护第二套默认值或配置框架。
 
 - 基础缓存使用类型固定的 region＋完整业务键，RBucket 保存有限 TTL。get／put 不自动防护外部回源，getOrLoad 才提供合并和负载保护。
 - L1 默认关；开启使用 Caffeine 3.2.4 管理有限容量与 TTL，通过同一 RedissonClient 接收 Redis 原生 keyevent；不建自定义同步总线或按键监听器。启用前核对 E$gx 通知（淘汰模式还需 e）；无配置或无权核对明确拒绝。重订阅清空 L1，按固定 region 集合创建并关闭。L2 TTL 从写入计时，L1 从本地填充计时；失效通知不等于强一致，晚回填／断连可能陈旧。严格当前事实绕过两层，不能以 TTL 承诺距 SQL 提交固定时间内必定最新。Redisson 4.8.0 原生 RClientSideCaching 不满足容量／TTL 要求，因此 L1 采用 Caffeine＋原生通知。

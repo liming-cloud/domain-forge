@@ -10,6 +10,7 @@
     <artifactId>framework</artifactId>
     <packaging>pom</packaging>
     <modules>
+        <module>domain-forge-defaults</module>
         <module>domain-forge-cache</module>
         <module>domain-forge-web-support</module>
         <module>domain-forge-persistence</module>

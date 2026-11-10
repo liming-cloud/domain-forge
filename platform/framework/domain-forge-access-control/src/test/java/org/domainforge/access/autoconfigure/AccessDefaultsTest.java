@@ -1,5 +1,6 @@
 package org.domainforge.access.autoconfigure;
 
+import org.domainforge.defaults.autoconfigure.ComponentDefaults;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
@@ -14,7 +15,7 @@ class AccessDefaultsTest {
     void serviceOverrideKeepsUnchangedDefaults() {
         var environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(new MapPropertySource("service", Map.of("sa-token.timeout", "3600")));
-        new AccessDefaults().postProcessEnvironment(environment, null);
+        new ComponentDefaults().postProcessEnvironment(environment, null);
         assertEquals("3600", environment.getProperty("sa-token.timeout"));
         assertEquals("Authorization", environment.getProperty("sa-token.token-name"));
         assertEquals("false", environment.getProperty("sa-token.is-read-cookie"));

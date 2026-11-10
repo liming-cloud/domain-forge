@@ -9,6 +9,12 @@
     </parent>
     <artifactId>domain-forge-cache</artifactId>
     <dependencies>
+        <!-- 加载本组件 META-INF/domain-forge/*-defaults.yml 的默认值。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-defaults</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-beans</artifactId>
