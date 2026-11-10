@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ENDPOINTS = {'login': ['login'], 'query': ['query'], 'submit': ['create', 'submit'], 'digest': ['digest']}
-STATUSES = ['200', '409', '429', '503']
+STATUSES = ['0', '200', '409', '429', '503', '504']
 # CPU 峰值表列出的容器（docker stats 的 100% 为 1 核），括号内为配额。
 CONTAINERS = [('nginx', 0.2), ('gateway', 0.6), ('iam', 0.8), ('order-service', 0.6), ('board-service', 0.2),
               ('postgres', 0.8), ('redis', 0.2), ('rocketmq-broker', 0.2)]

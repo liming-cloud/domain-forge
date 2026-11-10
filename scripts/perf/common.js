@@ -19,8 +19,8 @@ export function orderLine(n) {
 
 // 固定速率下每次迭代至少持续的秒数。k6 总是复用刚空闲的虚拟用户，响应快时少数几个虚拟用户（即少数源地址）
 // 就能接住全部请求；拉长迭代（不足部分休眠，不计入请求耗时）让同时在用的虚拟用户约为 VUS 的八成。
-export function pacing(rate) {
-    return (0.8 * VUS) / rate;
+export function pacing(rate, vus = VUS) {
+    return (0.8 * vus) / rate;
 }
 
 // 执行 body，再休眠到本次迭代满 seconds 秒。
@@ -37,12 +37,13 @@ export function request(method, path, body, token, name, headers) {
     return http.request(method, BASE + path, body === undefined ? null : JSON.stringify(body), params);
 }
 
-// 灌数用：429、503（限流、密码计算繁忙）退避重试，最多 attempts 次；其他失败或重试用尽时抛出，让整次灌数失败。
+// 灌数用：429、503（限流、密码计算繁忙）与连接失败（状态 0）退避重试，最多 attempts 次；其他失败或重试用尽时抛出，
+// 让整次灌数失败。
 export function must(method, path, body, token, name, attempts = 30) {
     for (let attempt = 1; ; attempt++) {
         const res = request(method, path, body, token, name);
         if (res.status >= 200 && res.status < 300) return res;
-        if ((res.status === 429 || res.status === 503) && attempt < attempts) {
+        if ([0, 429, 503].includes(res.status) && attempt < attempts) {
             sleep(Math.min(2 * attempt, 10));
             continue;
         }

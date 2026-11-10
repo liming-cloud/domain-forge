@@ -11,13 +11,16 @@ import { ACCOUNTS, PASSWORD, VUS, accountName, must, orderLine, paced, pacing } 
 
 const ORDERS = Number(__ENV.ORDERS_PER_ACCOUNT || 10);
 const RATE = Number(__ENV.SEED_RATE || 12);
+// 灌数的虚拟用户数：迭代节拍（0.8 × 虚拟用户数 ÷ 速率，约 17 秒）须短于 Nginx 的长连接超时（约 65 秒），
+// 否则每次迭代都从闲置已久的源地址重新建连，邻居表项已过期，连接常常失败。
+const SEED_VUS = Math.min(256, VUS);
 const seeded = new Counter('seeded');
 
 export const options = {
     scenarios: {
         seed: {
             executor: 'constant-arrival-rate', rate: RATE, timeUnit: '1s', duration: `${Math.ceil(ACCOUNTS / RATE)}s`,
-            preAllocatedVUs: VUS, maxVUs: VUS,
+            preAllocatedVUs: SEED_VUS, maxVUs: SEED_VUS,
         },
     },
     // 每个账号都灌完才算成功（按时长发起的迭代可能比账号数多一两次，多出的不做事）。
@@ -28,7 +31,7 @@ export const options = {
 export default function () {
     const i = exec.scenario.iterationInTest + 1;
     if (i > ACCOUNTS) return;
-    paced(pacing(RATE), () => {
+    paced(pacing(RATE, SEED_VUS), () => {
         const admin = __ENV.ADMIN_TOKEN;
         const loginName = accountName(i);
         const secret = must('POST', '/api/invitations', { loginName }, admin, 'invite').json('secret');

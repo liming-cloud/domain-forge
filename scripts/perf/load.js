@@ -29,7 +29,7 @@ for (const name of ENDPOINTS[SCENARIO]) {
     thresholds[`http_req_duration{phase:measure,name:${name}}`] = [`p(95)<${__ENV.P95_MS || 200}`];
     thresholds[`http_req_failed{phase:measure,name:${name}}`] = [`rate<${__ENV.ERROR_RATE || 0.001}`];
     // 只为在汇总中按状态码列出请求数，不作判断。
-    for (const status of [200, 409, 429, 503]) {
+    for (const status of [0, 200, 409, 429, 503, 504]) {
         thresholds[`http_reqs{phase:measure,name:${name},status:${status}}`] = ['count>=0'];
     }
 }
