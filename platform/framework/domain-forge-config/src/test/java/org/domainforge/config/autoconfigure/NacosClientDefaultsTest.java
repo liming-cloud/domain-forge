@@ -1,5 +1,6 @@
 package org.domainforge.config.autoconfigure;
 
+import org.domainforge.defaults.autoconfigure.ComponentDefaults;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.core.env.MapPropertySource;
@@ -17,7 +18,7 @@ class NacosClientDefaultsTest {
         var environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(new MapPropertySource("test", properties));
         new NacosClientDefaults().postProcessEnvironment(environment, new SpringApplication());
-        new ConfigDefaults().postProcessEnvironment(environment, new SpringApplication());
+        new ComponentDefaults().postProcessEnvironment(environment, new SpringApplication());
         return environment.getProperty("spring.cloud.nacos.config.enabled");
     }
 

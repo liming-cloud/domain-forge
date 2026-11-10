@@ -137,6 +137,11 @@
             </dependency>
             <dependency>
                 <groupId>org.domainforge</groupId>
+                <artifactId>domain-forge-defaults</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.domainforge</groupId>
                 <artifactId>domain-forge-file-storage</artifactId>
                 <version>${project.version}</version>
             </dependency>

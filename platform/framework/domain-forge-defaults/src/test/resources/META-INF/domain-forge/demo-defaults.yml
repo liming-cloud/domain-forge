@@ -1,0 +1,5 @@
+demo:
+  kept: component
+  by-service: component
+  by-argument: component
+  by-application: component
