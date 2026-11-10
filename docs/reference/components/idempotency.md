@@ -21,7 +21,8 @@
 | Redis 不可用 | 503 `SERVICE_UNAVAILABLE`，不执行；不退化为“不做幂等”，避免重复执行 |
 
 - 业务拒绝（4xx 的 Problem Details）也是“首次结果”，重复请求得到同样的拒绝。
-- 处理租期 60 秒：首次请求在租期内没有结束（如进程中断），记录过期后同一键可以重试。租期须长于入口的最长处理时间。
+- 处理租期 60 秒：首次请求处理期间每隔三分之一租期续租，处理再久也不会被同一键第二次执行；进程中断、不再续租时，记录在租期后过期，同一键可以重试。
+- 重放带回首次结果的状态码、内容类型、`Location` 与响应体，以及 `Idempotent-Replayed: true`；其他响应头不保存。
 - `IDEMPOTENCY_IN_PROGRESS`、`IDEMPOTENCY_KEY_REUSED` 是平台保留代码，业务拒绝不能使用（见[错误码](../错误码.md)）。
 
 ## 组件
@@ -31,7 +32,7 @@
 | 注解 `@Idempotent` | 标在入口方法上；组件在首次请求时从 MVC 映射表读取标注入口的方法与路径模式 |
 | 过滤器 | Servlet 过滤器，排在会话与 Same-Token 等安全过滤器之后、进入 MVC 之前；读出请求体计算指纹后交还后续处理 |
 | 账号 | 取自 Sa-Token 原生会话（一次 Redis 读取，不调用 IAM） |
-| 记录 | 服务的会话 Redis 中，键为 `domainforge:idempotency:<摘要>`（摘要含服务名、账号、方法、路径与键，不暴露原值），字段为状态、请求指纹与首次结果；开始、保存、放弃各为一次 Lua 原子操作，多实例共享 |
+| 记录 | 服务的会话 Redis 中，键为 `domainforge:idempotency:<摘要>`（摘要含服务名、账号、方法、路径与键，不暴露原值），字段为状态、请求指纹与首次结果；开始、续租、保存、放弃各为一次 Lua 原子操作，多实例共享 |
 | 配置 | `domainforge.idempotency.enabled`（true，设为 false 不注册过滤器）、`ttl`（24h）、`lease`（60s）、`max-request-size`（1MB）、`max-response-size`（1MB） |
 
 ## 服务中的写法

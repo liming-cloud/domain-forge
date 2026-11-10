@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,7 +66,11 @@ class CacheOperationsIT {
                         type.formatted("narrow"),
                         "--domainforge.cache.regions.narrow.ttl=10m",
                         "--domainforge.cache.regions.narrow.load-concurrency=1",
-                        "--domainforge.cache.regions.narrow.load-wait=100ms");
+                        "--domainforge.cache.regions.narrow.load-wait=100ms",
+                        type.formatted("queued"),
+                        "--domainforge.cache.regions.queued.ttl=10m",
+                        "--domainforge.cache.regions.queued.load-concurrency=1",
+                        "--domainforge.cache.regions.queued.load-wait=300ms");
         caches = application.getBean(CacheOperations.class);
     }
 
@@ -151,6 +156,63 @@ class CacheOperationsIT {
             assertThrows(CacheUnavailableException.class,
                     () -> narrow.getOrLoad(key(), () -> new Product("blocked", 1)));
             assertEquals("slow", slow.get().name());
+        }
+    }
+
+    // 写事务里回源的值可能回滚，不交给事务外同键的并发调用方。
+    @Test
+    void writeTransactionLoadIsNotSharedOutside() throws Exception {
+        CacheRegion<Product> products = caches.region("products", Product.class);
+        String key = key();
+        CountDownLatch loading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        var transactions = new TransactionTemplate(new LocalTransactions());
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Product> inside = pool.submit(() -> transactions.execute(status -> products.getOrLoad(key, () -> {
+                loading.countDown();
+                await(release);
+                return new Product("uncommitted", 1);
+            })));
+            assertTrue(loading.await(2, TimeUnit.SECONDS));
+            Future<Product> outside = pool.submit(() -> products.getOrLoad(key, () -> new Product("committed", 1)));
+            assertEquals("committed", outside.get(2, TimeUnit.SECONDS).name());
+            release.countDown();
+            assertEquals("uncommitted", inside.get(2, TimeUnit.SECONDS).name());
+        }
+        assertEquals("committed", products.get(key).orElseThrow().name());
+    }
+
+    // leader 先等许可再回源，合并等待的调用方按 leader 的等待预算等，不提前失败。
+    @Test
+    void followerOutwaitsLeaderQueuedForPermit() throws Exception {
+        CacheRegion<Product> queued = caches.region("queued", Product.class);
+        String key = key();
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch releaseHolder = new CountDownLatch(1);
+        CountDownLatch loading = new CountDownLatch(1);
+        CountDownLatch finish = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(3)) {
+            Future<Product> holder = pool.submit(() -> queued.getOrLoad(key(), () -> {
+                holding.countDown();
+                await(releaseHolder);
+                return new Product("holder", 1);
+            }));
+            assertTrue(holding.await(2, TimeUnit.SECONDS));
+            Callable<Product> call = () -> queued.getOrLoad(key, () -> {
+                loading.countDown();
+                await(finish);
+                return new Product("shared", 1);
+            });
+            Future<Product> first = pool.submit(call);
+            Future<Product> second = pool.submit(call);
+            assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS), "许可被占，尚未回源");
+            releaseHolder.countDown();
+            assertTrue(loading.await(2, TimeUnit.SECONDS));
+            assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS), "回源进行中");
+            finish.countDown();
+            assertEquals("shared", first.get(2, TimeUnit.SECONDS).name());
+            assertEquals("shared", second.get(2, TimeUnit.SECONDS).name());
+            assertEquals("holder", holder.get(2, TimeUnit.SECONDS).name());
         }
     }
 

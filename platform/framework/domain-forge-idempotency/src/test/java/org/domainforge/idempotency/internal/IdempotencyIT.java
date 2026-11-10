@@ -27,17 +27,20 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 真实 Redis 上、两个应用实例之间的幂等合同：重复请求返回首次结果（跨实例）、请求体不同 422、首次仍在处理 409、
- * 5xx 不保存可重试、账号之间互不影响、无键与非幂等入口照常执行、键格式与未登录、Redis 不可用 503。
+ * 处理超过租期仍是 409、重放带回 Location、5xx 不保存可重试、账号之间互不影响、无键与非幂等入口照常执行、键格式与未登录、Redis 不可用 503。
  */
 class IdempotencyIT {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final Map<String, AtomicInteger> EXECUTED = new ConcurrentHashMap<>();
+    private static final CountDownLatch HOLD = new CountDownLatch(1);
     private static ConfigurableApplicationContext first;
     private static ConfigurableApplicationContext second;
     private static String alice;
@@ -68,7 +71,7 @@ class IdempotencyIT {
                 "--spring.data.redis.host=127.0.0.1",
                 "--spring.data.redis.port=" + System.getenv("REDIS_PORT"),
                 "--spring.data.redis.password=" + System.getenv("REDIS_PASSWORD"),
-                "--domainforge.idempotency.lease=PT5S");
+                "--domainforge.idempotency.lease=PT1S");
     }
 
     private static String login(ConfigurableApplicationContext context, long account) {
@@ -120,6 +123,8 @@ class IdempotencyIT {
             assertEquals(created.body(), replay.body());
             assertEquals("true", replay.headers().firstValue("Idempotent-Replayed").orElse(null));
             assertTrue(replay.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
+            assertEquals(created.headers().firstValue("Location").orElseThrow(),
+                    replay.headers().firstValue("Location").orElse(null));
         }
         assertEquals(1, executed(body));
     }
@@ -156,6 +161,28 @@ class IdempotencyIT {
         var done = slow.get();
         assertEquals(201, done.statusCode());
         assertEquals(done.body(), post(second, "/api/orders", alice, key, body).body());
+        assertEquals(1, executed(body));
+    }
+
+    // 处理时长超过租期时续租：同一键的重复请求仍是 409，不被第二次执行。
+    @Test
+    void processingBeyondLeaseIsNotRepeated() throws Exception {
+        String key = UUID.randomUUID().toString();
+        String body = "{\"order\":\"hold-" + UUID.randomUUID() + "\"}";
+        CompletableFuture<HttpResponse<String>> held = CompletableFuture.supplyAsync(() -> {
+            try {
+                return post(first, "/api/orders", alice, key, body);
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        });
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (executed(body) == 0 && System.nanoTime() < deadline) Thread.sleep(20);
+        Thread.sleep(2500);
+        var during = post(second, "/api/orders", alice, key, body);
+        HOLD.countDown();
+        assertEquals(409, during.statusCode(), during.body());
+        assertEquals(201, held.get(5, TimeUnit.SECONDS).statusCode());
         assertEquals(1, executed(body));
     }
 
@@ -225,8 +252,10 @@ class IdempotencyIT {
         org.springframework.http.ResponseEntity<String> create(@RequestBody String body) throws Exception {
             EXECUTED.computeIfAbsent(body, ignored -> new AtomicInteger()).incrementAndGet();
             if (body.contains("slow-")) Thread.sleep(1500);
-            return org.springframework.http.ResponseEntity.status(201)
-                    .body("{\"id\":" + ids.incrementAndGet() + ",\"at\":\"" + System.nanoTime() + "\"}");
+            if (body.contains("hold-")) assertTrue(HOLD.await(10, TimeUnit.SECONDS));
+            int id = ids.incrementAndGet();
+            return org.springframework.http.ResponseEntity.status(201).location(URI.create("/api/orders/" + id))
+                    .body("{\"id\":" + id + ",\"at\":\"" + System.nanoTime() + "\"}");
         }
 
         @SaCheckLogin
