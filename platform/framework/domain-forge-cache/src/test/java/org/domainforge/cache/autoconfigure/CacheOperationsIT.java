@@ -24,9 +24,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,6 +36,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -103,22 +107,35 @@ class CacheOperationsIT {
         assertThrows(IllegalArgumentException.class, () -> caches.region("products", Product.class).get(" "));
     }
 
-    // 同进程同键的并发回源合并为一次。
+    // 同进程同键的并发回源合并为一次：其余调用方都在等待进行中的回源之后才放行。
     @Test
     void concurrentMissesLoadOnce() throws Exception {
         CacheRegion<Product> products = caches.region("products", Product.class);
         String key = key();
         AtomicInteger loads = new AtomicInteger();
-        List<Callable<Product>> calls = new ArrayList<>();
-        for (int index = 0; index < 8; index++) {
-            calls.add(() -> products.getOrLoad(key, () -> {
-                loads.incrementAndGet();
-                sleep(200);
-                return new Product("p2", 1);
-            }));
-        }
+        CountDownLatch loading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        List<Thread> followers = new CopyOnWriteArrayList<>();
+        Callable<Product> call = () -> products.getOrLoad(key, () -> {
+            loads.incrementAndGet();
+            loading.countDown();
+            await(release);
+            return new Product("p2", 1);
+        });
         try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
-            for (Future<Product> result : pool.invokeAll(calls)) assertEquals("p2", result.get().name());
+            List<Future<Product>> results = new ArrayList<>(List.of(pool.submit(call)));
+            assertTrue(loading.await(2, TimeUnit.SECONDS));
+            for (int index = 0; index < 7; index++) {
+                results.add(pool.submit(() -> {
+                    followers.add(Thread.currentThread());
+                    return call.call();
+                }));
+            }
+            assertTrue(within(Duration.ofSeconds(2),
+                    () -> followers.size() == 7 && followers.stream().allMatch(CacheOperationsIT::awaitingLeader)),
+                    "其余调用方应在等待进行中的回源");
+            release.countDown();
+            for (Future<Product> result : results) assertEquals("p2", result.get(2, TimeUnit.SECONDS).name());
         }
         assertEquals(1, loads.get());
         assertEquals("p2", products.getOrLoad(key, () -> null).name());
@@ -146,16 +163,18 @@ class CacheOperationsIT {
     void loadConcurrencyIsBounded() throws Exception {
         CacheRegion<Product> narrow = caches.region("narrow", Product.class);
         CountDownLatch loading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
             Future<Product> slow = pool.submit(() -> narrow.getOrLoad(key(), () -> {
                 loading.countDown();
-                sleep(500);
+                await(release);
                 return new Product("slow", 1);
             }));
             assertTrue(loading.await(2, TimeUnit.SECONDS));
             assertThrows(CacheUnavailableException.class,
                     () -> narrow.getOrLoad(key(), () -> new Product("blocked", 1)));
-            assertEquals("slow", slow.get().name());
+            release.countDown();
+            assertEquals("slow", slow.get(2, TimeUnit.SECONDS).name());
         }
     }
 
@@ -281,13 +300,20 @@ class CacheOperationsIT {
         return null;
     }
 
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(interrupted);
+    // 线程正在缓存内部等待同键的进行中回源（合并），而不是自己回源。
+    private static boolean awaitingLeader(Thread thread) {
+        return Arrays.stream(thread.getStackTrace())
+                .anyMatch(frame -> frame.getClassName().equals("org.domainforge.cache.internal.LoadingRegion")
+                        && frame.getMethodName().equals("await"));
+    }
+
+    private static boolean within(Duration timeout, BooleanSupplier condition) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) return false;
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
         }
+        return true;
     }
 
     private static void await(CountDownLatch latch) {

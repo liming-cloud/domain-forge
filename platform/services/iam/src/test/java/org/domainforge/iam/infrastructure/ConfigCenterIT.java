@@ -46,7 +46,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 在开启鉴权的真实 Nacos 上验证配置中心合同（设计见 docs/reference/components/config.md）：
  * 启动读取、动态生效、无法应用的值保持当前值、运行中断开与恢复、启动时不可达或 dataId 缺失即失败。
  * 生效以登录防护的实际行为判定，不以收到通知为准。
+ *
+ * <p>本类自建上下文（配置中心 profile），排在共享上下文的 IT 之后执行，开始前关闭共享上下文。
  */
+@Order(Integer.MAX_VALUE)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ConfigCenterIT {
     private static final String DATA_ID = "iam.yaml";
@@ -58,6 +61,7 @@ class ConfigCenterIT {
 
     @BeforeAll
     static void prepare() throws Exception {
+        SharedIamApplication.close();
         assertNotNull(System.getenv("NACOS_PORT"), "需要真实 Nacos 验证环境");
         int http = Integer.parseInt(System.getenv("NACOS_PORT"));
         int grpc = Integer.parseInt(System.getenv("NACOS_GRPC_PORT"));
