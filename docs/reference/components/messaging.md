@@ -10,7 +10,7 @@
 |---|---|
 | 发布 | `EventPublisher.publish` 只能在业务事务内调用：事件与业务数据一起提交，回滚时一并消失；没有事务时抛出异常 |
 | 发送 | 提交后由中继发送；发送失败按 2 的幂退避（上限 5 分钟），记录永不丢弃。业务数据提交后、发送前应用中断，重启后（或其他实例）继续发送 |
-| 重复 | 至少一次：中继可能在发送成功、记录结果之前中断，同一事件（同一事件 ID）会再次发送 |
+| 重复 | 至少一次：中继可能在发送成功、记录结果之前中断，或发送超过租约被其他实例接手，同一事件（同一事件 ID）会再次发送 |
 | 去重 | 消费方在本地事务内先登记“消费组＋事件 ID”，再执行处理者；重复投递只确认不重复生效。去重记录保留 7 天，超过保留期的重复不再识别 |
 | 顺序 | 普通主题不保证顺序（事件可带聚合版本，由消费方丢弃过期事件）。FIFO 主题：同一顺序键的事件按 Outbox 顺序逐条发送（前一条未发成功不发后一条），消费组为顺序消费组，前一条处理失败时同键后续消息等待 |
 | 失败 | 处理者抛出异常则回滚，消息稍后重投；共投递 5 次仍失败时计数 `domainforge.messaging.dead-letter` 并记录错误日志，服务端转入 `%DLQ%<消费组>` |
@@ -22,8 +22,8 @@
 
 | 部分 | 行为 |
 |---|---|
-| Outbox 表 `domainforge_outbox` | 服务在自己的迁移中创建（结构见组件 `domain-forge/messaging/schema.sql`）；`domainforge.messaging.outbox.enabled=true` 启用发布。列 `trace_parent` 记录发布时的链路，用于中继与消费方延续同一链路（见[链路追踪](tracing.md)）；在加入该列之前已建表的服务，须新增迁移 `alter table domainforge_outbox add column trace_parent varchar(64)`，不能修改已执行的迁移 |
-| 中继 | 每秒扫描，事务提交后立即唤醒（中继未启动或正在停止时忽略唤醒，由下次扫描发送）；`FOR UPDATE SKIP LOCKED` 抢占，多实例分担；有顺序键的只取该键最早一条。一批中出现发送失败即停止本批，不在持有行锁的事务里逐条等超时。已发送记录保留 7 天后清理 |
+| Outbox 表 `domainforge_outbox` | 服务在自己的迁移中创建（结构见组件 `domain-forge/messaging/schema.sql`）；`domainforge.messaging.outbox.enabled=true` 启用发布。列 `trace_parent` 记录发布时的链路，用于中继与消费方延续同一链路（见[链路追踪](tracing.md)）；在加入该列之前已建表的服务，须新增迁移 `alter table domainforge_outbox add column trace_parent varchar(64)`，不能修改已执行的迁移。列 `claimed_until`、`claim_token` 是中继的租约；在加入它们之前已建表的服务，同样新增迁移 `alter table domainforge_outbox add column claimed_until timestamptz, add column claim_token varchar(36)` |
+| 中继 | 每秒扫描，事务提交后立即唤醒（中继未启动或正在停止时忽略唤醒，由下次扫描发送）；短事务内 `FOR UPDATE SKIP LOCKED` 认领一批并写入 60 秒租约，在事务外发送，再以短事务按租约令牌记录结果，发送期间不持有连接与行锁（[0025](../../decisions/0025-Outbox中继改为租约认领.md)）；多实例分担，租约过期后可由其他实例重新认领；有顺序键的只取该键最早一条。一批中出现发送失败即停止本批，释放未发送记录的租约。已发送记录保留 7 天后清理 |
 | 消费 | 每个 `EventHandler` Bean 对应一个推送消费者（消费组、主题由处理者声明）；去重表 `domainforge_inbox` 由服务在迁移中创建 |
 | 连接 | `domainforge.messaging.endpoints`（Proxy 地址）；需要连接（启用中继或有处理者）却未配置时启动失败 |
 | 指标 | `domainforge.messaging.outbox.pending`（积压）、`.outbox.sent`、`.outbox.failed`、`domainforge.messaging.duplicate`、`domainforge.messaging.dead-letter`（按消费组） |

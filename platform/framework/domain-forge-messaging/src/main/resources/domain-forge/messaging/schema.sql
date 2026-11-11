@@ -16,7 +16,10 @@ CREATE TABLE domainforge_outbox
     sent_at         timestamptz,
     last_error      varchar(200),
     -- 发布时的链路上下文（W3C traceparent），中继发送与消费方以它为父继续同一条链路；未启用追踪时为空。
-    trace_parent    varchar(64)
+    trace_parent    varchar(64),
+    -- 中继认领的租约：截止时间之前其他实例不认领；结果只按令牌写回，租约被他人接手后原实例的结果不覆盖。
+    claimed_until   timestamptz,
+    claim_token     varchar(36)
 );
 CREATE INDEX domainforge_outbox_due ON domainforge_outbox (next_attempt_at, id) WHERE sent_at IS NULL;
 CREATE INDEX domainforge_outbox_order ON domainforge_outbox (order_key, id) WHERE sent_at IS NULL AND order_key IS NOT NULL;

@@ -8,31 +8,55 @@
                 #{event.payload}, #{traceParent})
     </insert>
 
-    <!-- 同一顺序键只有最早的未发送记录可被抢占；它被其他实例锁住时，后面的记录同样不可见，因此按键串行。 -->
+    <!-- 短事务认领：锁住到期且没有有效租约的记录，写入租约后随事务提交释放行锁。
+         同一顺序键只有最早的未发送记录可被认领；它被其他实例认领（租约有效）时，后面的记录同样不可见，因此按键串行。 -->
     <select id="claim" resultType="org.domainforge.messaging.internal.OutboxRow">
-        SELECT o.id, o.event_id AS eventId, o.topic, o.event_type AS eventType, o.event_version AS version,
-               o.event_key AS eventKey, o.order_key AS orderKey, o.payload, o.attempts, o.trace_parent AS traceParent
-        FROM domainforge_outbox o
-        WHERE o.sent_at IS NULL
-          AND o.next_attempt_at &lt;= now()
-          AND (o.order_key IS NULL OR NOT EXISTS (
-                SELECT 1 FROM domainforge_outbox p
-                WHERE p.order_key = o.order_key AND p.sent_at IS NULL AND p.id &lt; o.id))
-        ORDER BY o.id
-        LIMIT #{limit}
-        FOR UPDATE SKIP LOCKED
+        WITH due AS (
+            SELECT o.id
+            FROM domainforge_outbox o
+            WHERE o.sent_at IS NULL
+              AND o.next_attempt_at &lt;= now()
+              AND (o.claimed_until IS NULL OR o.claimed_until &lt;= now())
+              AND (o.order_key IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM domainforge_outbox p
+                    WHERE p.order_key = o.order_key AND p.sent_at IS NULL AND p.id &lt; o.id))
+            ORDER BY o.id
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED),
+        claimed AS (
+            UPDATE domainforge_outbox o
+            SET claimed_until = now() + make_interval(secs => #{leaseSeconds}), claim_token = #{token}
+            FROM due
+            WHERE o.id = due.id
+            RETURNING o.id, o.event_id, o.topic, o.event_type, o.event_version, o.event_key, o.order_key, o.payload,
+                      o.attempts, o.trace_parent)
+        SELECT id, event_id AS eventId, topic, event_type AS eventType, event_version AS version,
+               event_key AS eventKey, order_key AS orderKey, payload, attempts, trace_parent AS traceParent
+        FROM claimed
+        ORDER BY id
     </select>
 
+    <!-- 结果只写回本次认领的记录：租约已被其他实例接手（令牌不同）时不更新。 -->
     <update id="markSent">
-        UPDATE domainforge_outbox SET sent_at = now(), last_error = NULL WHERE id = #{id}
+        UPDATE domainforge_outbox
+        SET sent_at = now(), last_error = NULL, claimed_until = NULL, claim_token = NULL
+        WHERE id = #{id} AND claim_token = #{token}
     </update>
 
     <update id="markFailed">
         UPDATE domainforge_outbox
         SET attempts = attempts + 1,
             next_attempt_at = now() + make_interval(secs => #{delaySeconds}),
-            last_error = #{error}
-        WHERE id = #{id}
+            last_error = #{error},
+            claimed_until = NULL,
+            claim_token = NULL
+        WHERE id = #{id} AND claim_token = #{token}
+    </update>
+
+    <update id="release">
+        UPDATE domainforge_outbox
+        SET claimed_until = NULL, claim_token = NULL
+        WHERE claim_token = #{token} AND sent_at IS NULL
     </update>
 
     <delete id="purgeSent">

@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,18 +24,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Outbox 中继：定时（以及事务提交后被唤醒时）抢占到期记录、发送、在同一短事务中记录结果。
+ * Outbox 中继：定时（以及事务提交后被唤醒时）短事务认领到期记录的租约、在事务外发送、再以短事务记录结果。
  *
  * <ul>
- *   <li>多实例以 {@code FOR UPDATE SKIP LOCKED} 分担；有顺序键的记录只取该键最早一条（由抢占 SQL 保证），失败时同键后续不发，保持顺序。</li>
- *   <li>一批中出现发送失败即停止本批：多半是 RocketMQ 不可用，不在持有行锁的事务里逐条等超时。</li>
+ *   <li>发送期间不持有数据库连接与行锁：RocketMQ 变慢时不拖住同库的业务事务。</li>
+ *   <li>多实例以 {@code FOR UPDATE SKIP LOCKED} 认领、以租约（固定 60 秒）分担；有顺序键的记录只取该键最早一条（由认领 SQL 保证），失败时同键后续不发，保持顺序。</li>
+ *   <li>结果按记录 ID 与本批令牌写回：租约过期被其他实例接手后，原实例迟到的结果不覆盖。</li>
+ *   <li>一批中出现发送失败即停止本批并释放未发送记录的租约：多半是 RocketMQ 不可用，不逐条等超时。</li>
  *   <li>失败按 2 的幂退避（上限 5 分钟），永不丢弃；积压以指标 {@code domainforge.messaging.outbox.pending} 观察。</li>
- *   <li>发送成功、记录结果之前中断会重发同一事件 ID：至少一次，由消费方去重。</li>
+ *   <li>发送成功、记录结果之前中断，或发送超过租约被其他实例接手，会重发同一事件 ID：至少一次，由消费方去重。</li>
  * </ul>
  */
 public final class OutboxRelay implements SmartLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(OutboxRelay.class);
     private static final long MAX_DELAY_SECONDS = 300;
+    private static final long LEASE_SECONDS = 60;
 
     private final OutboxMapper outbox;
     private final InboxMapper inbox;
@@ -91,40 +95,55 @@ public final class OutboxRelay implements SmartLifecycle {
     }
 
     /**
-     * 执行一轮：反复抢占直到没有到期记录或出现发送失败；返回本轮发送成功条数。
+     * 执行一轮：反复认领直到没有到期记录或出现发送失败；返回本轮发送成功条数。
      */
     public int relayOnce() {
         int total = 0;
         while (true) {
-            Batch batch = transactions.execute(status -> sendBatch(outbox.claim(settings.batchSize())));
-            if (batch == null) return total;
+            String token = UUID.randomUUID().toString();
+            List<OutboxRow> rows = transactions.execute(
+                    status -> outbox.claim(settings.batchSize(), token, LEASE_SECONDS));
+            if (rows == null) return total;
+            Batch batch = sendBatch(rows, token);
             total += batch.sent();
             if (batch.stopped() || batch.claimed() < settings.batchSize()) return total;
         }
     }
 
-    private Batch sendBatch(List<OutboxRow> rows) {
+    private Batch sendBatch(List<OutboxRow> rows, String token) {
         int delivered = 0;
         for (OutboxRow row : rows) {
-            Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
-            try (Tracer.SpanInScope ignored = traces.scope(span)) {
-                producer.send(message(row, traces.inject(span)));
-                outbox.markSent(row.id());
+            Exception failure = send(row);
+            if (failure == null) {
+                transactions.executeWithoutResult(status -> outbox.markSent(row.id(), token));
                 sent.increment();
                 delivered++;
-            } catch (Exception failure) {
-                span.error(failure);
-                long delay = Math.min(MAX_DELAY_SECONDS, 1L << Math.min(row.attempts(), 9));
-                outbox.markFailed(row.id(), delay, failure.getClass().getName());
-                failed.increment();
-                LOG.warn("messaging_outbox_send_failed event_id={} topic={} attempts={} reason={}",
-                        row.eventId(), row.topic(), row.attempts() + 1, failure.getClass().getName());
-                return new Batch(rows.size(), delivered, true);
-            } finally {
-                span.end();
+                continue;
             }
+            long delay = Math.min(MAX_DELAY_SECONDS, 1L << Math.min(row.attempts(), 9));
+            transactions.executeWithoutResult(status -> {
+                outbox.markFailed(row.id(), token, delay, failure.getClass().getName());
+                outbox.release(token);
+            });
+            failed.increment();
+            LOG.warn("messaging_outbox_send_failed event_id={} topic={} attempts={} reason={}",
+                    row.eventId(), row.topic(), row.attempts() + 1, failure.getClass().getName());
+            return new Batch(rows.size(), delivered, true);
         }
         return new Batch(rows.size(), delivered, false);
+    }
+
+    private Exception send(OutboxRow row) {
+        Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
+        try (Tracer.SpanInScope ignored = traces.scope(span)) {
+            producer.send(message(row, traces.inject(span)));
+            return null;
+        } catch (Exception failure) {
+            span.error(failure);
+            return failure;
+        } finally {
+            span.end();
+        }
     }
 
     private static org.apache.rocketmq.client.apis.message.Message message(OutboxRow row, String traceParent) {

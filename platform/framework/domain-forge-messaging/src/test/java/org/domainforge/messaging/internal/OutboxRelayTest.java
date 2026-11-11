@@ -46,7 +46,7 @@ class OutboxRelayTest {
      */
     private record BlockingOutbox(CountDownLatch claiming, CountDownLatch release) implements OutboxMapper {
         @Override
-        public List<OutboxRow> claim(int limit) {
+        public List<OutboxRow> claim(int limit, String token, long leaseSeconds) {
             claiming.countDown();
             try {
                 release.await(5, TimeUnit.SECONDS);
@@ -62,12 +62,17 @@ class OutboxRelayTest {
         }
 
         @Override
-        public int markSent(long id) {
+        public int markSent(long id, String token) {
             return 0;
         }
 
         @Override
-        public int markFailed(long id, long delaySeconds, String error) {
+        public int markFailed(long id, String token, long delaySeconds, String error) {
+            return 0;
+        }
+
+        @Override
+        public int release(String token) {
             return 0;
         }
 
