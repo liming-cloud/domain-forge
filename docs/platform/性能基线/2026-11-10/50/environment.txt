@@ -1,0 +1,19 @@
+commit e382c0551f6d9b5ab1168592b43722cd8635131f
+date 2026-11-10T18:05:49Z
+host Darwin arm64 Apple M3
+docker 29.2.1 8 CPU 8217341952 B
+k6 grafana/k6:2.3.0@sha256:3e4186aea62e11a45560bfc51e19eeafe82fc07ce069c78aff44b7ff893d9a5e
+board-service-1 cpus=200000000 mem=671088640
+gateway-1 cpus=600000000 mem=805306368
+iam-1 cpus=800000000 mem=1073741824
+nacos-1 cpus=200000000 mem=805306368
+nginx-1 cpus=200000000 mem=134217728
+order-service-1 cpus=600000000 mem=805306368
+postgres-1 cpus=800000000 mem=1476395008
+powerjob-server-1 cpus=100000000 mem=671088640
+redis-1 cpus=200000000 mem=402653184
+rocketmq-broker-1 cpus=200000000 mem=1073741824
+rocketmq-namesrv-1 cpus=100000000 mem=536870912
+seed_seconds 865
+accounts 10001
+orders 100000

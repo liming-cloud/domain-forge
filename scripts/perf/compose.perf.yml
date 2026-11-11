@@ -1,0 +1,48 @@
+# 性能基线的覆盖文件（只用于压测，见 docs/platform/性能基线.md）：
+# - 常驻容器的内存配额（合计 8064m），JVM 据此确定堆大小；CPU 配额（合计 4 核）在全部健康后由 run_baseline.sh 施加。
+#   JVM 按施加 CPU 配额后会检测到的 1 个处理器确定线程与 GC 规模（各 JVM 容器的配额都不超过 1 核）。
+# - 压测网络 loadgen 只接入 Nginx：k6 在其中绑定上千个源地址，按地址的登录保护与网关限流按真实客户端分布生效。
+x-jvm: &jvm
+  JAVA_TOOL_OPTIONS: -XX:ActiveProcessorCount=1
+
+services:
+  postgres:
+    mem_limit: 1408m
+  redis:
+    mem_limit: 384m
+  nacos:
+    mem_limit: 768m
+    environment: *jvm
+  rocketmq-namesrv:
+    mem_limit: 512m
+    environment: *jvm
+  rocketmq-broker:
+    mem_limit: 1024m
+    environment: *jvm
+  powerjob-server:
+    mem_limit: 640m
+    environment: *jvm
+  iam:
+    mem_limit: 1024m
+    environment: *jvm
+  gateway:
+    mem_limit: 768m
+    environment: *jvm
+  order-service:
+    mem_limit: 768m
+    environment: *jvm
+  board-service:
+    mem_limit: 640m
+    environment: *jvm
+  nginx:
+    mem_limit: 128m
+    networks:
+      loadgen: {}
+
+networks:
+  loadgen:
+    # 动态分配只用 10.231.255.0/24；10.231.4.1—10.231.7.254 留给 k6 的源地址。不用 Docker 默认地址池中的网段，避免与本机其他网络冲突。
+    ipam:
+      config:
+        - subnet: 10.231.0.0/16
+          ip_range: 10.231.255.0/24
