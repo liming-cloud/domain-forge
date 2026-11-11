@@ -1,6 +1,7 @@
 package org.domainforge.iam.infrastructure.persistence.account;
 
 import org.apache.ibatis.annotations.Param;
+import org.domainforge.iam.domain.model.account.Membership;
 
 import java.util.List;
 
@@ -41,7 +42,7 @@ public interface AccountMapper {
 
     List<Long> roles(long account);
 
-    List<MembershipRow> memberships(long account);
+    List<Membership> memberships(long account);
 
     int deleteRoles(long account);
 
@@ -49,7 +50,7 @@ public interface AccountMapper {
 
     int deleteMemberships(long account);
 
-    int insertMemberships(@Param("account") long account, @Param("items") List<MembershipRow> items);
+    int insertMemberships(@Param("account") long account, @Param("items") List<Membership> items);
 
     /**
      * 启用且持有系统管理员角色的账号数。

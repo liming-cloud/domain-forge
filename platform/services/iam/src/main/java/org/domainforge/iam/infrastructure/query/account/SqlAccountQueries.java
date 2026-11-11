@@ -30,9 +30,9 @@ public class SqlAccountQueries implements AccountQueries {
      */
     @Override
     public AccountView self(long id) {
-        AccountProjection row = mapper.self(id);
+        AccountView row = mapper.self(id);
         if (row == null) throw new IamException(IamFailure.UNAUTHENTICATED, "当前主体无效");
-        return row.view();
+        return row;
     }
 
     /**
@@ -42,13 +42,13 @@ public class SqlAccountQueries implements AccountQueries {
     public AccountPage list(long after, int limit) {
         if (after < 0 || limit < 1 || limit > 100)
             throw new IamException(IamFailure.INVALID_REQUEST, "分页游标须非负且大小须为1至100");
-        var items = mapper.list(after, limit).stream().map(AccountProjection::view).toList();
+        var items = mapper.list(after, limit);
         return new AccountPage(items, items.size() == limit ? items.getLast().id() : null);
     }
 
     @Override
     public AccountDetail detail(long id) {
-        AccountProjection row = mapper.self(id);
+        AccountView row = mapper.self(id);
         if (row == null) return null;
         var roles = new HashSet<Long>();
         var memberships = new ArrayList<AccountDetail.MembershipView>();
@@ -56,6 +56,6 @@ public class SqlAccountQueries implements AccountQueries {
             if ("role".equals(relation.kind())) roles.add(relation.targetId());
             else memberships.add(new AccountDetail.MembershipView(relation.targetId(), relation.primary()));
         }
-        return new AccountDetail(row.view(), roles, memberships);
+        return new AccountDetail(row, roles, memberships);
     }
 }
