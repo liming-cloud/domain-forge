@@ -23,5 +23,4 @@
 
 - 发送期间中继不持有连接与行锁（`OutboxLeaseIT`）。
 - 重发的机会多了一种：发送超过 60 秒、或中继在发送中被终止，租约过期后由其他实例（或重启后的本实例）重新认领，可能重发同一事件 ID。仍是“至少一次、消费方去重”的既有合同。中继停止时被中断的那一批，要等租约过期（至多 60 秒）才会再发。
-- 已建表的服务须新增迁移 `alter table domainforge_outbox add column claimed_until timestamptz, add column claim_token varchar(36)`，不能修改已执行的迁移。
 - 合同与用法见[消息与 Outbox](../reference/components/messaging.md)。
