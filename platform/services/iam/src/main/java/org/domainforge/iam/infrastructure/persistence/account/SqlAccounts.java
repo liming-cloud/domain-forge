@@ -3,15 +3,12 @@ package org.domainforge.iam.infrastructure.persistence.account;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
-import org.domainforge.iam.domain.model.account.Membership;
 import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * MyBatis账号仓储：主表与角色、成员子表一起还原和保存，并验证实际更新行数。
@@ -29,10 +26,7 @@ public class SqlAccounts implements AccountRepository {
 
     private Account domain(AccountRow row) {
         if (row == null) return null;
-        Set<Membership> memberships = mapper.memberships(row.id()).stream()
-                .map(item -> new Membership(item.unitId(), item.primary()))
-                .collect(Collectors.toSet());
-        return row.toDomain(new HashSet<>(mapper.roles(row.id())), memberships);
+        return row.toDomain(new HashSet<>(mapper.roles(row.id())), new HashSet<>(mapper.memberships(row.id())));
     }
 
     @Override
@@ -63,25 +57,35 @@ public class SqlAccounts implements AccountRepository {
     }
 
     /**
-     * 零行写入是版本冲突，不能默认为已完成；子表整体替换。
+     * 零行写入是版本冲突，不能默认为已完成；子表只在相对读取快照变化时整体替换。
      */
     @Override
-    public void update(Account account, long expected) {
-        if (mapper.update(AccountRow.from(account), expected) != 1) {
+    public void update(Account current, Account changed) {
+        if (mapper.update(AccountRow.from(changed), current.version()) != 1) {
             throw new IamException(IamFailure.CONFLICT, "账号版本已变化");
         }
-        mapper.deleteRoles(account.id());
-        mapper.deleteMemberships(account.id());
-        writeChildren(account);
+        if (!changed.roleIds().equals(current.roleIds())) {
+            mapper.deleteRoles(changed.id());
+            writeRoles(changed);
+        }
+        if (!changed.memberships().equals(current.memberships())) {
+            mapper.deleteMemberships(changed.id());
+            writeMemberships(changed);
+        }
     }
 
     private void writeChildren(Account account) {
+        writeRoles(account);
+        writeMemberships(account);
+    }
+
+    private void writeRoles(Account account) {
         if (!account.roleIds().isEmpty()) mapper.insertRoles(account.id(), List.copyOf(account.roleIds()));
-        if (!account.memberships().isEmpty()) {
-            mapper.insertMemberships(account.id(), account.memberships().stream()
-                    .map(item -> new MembershipRow(item.unitId(), item.primary()))
-                    .toList());
-        }
+    }
+
+    private void writeMemberships(Account account) {
+        if (!account.memberships().isEmpty())
+            mapper.insertMemberships(account.id(), List.copyOf(account.memberships()));
     }
 
     @Override

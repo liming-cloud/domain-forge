@@ -4,6 +4,7 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.account.InitializeAdministrator;
 import org.domainforge.iam.application.command.account.ManageAccount;
 import org.domainforge.iam.application.command.account.MembershipInput;
+import org.domainforge.iam.application.command.authentication.ChangePassword;
 import org.domainforge.iam.application.command.authentication.Login;
 import org.domainforge.iam.application.command.catalog.InstallPermissions;
 import org.domainforge.iam.application.command.catalog.PermissionInput;
@@ -45,6 +46,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AccessModelIT {
     private static final String PASSWORD = "A private registration 密码 2026!";
+    private static final String NEW_PASSWORD = "Another private 密码 for 2027!";
     private static final String ADMIN = "initial.admin";
     private static final String READ = "sales:order:read";
     private static final String EXPORT = "sales:order:export";
@@ -150,6 +153,29 @@ class AccessModelIT {
 
     private static AccessScope scope(String name) {
         return bean(AccessScopes.class).scopes(digest(name), List.of(READ)).get(READ);
+    }
+
+    // 只改密码或启用状态不重写角色与成员归属子表（行的 ctid 不变）；只改成员归属时只重写成员子表。
+    @Test
+    void accountUpdateRewritesOnlyChangedChildRows() {
+        long east = unit(OrganizationUnit.ROOT_ID, "华东");
+        long west = unit(OrganizationUnit.ROOT_ID, "华西");
+        long id = member("rows.member");
+        assign("rows.member", role("ROWS", grant(READ, DataScope.DEPARTMENT)));
+        place("rows.member", east);
+        List<String> rows = sql.childRows(id);
+        assertEquals(2, rows.size());
+
+        bean(ChangePassword.class).execute(identity("rows.member"), PASSWORD, NEW_PASSWORD);
+        var state = bean(ManageAccount.class);
+        state.state(admin, id, account("rows.member").version(), false);
+        state.state(admin, id, account("rows.member").version(), true);
+        assertEquals(rows, sql.childRows(id));
+
+        place("rows.member", west);
+        List<String> moved = sql.childRows(id);
+        assertNotEquals(rows.getFirst(), moved.getFirst());
+        assertEquals(rows.getLast(), moved.getLast());
     }
 
     // 组织树：同级不重名、不成环、根受保护、有下级或成员时不能删除。

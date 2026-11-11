@@ -64,4 +64,10 @@
         SELECT g, 'fixture', g, 'retention.old', clock_timestamp() - interval '91 days'
         FROM generate_series(1, #{count}) AS g
     </insert>
+    <select id="childRows" resultType="string">
+        SELECT 'role ' || ctid FROM iam_account_role WHERE account_id = #{account}
+        UNION ALL
+        SELECT 'member ' || ctid FROM iam_membership WHERE account_id = #{account}
+        ORDER BY 1
+    </select>
 </mapper>

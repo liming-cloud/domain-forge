@@ -1,6 +1,7 @@
 package org.domainforge.iam.infrastructure.query.account;
 
 import org.apache.ibatis.annotations.Param;
+import org.domainforge.iam.application.query.account.AccountView;
 
 import java.util.List;
 
@@ -12,12 +13,12 @@ public interface AccountQueryMapper {
     /**
      * 本人查询只按可信身份绑定主键。
      */
-    AccountProjection self(long id);
+    AccountView self(long id);
 
     /**
      * 固定排序和绑定游标，不能将客户端字段作为SQL排序片段。
      */
-    List<AccountProjection> list(@Param("after") long after, @Param("limit") int limit);
+    List<AccountView> list(@Param("after") long after, @Param("limit") int limit);
 
     /**
      * 账号的角色分配与成员归属合并为一次查询。

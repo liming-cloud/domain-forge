@@ -181,11 +181,11 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void update(Account account, long expectedVersion) {
-            Account current = rows.get(account.id());
-            if (current == null || current.version() != expectedVersion) throw conflict();
-            rows.put(account.id(), account);
-            write("account.update " + account.id());
+        public void update(Account current, Account changed) {
+            Account stored = rows.get(changed.id());
+            if (stored == null || stored.version() != current.version()) throw conflict();
+            rows.put(changed.id(), changed);
+            write("account.update " + changed.id());
         }
 
         @Override

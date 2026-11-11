@@ -35,7 +35,7 @@
     <select id="roles" resultType="long">
         SELECT role_id FROM iam_account_role WHERE account_id = #{account}
     </select>
-    <select id="memberships" resultType="org.domainforge.iam.infrastructure.persistence.account.MembershipRow">
+    <select id="memberships" resultType="org.domainforge.iam.domain.model.account.Membership">
         SELECT unit_id, is_primary FROM iam_membership WHERE account_id = #{account}
     </select>
     <delete id="deleteRoles">

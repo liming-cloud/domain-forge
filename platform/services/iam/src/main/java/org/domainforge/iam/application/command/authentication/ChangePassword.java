@@ -53,7 +53,7 @@ public final class ChangePassword {
                 throw new IamException(IamFailure.UNAUTHENTICATED, "当前凭据无效");
             // 按校验时读到的版本条件更新：其间账号有任何修改（含改密、禁用）都以 409 拒绝，无需行锁。
             var changed = verified.changePassword(digest);
-            accounts.update(changed, verified.version());
+            accounts.update(verified, changed);
             audit.record(new AuditEvent(Long.toString(actor.accountId()), verified.id(), "account.password"));
             return new CommandResult(changed.id(), changed.version());
         });

@@ -134,7 +134,7 @@ public class ManageAccount {
             throw new IamException(IamFailure.CONFLICT, "必须保留至少一名启用的系统管理员");
         }
         if (changed != current) {
-            accounts.update(changed, current.version());
+            accounts.update(current, changed);
             audit.record(new AuditEvent(Long.toString(actor.accountId()), changed.id(), action));
         }
         return new CommandResult(changed.id(), changed.version());

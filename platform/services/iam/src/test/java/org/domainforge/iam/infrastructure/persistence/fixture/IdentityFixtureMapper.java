@@ -3,6 +3,8 @@ package org.domainforge.iam.infrastructure.persistence.fixture;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * 集成测试专用：重置数据、观察真实表状态，并安装数据库级故障（触发器）以验证事务回滚。
  */
@@ -57,4 +59,9 @@ public interface IdentityFixtureMapper {
      * 插入指定数量、发生时间早于保留期的审计，动作名为 retention.old。
      */
     void insertExpiredAudits(@Param("count") int count);
+
+    /**
+     * 账号角色与成员归属子表各行的物理位置（ctid），按表与位置排序；行被删除重插后位置改变。
+     */
+    List<String> childRows(@Param("account") long account);
 }
