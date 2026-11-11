@@ -22,7 +22,6 @@ import org.domainforge.iam.application.query.access.AccessScopes;
 import org.domainforge.iam.application.query.menu.MenuQueries;
 import org.domainforge.iam.application.query.menu.MenuView;
 import org.domainforge.iam.application.query.organization.OrganizationQueries;
-import org.domainforge.iam.bootstrap.IamApplication;
 import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
@@ -31,13 +30,10 @@ import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.shared.BusinessRuleViolation;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
@@ -66,16 +62,8 @@ class AccessModelIT {
 
     @BeforeAll
     static void start() {
-        assertTrue(System.getenv("IAM_DB_URL") != null, "需要真实数据库验证环境");
-        application = new SpringApplicationBuilder(IamApplication.class)
-                .web(WebApplicationType.NONE)
-                .run("--spring.main.banner-mode=off", "--logging.level.root=WARN");
+        application = SharedIamApplication.get();
         sql = application.getBean(IdentityFixtureMapper.class);
-    }
-
-    @AfterAll
-    static void stop() {
-        if (application != null) application.close();
     }
 
     @BeforeEach

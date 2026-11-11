@@ -31,14 +31,11 @@ import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.iam.infrastructure.persistence.retention.RetentionCleanup;
 import org.domainforge.shared.BusinessRuleViolation;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.function.Executable;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
@@ -80,20 +77,11 @@ class IdentityPersistenceIT {
     private static ConfigurableApplicationContext application;
     private static IdentityFixtureMapper sql;
 
-    // 外部环境提供临时数据库，缺失输入直接失败，不能跳过后显示绿灯。
     @BeforeAll
     static void start() {
-        assertNotNull(System.getenv("IAM_DB_URL"), "需要真实数据库验证环境");
-        application = new SpringApplicationBuilder(IamApplication.class)
-                .web(WebApplicationType.NONE)
-                .run("--spring.main.banner-mode=off", "--logging.level.root=WARN");
+        application = SharedIamApplication.get();
         sql = application.getBean(IdentityFixtureMapper.class);
         assertEquals(1, application.getBeansOfType(StpLogic.class).size());
-    }
-
-    @AfterAll
-    static void stop() {
-        if (application != null) application.close();
     }
 
     // 每个不变量独立建立业务状态；共享进程不共享账号、防护和审计前置。
