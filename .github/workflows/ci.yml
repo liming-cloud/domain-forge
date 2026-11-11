@@ -154,6 +154,8 @@ jobs:
         run: python3 scripts/check_doc_links.py
       - name: 删除平台专有资产后的引用与链接（起步清单演练）
         run: scripts/verify_starter.sh --docs-only
+      - name: Claude Code 钩子自测（拦截 main 上提交与强推）
+        run: scripts/test_guard_git.sh
 
   guard:
     name: 过程守卫（PR 标题前缀、WIP 提交）
