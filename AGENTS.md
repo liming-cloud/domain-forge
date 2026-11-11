@@ -29,7 +29,7 @@
 
 ```bash
 platform/mvnw -f platform/pom.xml verify                                  # 完整门禁（约 25 分钟）
-platform/mvnw -f platform/pom.xml verify -DskipITs -Ddocker.skip=true     # 无 Docker 时
+platform/mvnw -f platform/pom.xml verify -DskipITs -Ddocker.skip=true     # 快速门禁：单元测试、架构规则、Checkstyle，不起容器（约 1.5 分钟）
 platform/mvnw -f platform/pom.xml spotless:apply                         # 整理格式（结果确定，可对整个仓库执行）
 python3 scripts/check_doc_links.py                                        # 文档链接
 ```
