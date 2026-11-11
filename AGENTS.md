@@ -5,7 +5,7 @@
 ## 开工前
 
 1. 任务来自 `status/ready`、且依赖（blocked by）已全部关闭的结果 issue，编号小的优先（流程见[开发流程](docs/workflow/01-开发流程.md#任务与-issue)）。issue 描述是唯一依据，任务不在其范围内时先问人。没有就绪的任务时，先把未决问题写进对应 issue，不自行开工。
-2. 执行 `git config core.hooksPath .githooks`，启用钩子（拦截在 `main` 上的提交）；从最新 `main` 新建功能分支再动手。WIP 提交只放功能分支，暂停时推送功能分支；PR 含以 `wip` 开头的提交会被 CI 拒绝，评审前整理掉。
+2. 用 Claude Code 时，项目级钩子（`.claude/settings.json`）自动拦截在 `main` 上的提交和强推；其他工具执行 `git config core.hooksPath .githooks`，启用钩子（拦截在 `main` 上的提交）。从最新 `main` 新建功能分支再动手。WIP 提交只放功能分支，暂停时推送功能分支；PR 含以 `wip` 开头的提交会被 CI 拒绝，评审前整理掉。
 3. 读[总体架构](docs/explanation/总体架构.md)：模块划分、依赖方向、DDD 分层和查询短路径。
 4. 按任务类型读规则卡和参考页（卡号连续的一段写成范围，只读相关的卡；参考页只读用到的组件）：
 

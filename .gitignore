@@ -14,3 +14,7 @@
 /target/
 /platform/**/target/
 __pycache__/
+
+# Claude Code 的本机设置和工作树；项目级 settings.json、hooks 进仓库（#136）
+.claude/settings.local.json
+.claude/worktrees/
