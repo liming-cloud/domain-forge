@@ -27,7 +27,9 @@ CREATE TABLE iam_account
     credential_digest  varchar(512) NOT NULL CHECK (length(credential_digest) > 0),
     credential_version bigint       NOT NULL CHECK (credential_version > 0),
     version            bigint       NOT NULL CHECK (version > 0),
-    enabled            boolean      NOT NULL
+    enabled            boolean      NOT NULL,
+    -- 注册所用邀请的摘要：唯一约束保证一份邀请最多建一个账号，“已使用”由此推导。
+    invitation_digest  char(64) UNIQUE CHECK (invitation_digest ~ '^[a-f0-9]{64}$')
 );
 
 -- 权限目录：服务命名空间内的精确操作码。scoped 表示授予时需要数据范围；system_only 只能授予系统角色。
@@ -157,9 +159,7 @@ CREATE TABLE iam_invitation
     secret_digest char(64)    NOT NULL UNIQUE CHECK (secret_digest ~ '^[a-f0-9]{64}$'),
     expires_at    timestamptz NOT NULL,
     created_by    bigint      NOT NULL REFERENCES iam_account (id),
-    consumed_by   bigint UNIQUE REFERENCES iam_account (id),
-    invalidated   boolean     NOT NULL DEFAULT false,
-    CHECK (consumed_by IS NULL OR NOT invalidated)
+    invalidated   boolean     NOT NULL DEFAULT false
 );
 CREATE INDEX iam_invitation_expiry ON iam_invitation (expires_at);
 

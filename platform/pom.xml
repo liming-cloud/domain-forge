@@ -25,6 +25,10 @@
         <surefire.failIfNoTests>true</surefire.failIfNoTests>
         <spring-boot.version>4.1.2</spring-boot.version>
         <redisson.version>4.8.0</redisson.version>
+        <!-- MyBatis 与 MyBatis-Plus：同族构件只在这里定一个版本，BOM 与各组件引用同一属性。 -->
+        <mybatis.version>3.5.19</mybatis.version>
+        <mybatis-spring.version>4.0.0</mybatis-spring.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
         <!-- 统一质量检查：mvn verify 即完整门禁，规则说明见 docs 中的源码规范。 -->
