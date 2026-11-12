@@ -27,7 +27,7 @@ scripts/                       文档链接检查、单服务冒烟，以及模�
 
 ## 构建与验证
 
-需要 JDK 21 及以上。集成测试需要 Docker。
+需要 JDK 25 及以上。集成测试需要 Docker。
 
 ```bash
 # 完整门禁：编译、架构规则、单元测试、集成测试、格式（Spotless）、Checkstyle、依赖声明

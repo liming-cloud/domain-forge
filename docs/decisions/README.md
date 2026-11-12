@@ -29,6 +29,7 @@
 | [0023](0023-会话迟到写入由SQL许可兜底.md) | 会话迟到写入由 SQL 许可兜底 |
 | [0024](0024-与rag-pilot统一issue和PR约定.md) | 与 rag-pilot 统一 issue 和 PR 约定 |
 | [0025](0025-Outbox中继改为租约认领.md) | Outbox 中继改为租约认领 |
+| [0026](0026-升级Java25并启用AOT缓存.md) | 升级 Java 25 并启用 AOT 缓存 |
 
 ## 模板
 

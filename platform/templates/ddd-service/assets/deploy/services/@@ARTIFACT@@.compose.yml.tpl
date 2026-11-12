@@ -66,6 +66,8 @@ services:
       @@ENV@@_MANAGEMENT_ADDRESS: 0.0.0.0
     volumes:
       - @@ARTIFACT@@-files:/var/lib/domain-forge/files
+      # AOT 缓存（见 deploy/jvm/start.sh）：不进入备份，丢失后下次启动重新训练。
+      - @@ARTIFACT@@-aot:/var/lib/domain-forge/aot
     networks: [backend]
     depends_on:
       @@ARTIFACT@@-db-init:
@@ -88,3 +90,4 @@ services:
 
 volumes:
   @@ARTIFACT@@-files:
+  @@ARTIFACT@@-aot:
