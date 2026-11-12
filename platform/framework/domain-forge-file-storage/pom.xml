@@ -23,7 +23,11 @@
         </dependencies>
     </dependencyManagement>
     <dependencies>
-        <!-- S3 兼容存储：官方 AWS SDK v2，只用同步客户端与 Apache HTTP 客户端，不引入 Netty。 -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <!-- S3 兼容存储：官方 AWS SDK v2，只用同步客户端及其默认 HTTP 客户端（s3 自带的 apache5-client），不引入 Netty。 -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
@@ -33,10 +37,6 @@
                     <artifactId>netty-nio-client</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>apache-client</artifactId>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

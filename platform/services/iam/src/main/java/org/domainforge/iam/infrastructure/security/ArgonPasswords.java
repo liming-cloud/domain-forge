@@ -1,7 +1,7 @@
 package org.domainforge.iam.infrastructure.security;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.IamUnavailableException;
 import org.domainforge.iam.application.port.authentication.Passwords;
 import org.domainforge.iam.domain.policy.PasswordPolicy;
 import org.domainforge.iam.infrastructure.configuration.PasswordHashingSettings;
@@ -90,7 +90,7 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
         try {
             future = workers.submit(task);
         } catch (RejectedExecutionException e) {
-            throw new IamException(IamFailure.RATE_LIMITED, "密码计算繁忙，请稍后重试");
+            throw IamException.rateLimited("PASSWORD_BUSY", "密码计算繁忙，请稍后重试", 1);
         }
         try {
             return future.get(waitMillis, TimeUnit.MILLISECONDS);
@@ -98,13 +98,13 @@ public final class ArgonPasswords implements Passwords, AutoCloseable {
             Thread.currentThread().interrupt();
             future.cancel(true);
             workers.remove((Runnable) future);
-            throw new IamException(IamFailure.UNAVAILABLE, "密码计算被中断");
+            throw new IamUnavailableException("密码计算被中断", e);
         } catch (TimeoutException e) {
             future.cancel(true);
             workers.remove((Runnable) future);
-            throw new IamException(IamFailure.RATE_LIMITED, "密码计算繁忙，请稍后重试");
+            throw IamException.rateLimited("PASSWORD_BUSY", "密码计算繁忙，请稍后重试", 1);
         } catch (ExecutionException e) {
-            throw new IamException(IamFailure.UNAVAILABLE, "密码计算不可用");
+            throw new IamUnavailableException("密码计算不可用", e.getCause());
         }
     }
 

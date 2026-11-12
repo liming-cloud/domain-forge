@@ -1,11 +1,11 @@
 package org.domainforge.iam.infrastructure.query.account;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.query.account.AccountDetail;
 import org.domainforge.iam.application.query.account.AccountPage;
 import org.domainforge.iam.application.query.account.AccountQueries;
 import org.domainforge.iam.application.query.account.AccountView;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ public class SqlAccountQueries implements AccountQueries {
     @Override
     public AccountView self(long id) {
         AccountView row = mapper.self(id);
-        if (row == null) throw new IamException(IamFailure.UNAUTHENTICATED, "当前主体无效");
+        if (row == null) throw IamException.unauthenticated("UNAUTHENTICATED", "当前主体无效");
         return row;
     }
 
@@ -41,13 +41,13 @@ public class SqlAccountQueries implements AccountQueries {
     @Override
     public AccountPage list(long after, int limit) {
         if (after < 0 || limit < 1 || limit > 100)
-            throw new IamException(IamFailure.INVALID_REQUEST, "分页游标须非负且大小须为1至100");
+            throw IamException.invalid("分页游标须非负且大小须为1至100");
         var items = mapper.list(after, limit);
         return new AccountPage(items, items.size() == limit ? items.getLast().id() : null);
     }
 
     @Override
-    public AccountDetail detail(long id) {
+    public @Nullable AccountDetail detail(long id) {
         AccountView row = mapper.self(id);
         if (row == null) return null;
         var roles = new HashSet<Long>();

@@ -1,5 +1,7 @@
 package org.domainforge.web.api;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * 把第三方框架的原生异常转为平台失败类型（{@code BusinessRuleViolation} 或 {@code DependencyUnavailableException}），
  * 使它们同样经过 {@link Problems#dispatch} 这一个分派点。
@@ -13,5 +15,6 @@ public interface FailureTranslator {
      * @param failure 入口捕获的异常
      * @return 平台失败类型；不认识时返回 null
      */
+    @Nullable
     RuntimeException translate(Exception failure);
 }

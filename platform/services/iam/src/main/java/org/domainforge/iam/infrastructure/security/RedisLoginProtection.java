@@ -2,11 +2,12 @@ package org.domainforge.iam.infrastructure.security;
 
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.IamUnavailableException;
 import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.application.port.authentication.LoginReservation;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,8 +51,8 @@ public final class RedisLoginProtection implements LoginProtection {
         return script;
     }
 
-    private static IamException unavailable() {
-        return new IamException(IamFailure.UNAVAILABLE, "登录防护存储暂不可用");
+    private static IamUnavailableException unavailable(@Nullable RuntimeException cause) {
+        return new IamUnavailableException("登录防护存储暂不可用", cause);
     }
 
     /**
@@ -60,7 +61,7 @@ public final class RedisLoginProtection implements LoginProtection {
     @Override
     public LoginReservation reserve(String name, String address) {
         if (address == null || address.length() > 64)
-            throw new IamException(IamFailure.INVALID_REQUEST, "来源地址无效");
+            throw IamException.invalid("来源地址无效");
         String accountKey = "iam:login:account:" + secrets.fingerprint("account", name);
         String addressKey = "iam:login:address:" + secrets.fingerprint("address", address);
         String attempt = UUID.randomUUID().toString();
@@ -77,13 +78,13 @@ public final class RedisLoginProtection implements LoginProtection {
                     Integer.toString(limits.accountWindowSeconds()),
                     Integer.toString(limits.addressAttempts()),
                     Integer.toString(limits.addressWindowSeconds()));
-        } catch (IamException e) {
+        } catch (IamException | IamUnavailableException e) {
             throw e;
         } catch (RuntimeException e) {
-            throw unavailable();
+            throw unavailable(e);
         }
-        if (result == null || result < 0) throw unavailable();
-        if (result > 0) throw new IamException(IamFailure.RATE_LIMITED, "登录尝试过多，请稍后重试", result);
+        if (result == null || result < 0) throw unavailable(null);
+        if (result > 0) throw IamException.rateLimited("LOGIN_RATE_LIMITED", "登录尝试过多，请稍后重试", result);
         return new LoginReservation(accountKey, attempt);
     }
 
@@ -95,11 +96,11 @@ public final class RedisLoginProtection implements LoginProtection {
         try {
             Long result = redis.execute(
                     successScript, List.of(reservation.accountKey()), reservation.attemptId());
-            if (result == null || result < 0) throw unavailable();
-        } catch (IamException e) {
+            if (result == null || result < 0) throw unavailable(null);
+        } catch (IamException | IamUnavailableException e) {
             throw e;
         } catch (RuntimeException e) {
-            throw unavailable();
+            throw unavailable(e);
         }
     }
 
@@ -112,6 +113,6 @@ public final class RedisLoginProtection implements LoginProtection {
         if (config == null
                 || !"noeviction".equals(config.getProperty("maxmemory-policy"))
                 || Long.parseLong(config.getProperty("maxmemory", "0")) <= 0)
-            throw unavailable();
+            throw unavailable(null);
     }
 }

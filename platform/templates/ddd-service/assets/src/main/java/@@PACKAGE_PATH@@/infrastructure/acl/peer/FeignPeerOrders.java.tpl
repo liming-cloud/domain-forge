@@ -42,7 +42,7 @@ public class FeignPeerOrders implements PeerOrders {
         return switch (failure.failure()) {
             case UNAUTHENTICATED -> new AccessException(AccessFailure.UNAUTHENTICATED);
             case FORBIDDEN -> new AccessException(AccessFailure.FORBIDDEN);
-            default -> new AccessUnavailableException();
+            default -> new AccessUnavailableException(failure);
         };
     }
 }

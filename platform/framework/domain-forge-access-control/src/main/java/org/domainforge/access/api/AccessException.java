@@ -2,10 +2,15 @@ package org.domainforge.access.api;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
+import java.io.Serial;
+
 /**
  * 明确的访问拒绝：未认证为 401，无权限为 403；错误消息不携带传输细节或秘密。
  */
 public final class AccessException extends BusinessRuleViolation {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final AccessFailure failure;
 
     /**

@@ -2,7 +2,6 @@ package org.domainforge.iam.application.command.registration;
 
 import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.Passwords;
@@ -59,7 +58,7 @@ public final class AcceptInvitation {
      */
     public CommandResult execute(String secret, String loginName, String password) {
         if (secret == null || !secret.matches("[A-Za-z0-9_-]{43}"))
-            throw new IamException(IamFailure.INVALID_REQUEST, "注册输入无效");
+            throw IamException.invalid("注册输入无效");
         String name = new LoginName(loginName).value();
         String invitationDigest = secrets.digest(secret);
         String digest = passwords.encode(password);

@@ -1,5 +1,7 @@
 package org.domainforge.iam.application.port.authentication;
 
+import org.domainforge.iam.application.port.IamException;
+
 import java.time.Instant;
 
 /**
@@ -17,7 +19,7 @@ public record SessionGrant(String tokenDigest, long accountId, long credentialVe
                 || accountId <= 0
                 || credentialVersion < 1
                 || expiresAt == null)
-            throw new IllegalArgumentException("会话许可无效");
+            throw IamException.invalid("会话许可无效");
     }
 
     /**

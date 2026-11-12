@@ -3,6 +3,7 @@ package org.domainforge.messaging.internal;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,6 +30,7 @@ public final class TraceContexts {
     /**
      * 当前链路的 traceparent；没有当前 span 时为空。
      */
+    @Nullable
     String current() {
         Span span = tracer.currentSpan();
         return span == null ? null : inject(span);

@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -118,7 +119,7 @@ class IdempotencyIT {
         assertEquals(201, created.statusCode(), created.body());
         var again = post(first, "/api/orders", alice, key, body);
         var elsewhere = post(second, "/api/orders", alice, key, body);
-        for (var replay : new HttpResponse[]{again, elsewhere}) {
+        for (var replay : List.of(again, elsewhere)) {
             assertEquals(201, replay.statusCode());
             assertEquals(created.body(), replay.body());
             assertEquals("true", replay.headers().firstValue("Idempotent-Replayed").orElse(null));

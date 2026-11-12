@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,6 +18,7 @@ public interface OrganizationRepository {
     /**
      * 锁定组织节点，不存在返回 null。
      */
+    @Nullable
     OrganizationUnit lock(long id);
 
     /**

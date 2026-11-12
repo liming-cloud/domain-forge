@@ -2,7 +2,6 @@ package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -47,7 +46,7 @@ public final class Logout {
      */
     public void execute(CurrentIdentity identity, String token) {
         if (token == null || !identity.tokenDigest().equals(secrets.digest(token)))
-            throw new IamException(IamFailure.INVALID_REQUEST, "退出输入无效");
+            throw IamException.invalid("退出输入无效");
         transactions.executeWithoutResult(status -> {
             var actor = authorization.require(identity.tokenDigest(), null);
             sessions.revoke(identity.tokenDigest());

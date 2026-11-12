@@ -2,10 +2,10 @@ package org.domainforge.iam.application.command.account;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.account.Membership;
 import org.domainforge.iam.domain.model.shared.SystemRole;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Set;
 
 import static org.domainforge.iam.application.FailureAssertions.assertFailure;
+import static org.domainforge.iam.application.FailureAssertions.assertInvalidRequest;
 import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -58,31 +58,33 @@ class ManageAccountTest {
     @Test
     void stateRequiresPermission() {
         String clerk = iam.actor(USER, false);
-        assertFailure(IamFailure.FORBIDDEN, () -> accounts.state(clerk, ADMIN, 1, false));
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> accounts.state("unknown", USER, 1, false));
+        assertFailure(Kind.FORBIDDEN, () -> accounts.state(clerk, ADMIN, 1, false));
+        assertFailure(Kind.UNAUTHENTICATED, () -> accounts.state("unknown", USER, 1, false));
         assertTrue(iam.writes.isEmpty());
     }
 
     @Test
     void onlySystemAdministratorMayChangeSystemAdministrator() {
         String operator = iam.actor(USER, false, "iam:account:state");
-        assertFailure(IamFailure.FORBIDDEN, () -> accounts.state(operator, ADMIN, 1, false));
+        assertFailure(Kind.FORBIDDEN, () -> accounts.state(operator, ADMIN, 1, false));
         assertTrue(iam.accounts.find(ADMIN).enabled());
         assertTrue(iam.writes.isEmpty());
     }
 
     @Test
     void staleVersionAndInvalidTargetAreRejected() {
-        assertFailure(IamFailure.CONFLICT, () -> accounts.state(admin, USER, 2, false));
-        assertFailure(IamFailure.CONFLICT, () -> accounts.state(admin, 999, 1, false));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accounts.state(admin, USER, 0, false));
+        assertEquals("VERSION_CONFLICT",
+                assertFailure(Kind.CONFLICT, () -> accounts.state(admin, USER, 2, false)).code());
+        assertEquals("ACCOUNT_NOT_FOUND",
+                assertFailure(Kind.NOT_FOUND, () -> accounts.state(admin, 999, 1, false)).code());
+        assertFailure(Kind.INVALID_REQUEST, () -> accounts.state(admin, USER, 0, false));
         assertTrue(iam.writes.isEmpty());
     }
 
     @Test
     void lastSystemAdministratorIsKept() {
-        assertFailure(IamFailure.CONFLICT, () -> accounts.state(admin, ADMIN, 1, false));
-        assertFailure(IamFailure.CONFLICT, () -> accounts.roles(admin, ADMIN, 1, Set.of()));
+        assertFailure(Kind.CONFLICT, () -> accounts.state(admin, ADMIN, 1, false));
+        assertFailure(Kind.CONFLICT, () -> accounts.roles(admin, ADMIN, 1, Set.of()));
         assertTrue(iam.accounts.find(ADMIN).isSystemAdministrator());
         assertTrue(iam.writes.isEmpty());
 
@@ -101,12 +103,14 @@ class ManageAccountTest {
     @Test
     void roleAssignmentRejectsMissingDisabledOrTooManyRoles() {
         iam.role(SALES, "SALES", false);
-        assertFailure(IamFailure.CONFLICT, () -> accounts.roles(admin, USER, 1, Set.of(SALES)));
-        assertFailure(IamFailure.CONFLICT, () -> accounts.roles(admin, USER, 1, Set.of(404L)));
+        assertEquals("ROLE_UNAVAILABLE",
+                assertFailure(Kind.UNPROCESSABLE, () -> accounts.roles(admin, USER, 1, Set.of(SALES))).code());
+        assertEquals("ROLE_UNAVAILABLE",
+                assertFailure(Kind.UNPROCESSABLE, () -> accounts.roles(admin, USER, 1, Set.of(404L))).code());
         Set<Long> tooMany = new HashSet<>();
         for (long id = 1; id <= Account.MAX_ROLES + 1; id++) tooMany.add(id);
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accounts.roles(admin, USER, 1, tooMany));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accounts.roles(admin, USER, 1, null));
+        assertFailure(Kind.INVALID_REQUEST, () -> accounts.roles(admin, USER, 1, tooMany));
+        assertFailure(Kind.INVALID_REQUEST, () -> accounts.roles(admin, USER, 1, null));
         assertTrue(iam.accounts.find(USER).roleIds().isEmpty());
         assertTrue(iam.writes.isEmpty());
     }
@@ -115,7 +119,7 @@ class ManageAccountTest {
     void roleAssignmentRequiresSystemAdministrator() {
         iam.role(SALES, "SALES", true);
         String operator = iam.actor(USER + 1, false, "iam:account:role");
-        assertFailure(IamFailure.FORBIDDEN, () -> accounts.roles(operator, USER, 1, Set.of(SALES)));
+        assertFailure(Kind.FORBIDDEN, () -> accounts.roles(operator, USER, 1, Set.of(SALES)));
         assertTrue(iam.writes.isEmpty());
     }
 
@@ -131,21 +135,21 @@ class ManageAccountTest {
     @Test
     void membershipsRejectMissingUnitOrPrimaryRule() {
         iam.unit(2, 1, "销售部");
-        assertFailure(IamFailure.CONFLICT,
-                () -> accounts.memberships(admin, USER, 1, List.of(new MembershipInput(404, true))));
+        assertEquals("MEMBERSHIP_UNIT_UNKNOWN", assertFailure(Kind.UNPROCESSABLE,
+                () -> accounts.memberships(admin, USER, 1, List.of(new MembershipInput(404, true)))).code());
         assertRule("MEMBERSHIP_PRIMARY_INVALID",
                 () -> accounts.memberships(admin, USER, 1, List.of(new MembershipInput(2, false))));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accounts.memberships(admin, USER, 1, null));
+        assertFailure(Kind.INVALID_REQUEST, () -> accounts.memberships(admin, USER, 1, null));
         assertTrue(iam.accounts.find(USER).memberships().isEmpty());
         assertTrue(iam.writes.isEmpty());
     }
 
-    // 现状：重复归属抛 IllegalArgumentException，经协议层会成为 500；修复见 #138，本测试只锁定现状。
+    // 重复归属是非法输入（400），不是 500。
     @Test
-    void duplicateMembershipCurrentlyEscapesAsIllegalArgument() {
+    void duplicateMembershipIsInvalidRequest() {
         iam.unit(2, 1, "销售部");
         var duplicate = List.of(new MembershipInput(2, true), new MembershipInput(2, true));
-        assertThrows(IllegalArgumentException.class, () -> accounts.memberships(admin, USER, 1, duplicate));
+        assertInvalidRequest(() -> accounts.memberships(admin, USER, 1, duplicate));
         assertTrue(iam.writes.isEmpty());
     }
 }

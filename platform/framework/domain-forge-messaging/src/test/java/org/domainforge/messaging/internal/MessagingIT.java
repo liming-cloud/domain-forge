@@ -187,7 +187,7 @@ class MessagingIT {
         var tracer = application.getBean(io.micrometer.tracing.Tracer.class);
         var span = tracer.nextSpan().name("publish-it").start();
         String id;
-        try (var ignored = tracer.withSpan(span)) {
+        try (var _ = tracer.withSpan(span)) {
             id = publish(application, normal("NoteCreated", "traced"));
         } finally {
             span.end();

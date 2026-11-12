@@ -1,5 +1,7 @@
 package org.domainforge.shared;
 
+import java.io.Serial;
+
 import java.util.regex.Pattern;
 
 /**
@@ -8,6 +10,9 @@ import java.util.regex.Pattern;
  * <p>领域层与应用层各自声明具体子类；Web 入口由 web-support 按 {@link Kind} 统一转为 Problem Details，不逐个登记映射。
  */
 public abstract class BusinessRuleViolation extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private static final Pattern CODE = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
 
     private final Kind kind;

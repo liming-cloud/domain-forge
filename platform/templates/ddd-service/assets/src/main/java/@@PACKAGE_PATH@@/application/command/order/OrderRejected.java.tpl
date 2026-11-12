@@ -2,11 +2,16 @@ package @@PACKAGE@@.application.command.order;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
+import java.io.Serial;
+
 /**
  * 订单用例已判定的业务拒绝：带稳定错误码，由 web-support 按类别统一转为 Problem Details（404／409／422／400），
  * 入口不需要登记映射。
  */
 public final class OrderRejected extends BusinessRuleViolation {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private OrderRejected(Kind kind, String code, String message) {
         super(kind, code, message);
     }

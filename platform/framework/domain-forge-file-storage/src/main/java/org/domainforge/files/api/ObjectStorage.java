@@ -1,5 +1,7 @@
 package org.domainforge.files.api;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -25,6 +27,7 @@ public interface ObjectStorage {
     /**
      * 打开对象；不存在时返回 null。
      */
+    @Nullable
     InputStream read(String key);
 
     /**

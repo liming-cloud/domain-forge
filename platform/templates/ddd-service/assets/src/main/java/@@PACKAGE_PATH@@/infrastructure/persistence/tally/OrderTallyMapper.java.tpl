@@ -1,5 +1,7 @@
 package @@PACKAGE@@.infrastructure.persistence.tally;
 
+import org.jspecify.annotations.Nullable;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -16,5 +18,5 @@ public interface OrderTallyMapper {
     /**
      * 某账号的订单数，没有记录为 null。
      */
-    Long count(@Param("ownerId") long ownerId);
+    @Nullable Long count(@Param("ownerId") long ownerId);
 }

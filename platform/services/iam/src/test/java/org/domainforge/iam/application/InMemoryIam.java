@@ -2,7 +2,6 @@ package org.domainforge.iam.application;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -141,7 +140,7 @@ public final class InMemoryIam {
     }
 
     private static IamException conflict() {
-        return new IamException(IamFailure.CONFLICT, "版本已变化");
+        return IamException.conflict("VERSION_CONFLICT", "版本已变化");
     }
 
     /**
@@ -500,7 +499,7 @@ public final class InMemoryIam {
 
         @Override
         public LoginReservation reserve(String normalizedName, String directAddress) {
-            if (limited) throw new IamException(IamFailure.RATE_LIMITED, "尝试过于频繁");
+            if (limited) throw IamException.rateLimited("LOGIN_RATE_LIMITED", "尝试过于频繁", 1);
             LoginReservation reservation = new LoginReservation(normalizedName, "attempt-" + pending.size());
             pending.add(reservation);
             return reservation;

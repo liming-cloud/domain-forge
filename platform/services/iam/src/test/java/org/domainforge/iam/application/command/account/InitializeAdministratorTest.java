@@ -1,9 +1,9 @@
 package org.domainforge.iam.application.command.account;
 
 import org.domainforge.iam.application.InMemoryIam;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.shared.SystemRole;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -39,7 +39,7 @@ class InitializeAdministratorTest {
     @Test
     void secondInitializationIsRejectedWithoutWrites() {
         iam.guard.initialized = true;
-        assertFailure(IamFailure.CONFLICT, () -> initialize.execute("other.admin", "secret"));
+        assertFailure(Kind.CONFLICT, () -> initialize.execute("other.admin", "secret"));
         assertRule("LOGIN_NAME_INVALID", () -> initialize.execute("x", "secret"));
         assertTrue(iam.accounts.rows.isEmpty());
         assertTrue(iam.writes.isEmpty());

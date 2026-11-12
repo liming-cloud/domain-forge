@@ -118,7 +118,27 @@ class ArchitectureRulesTest {
 
     @Test
     void domainCannotThrowGenericException() {
-        assertViolation("fixture.bad.domainexc", "[领域异常]");
+        assertViolation("fixture.bad.domainexc", "[通用异常]");
+    }
+
+    @Test
+    void applicationCannotThrowGenericException() {
+        assertViolation("fixture.bad.appexc", "[通用异常]");
+    }
+
+    @Test
+    void onlySlf4jForLogging() {
+        List<String> violations = check("fixture.bad.logging");
+        assertTrue(violations.stream().anyMatch(item -> item.startsWith("[日志 API]") && item.contains("UsesJul ")),
+                violations::toString);
+        assertTrue(violations.stream()
+                .anyMatch(item -> item.startsWith("[日志 API]") && item.contains("UsesCommonsLogging ")),
+                violations::toString);
+    }
+
+    @Test
+    void everyPackageMustBeNullMarked() {
+        assertViolation("fixture.bad.unmarked", "[空值约定]");
     }
 
     @Test

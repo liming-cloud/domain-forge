@@ -1,40 +1,30 @@
 package org.domainforge.web.internal;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.http.HttpServletResponse;
 import org.domainforge.shared.BusinessRuleViolation;
 import org.domainforge.web.api.Problems;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.ServletRequestBindingException;
 
+import java.io.Serial;
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class FailureDiagnosticsTest {
-    private final Logger logger = Logger.getLogger(Problems.class.getName());
-    private final List<LogRecord> records = new ArrayList<>();
-    private final Handler capture =
-            new Handler() {
-                public void publish(LogRecord record) {
-                    records.add(record);
-                }
-
-                public void flush() {
-                }
-
-                public void close() {
-                }
-            };
+    private final Logger logger = (Logger) LoggerFactory.getLogger(Problems.class);
+    private final ListAppender<ILoggingEvent> capture = new ListAppender<>();
+    private final List<ILoggingEvent> records = capture.list;
     private Level previousLevel;
-    private boolean previousParentHandlers;
+    private boolean previousAdditive;
 
     private static PlatformExceptionAdvice advice() {
         return new PlatformExceptionAdvice();
@@ -56,17 +46,18 @@ class FailureDiagnosticsTest {
     @BeforeEach
     void captureOnlyThisComponentsDiagnostics() {
         previousLevel = logger.getLevel();
-        previousParentHandlers = logger.getUseParentHandlers();
-        logger.setLevel(Level.ALL);
-        logger.setUseParentHandlers(false);
-        logger.addHandler(capture);
+        previousAdditive = logger.isAdditive();
+        logger.setLevel(Level.TRACE);
+        logger.setAdditive(false);
+        capture.start();
+        logger.addAppender(capture);
     }
 
     @AfterEach
     void restoreHostLogging() {
-        logger.removeHandler(capture);
+        logger.detachAppender(capture);
         logger.setLevel(previousLevel);
-        logger.setUseParentHandlers(previousParentHandlers);
+        logger.setAdditive(previousAdditive);
     }
 
     @Test
@@ -123,16 +114,19 @@ class FailureDiagnosticsTest {
 
     private String onlyDiagnostic() {
         assertEquals(1, records.size(), "故障必须留下且只留一条内部诊断");
-        LogRecord record = records.getFirst();
-        assertEquals(Level.SEVERE, record.getLevel());
-        assertNull(record.getThrown(), "原始异常会将 message/cause/suppressed 交给日志后端泄漏");
-        assertNull(record.getParameters());
-        String text = record.getMessage();
+        ILoggingEvent record = records.getFirst();
+        assertEquals(Level.ERROR, record.getLevel());
+        assertNull(record.getThrowableProxy(), "原始异常会将 message/cause/suppressed 交给日志后端泄漏");
+        assertNull(record.getArgumentArray());
+        String text = record.getFormattedMessage();
         assertFalse(text.contains("secret"), text);
         return text;
     }
 
     static class SensitiveFailure extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public String getMessage() {
             throw new AssertionError("诊断不应读取异常消息");
         }
@@ -143,6 +137,9 @@ class FailureDiagnosticsTest {
     }
 
     static class Declined extends BusinessRuleViolation {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         Declined(String message) {
             super(Kind.UNPROCESSABLE, "DECLINED", message);
         }

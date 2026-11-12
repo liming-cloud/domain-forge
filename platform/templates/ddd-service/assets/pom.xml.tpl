@@ -22,6 +22,10 @@
     </dependencyManagement>
     <dependencies>
         <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>shared</artifactId>
         </dependency>

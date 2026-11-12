@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.iam.application.command.account.ManageAccount;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
 import org.domainforge.iam.application.query.account.AccountQueries;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
@@ -75,7 +74,7 @@ public final class AccountController {
     @Operation(summary = "读取账号详情")
     public AccountDetailResponse account(@PathVariable long id) {
         var detail = queries.detail(id);
-        if (detail == null) throw new IamException(IamFailure.CONFLICT, "账号不存在");
+        if (detail == null) throw IamException.notFound("ACCOUNT_NOT_FOUND", "账号不存在");
         return AccountDetailResponse.of(detail);
     }
 

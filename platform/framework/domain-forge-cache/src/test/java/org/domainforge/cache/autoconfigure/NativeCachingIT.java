@@ -113,11 +113,11 @@ class NativeCachingIT {
                 new org.redisson.config.Config()
                         .setProtocol(Protocol.RESP3)
                         .setThreads(2)
-                        .setNettyThreads(2);
+                        .setNettyThreads(2)
+                        .setPassword(required("REDIS_PASSWORD"));
         config
                 .useSingleServer()
                 .setAddress("redis://127.0.0.1:" + required("REDIS_PORT"))
-                .setPassword(required("REDIS_PASSWORD"))
                 .setRetryAttempts(0)
                 .setConnectionMinimumIdleSize(1)
                 .setConnectionPoolSize(2)
@@ -158,12 +158,12 @@ class NativeCachingIT {
                 new org.redisson.config.Config()
                         .setProtocol(Protocol.RESP3)
                         .setThreads(2)
-                        .setNettyThreads(2);
+                        .setNettyThreads(2)
+                        .setUsername(user)
+                        .setPassword(password);
         config
                 .useSingleServer()
                 .setAddress("redis://127.0.0.1:" + required("REDIS_PORT"))
-                .setUsername(user)
-                .setPassword(password)
                 .setRetryAttempts(0)
                 .setTimeout(1000)
                 .setConnectionMinimumIdleSize(1)

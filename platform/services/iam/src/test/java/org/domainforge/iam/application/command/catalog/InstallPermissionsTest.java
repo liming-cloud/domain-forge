@@ -1,17 +1,19 @@
 package org.domainforge.iam.application.command.catalog;
 
 import org.domainforge.iam.application.InMemoryIam;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.role.Role;
 import org.domainforge.iam.domain.repository.PermissionCatalog;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
 import static org.domainforge.iam.application.FailureAssertions.assertFailure;
+import static org.domainforge.iam.application.FailureAssertions.assertInvalidRequest;
 import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,17 +47,24 @@ class InstallPermissionsTest {
                 Set.of(new PermissionGrant("sales:order:read", DataScope.ALL, Set.of()))));
         iam.writes.clear();
 
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales", List.of(EXPORT)));
+        assertFailure(Kind.CONFLICT, () -> install.install(admin, "sales", List.of(EXPORT)));
         var unscoped = new PermissionInput("sales:order:read", "查询订单", false, false);
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales", List.of(unscoped, EXPORT)));
+        assertFailure(Kind.CONFLICT, () -> install.install(admin, "sales", List.of(unscoped, EXPORT)));
         assertEquals(2, iam.catalog.rows.size());
+        assertTrue(iam.writes.isEmpty());
+    }
+
+    @Test
+    void missingCatalogIsInvalidRequest() {
+        assertInvalidRequest(() -> install.install(admin, "sales", null));
+        assertInvalidRequest(() -> install.install(admin, "sales", Arrays.asList(READ, null)));
         assertTrue(iam.writes.isEmpty());
     }
 
     @Test
     void onlySystemAdministratorMayInstall() {
         String operator = iam.actor(20, false, "iam:catalog:manage");
-        assertFailure(IamFailure.FORBIDDEN, () -> install.install(operator, "sales", List.of(READ)));
+        assertFailure(Kind.FORBIDDEN, () -> install.install(operator, "sales", List.of(READ)));
         assertRule("NAMESPACE_RESERVED", () -> install.install(admin, "iam",
                 List.of(new PermissionInput("iam:x:y", "x", false, false))));
         assertTrue(iam.catalog.rows.isEmpty());
@@ -65,7 +74,7 @@ class InstallPermissionsTest {
     @Test
     void catalogTotalIsBounded() {
         for (int i = 0; i < PermissionCatalog.MAX_TOTAL; i++) iam.permission("other:p:p" + i, false, false);
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales", List.of(READ)));
+        assertFailure(Kind.CONFLICT, () -> install.install(admin, "sales", List.of(READ)));
         assertTrue(iam.writes.isEmpty());
     }
 }

@@ -4,7 +4,6 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -15,6 +14,7 @@ import org.domainforge.iam.domain.model.role.Role;
 import org.domainforge.iam.domain.repository.OrganizationRepository;
 import org.domainforge.iam.domain.repository.PermissionCatalog;
 import org.domainforge.iam.domain.repository.RoleRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,7 +62,7 @@ public class ManageRole {
     public CommandResult create(String tokenDigest, String code, String name) {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         Role role = Role.create(identifiers.next(), code, name);
-        if (roles.codeTaken(role.code())) throw new IamException(IamFailure.CONFLICT, "角色代码已存在");
+        if (roles.codeTaken(role.code())) throw IamException.conflict("ROLE_CODE_TAKEN", "角色代码已存在");
         roles.insert(role);
         record(actor, role.id(), "role.create");
         return new CommandResult(role.id(), role.version());
@@ -97,7 +97,7 @@ public class ManageRole {
     public CommandResult grants(String tokenDigest, long id, long version, List<GrantInput> inputs) {
         ExpectedVersion.require(id, version);
         if (inputs == null || inputs.size() > PermissionCatalog.MAX_TOTAL)
-            throw new IamException(IamFailure.INVALID_REQUEST, "授予无效");
+            throw IamException.invalid("授予无效");
         Set<PermissionGrant> grants = toGrants(inputs);
         organizations.lockStructure();
         catalog.lock(false);
@@ -107,7 +107,7 @@ public class ManageRole {
         for (PermissionGrant grant : grants) {
             grant.requireCompatible(definitions.get(grant.permission()), current.system());
             if (organizations.existing(grant.unitIds()) != grant.unitIds().size())
-                throw new IamException(IamFailure.CONFLICT, "范围中的组织不存在");
+                throw IamException.unprocessable("GRANT_UNIT_UNKNOWN", "范围中的组织不存在");
         }
         return save(actor, current, current.replaceGrants(grants), "role.grants");
     }
@@ -121,7 +121,7 @@ public class ManageRole {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         Role current = lock(id, version);
         current.requireDeletable();
-        if (roles.assignments(id) > 0) throw new IamException(IamFailure.CONFLICT, "角色仍分配给账号，先撤销分配");
+        if (roles.assignments(id) > 0) throw IamException.conflict("ROLE_IN_USE", "角色仍分配给账号，先撤销分配");
         roles.delete(id);
         record(actor, id, "role.delete");
     }
@@ -129,15 +129,21 @@ public class ManageRole {
     private static Set<PermissionGrant> toGrants(List<GrantInput> inputs) {
         Set<PermissionGrant> grants = new HashSet<>();
         for (GrantInput input : inputs) {
-            if (input.scope() == null) throw new IllegalArgumentException("缺少数据范围");
-            grants.add(new PermissionGrant(input.permission(), DataScope.valueOf(input.scope()), input.unitIds()));
+            grants.add(new PermissionGrant(input.permission(), scope(input.scope()), input.unitIds()));
         }
         return grants;
     }
 
+    private static DataScope scope(@Nullable String value) {
+        for (DataScope scope : DataScope.values()) {
+            if (scope.name().equals(value)) return scope;
+        }
+        throw IamException.invalid("数据范围无效");
+    }
+
     private Role lock(long id, long version) {
         Role role = roles.lock(id);
-        return ExpectedVersion.current(role, role == null ? 0 : role.version(), version);
+        return ExpectedVersion.current(role, Role::version, version, "ROLE_NOT_FOUND");
     }
 
     private CommandResult save(CurrentIdentity actor, Role current, Role changed, String action) {

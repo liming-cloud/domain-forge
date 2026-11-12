@@ -45,7 +45,6 @@ public record FileStorageProperties(
      * @param endpoint       自定义服务地址
      * @param accessKey      访问密钥标识
      * @param secretKey      访问密钥
-     * @param socketTimeout  套接字超时
      * @param attemptTimeout 单次调用超时
      * @param callTimeout    调用总时长（含重试）
      */
@@ -57,7 +56,6 @@ public record FileStorageProperties(
             @DefaultValue("") String endpoint,
             @DefaultValue("") String accessKey,
             @DefaultValue("") String secretKey,
-            @DefaultValue("5s") Duration socketTimeout,
             @DefaultValue("5s") Duration attemptTimeout,
             @DefaultValue("10s") Duration callTimeout) {
     }

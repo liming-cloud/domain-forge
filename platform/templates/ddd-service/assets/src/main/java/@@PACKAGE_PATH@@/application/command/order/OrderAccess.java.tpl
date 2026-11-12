@@ -1,5 +1,7 @@
 package @@PACKAGE@@.application.command.order;
 
+import org.jspecify.annotations.Nullable;
+
 import @@PACKAGE@@.domain.model.order.Order;
 import org.domainforge.shared.CurrentScope;
 
@@ -23,7 +25,7 @@ public final class OrderAccess {
     /**
      * 能否新建：不归属组织的订单需要 ALL 或本人范围；归属组织时该组织须在范围内（本人范围不能扩展到任意组织）。
      */
-    public static boolean creatable(Long unitId, CurrentScope scope) {
+    public static boolean creatable(@Nullable Long unitId, CurrentScope scope) {
         return scope.all() || (unitId == null ? scope.self() : scope.unitIds().contains(unitId));
     }
 }

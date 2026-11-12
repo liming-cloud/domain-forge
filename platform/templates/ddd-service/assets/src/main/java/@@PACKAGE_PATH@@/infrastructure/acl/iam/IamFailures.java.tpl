@@ -20,10 +20,10 @@ final class IamFailures {
             return switch (call.failure()) {
                 case UNAUTHENTICATED -> new AccessException(AccessFailure.UNAUTHENTICATED);
                 case FORBIDDEN -> new AccessException(AccessFailure.FORBIDDEN);
-                default -> new AccessUnavailableException();
+                default -> new AccessUnavailableException(call);
             };
         }
-        return new AccessUnavailableException();
+        return new AccessUnavailableException(failure);
     }
 
     /**

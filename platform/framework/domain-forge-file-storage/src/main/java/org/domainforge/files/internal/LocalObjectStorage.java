@@ -2,6 +2,7 @@ package org.domainforge.files.internal;
 
 import org.domainforge.files.api.FileStorageUnavailableException;
 import org.domainforge.files.api.ObjectStorage;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,7 +62,7 @@ final class LocalObjectStorage implements ObjectStorage {
     }
 
     @Override
-    public InputStream read(String key) {
+    public @Nullable InputStream read(String key) {
         try {
             return Files.newInputStream(path(key));
         } catch (NoSuchFileException missing) {

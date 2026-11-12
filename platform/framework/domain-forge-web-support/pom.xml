@@ -10,6 +10,10 @@
     <artifactId>domain-forge-web-support</artifactId>
     <dependencies>
         <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.domainforge</groupId>
             <artifactId>shared</artifactId>
             <version>${project.version}</version>
@@ -59,6 +63,21 @@
             <artifactId>domain-forge-build-rules</artifactId>
             <version>${domain-forge-build-rules.version}</version>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- 测试直接读取诊断日志事件（ListAppender），版本由 Spring Boot 管理。 -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

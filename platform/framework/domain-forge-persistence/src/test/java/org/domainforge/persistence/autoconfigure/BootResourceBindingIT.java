@@ -102,7 +102,7 @@ class BootResourceBindingIT {
         assertThrows(
                 RuntimeException.class,
                 () -> {
-                    try (var ignored =
+                    try (var _ =
                             new SpringApplicationBuilder(Application.class)
                                     .web(WebApplicationType.NONE)
                                     .properties(properties)

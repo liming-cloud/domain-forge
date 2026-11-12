@@ -1,5 +1,7 @@
 package @@PACKAGE@@.infrastructure.persistence.order;
 
+import org.jspecify.annotations.Nullable;
+
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -9,9 +11,9 @@ import java.util.List;
  */
 @org.apache.ibatis.annotations.Mapper
 public interface OrderMapper {
-    OrderRow lock(long id);
+    @Nullable OrderRow lock(long id);
 
-    OrderRow find(long id);
+    @Nullable OrderRow find(long id);
 
     List<OrderLineRow> lines(long orderId);
 

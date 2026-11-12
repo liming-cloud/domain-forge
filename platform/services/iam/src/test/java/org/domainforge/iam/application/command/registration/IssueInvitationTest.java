@@ -1,8 +1,8 @@
 package org.domainforge.iam.application.command.registration;
 
 import org.domainforge.iam.application.InMemoryIam;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -52,8 +52,8 @@ class IssueInvitationTest {
     void rejectsWithoutPermissionOrForExistingAccount() {
         iam.account(20, "taken");
         String clerk = iam.actor(30, false);
-        assertFailure(IamFailure.FORBIDDEN, () -> issue.execute(clerk, "new.user", null));
-        assertFailure(IamFailure.CONFLICT, () -> issue.execute(admin, "taken", null));
+        assertFailure(Kind.FORBIDDEN, () -> issue.execute(clerk, "new.user", null));
+        assertFailure(Kind.CONFLICT, () -> issue.execute(admin, "taken", null));
         assertTrue(iam.invitations.rows.isEmpty());
         assertTrue(iam.writes.isEmpty());
     }
@@ -64,9 +64,9 @@ class IssueInvitationTest {
         iam.accounts.invitationDigests.put(99L, iam.secrets.digest(original.secret()));
         iam.writes.clear();
 
-        assertFailure(IamFailure.CONFLICT, () -> issue.execute(admin, "new.user", original.invitationId()));
-        assertFailure(IamFailure.CONFLICT, () -> issue.execute(admin, "other.user", original.invitationId()));
-        assertFailure(IamFailure.CONFLICT, () -> issue.execute(admin, "new.user", 404L));
+        assertFailure(Kind.CONFLICT, () -> issue.execute(admin, "new.user", original.invitationId()));
+        assertFailure(Kind.CONFLICT, () -> issue.execute(admin, "other.user", original.invitationId()));
+        assertFailure(Kind.CONFLICT, () -> issue.execute(admin, "new.user", 404L));
         assertFalse(iam.invitations.lock(original.invitationId()).invalidated());
         assertEquals(1, iam.invitations.rows.size());
         assertTrue(iam.writes.isEmpty());

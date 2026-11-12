@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.account.Account;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 账号聚合仓储（含角色分配与成员归属），账号不存在时读取返回null，写入冲突不可当成功。
@@ -9,11 +10,13 @@ public interface AccountRepository {
     /**
      * 读取当前账号；不得从跨请求缓存恢复允许依据。
      */
+    @Nullable
     Account find(long id);
 
     /**
      * 读取用于密码校验的账号快照；保存时按其版本条件更新。
      */
+    @Nullable
     Account findByLoginName(String normalizedName);
 
     /**

@@ -13,7 +13,6 @@ import org.domainforge.iam.application.command.registration.IssueInvitation;
 import org.domainforge.iam.application.command.role.GrantInput;
 import org.domainforge.iam.application.command.role.ManageRole;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
@@ -23,7 +22,6 @@ import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
 import org.domainforge.iam.application.port.operation.DatabaseTime;
 import org.domainforge.iam.bootstrap.IamApplication;
-import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.shared.SystemRole;
@@ -31,6 +29,7 @@ import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.iam.infrastructure.persistence.retention.RetentionCleanup;
 import org.domainforge.shared.BusinessRuleViolation;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -134,20 +133,17 @@ class IdentityPersistenceIT {
         bean(ManageAccount.class).state(identity(actorToken).tokenDigest(), target.id(), target.version(), enabled);
     }
 
-    private static void assertFailure(IamFailure expected, Executable command) {
+    private static void assertFailure(Kind expected, Executable command) {
         assertEquals(expected, failureOf(assertThrows(RuntimeException.class, command)));
     }
 
-    // 应用层拒绝与领域规则违反按同一分类比较：违反的 400／409 类别对应 INVALID_REQUEST／CONFLICT。
-    private static IamFailure failureOf(Exception failure) {
-        if (failure instanceof IamRuleViolation rule)
-            return rule.kind() == BusinessRuleViolation.Kind.CONFLICT ? IamFailure.CONFLICT
-                    : IamFailure.INVALID_REQUEST;
-        return assertInstanceOf(IamException.class, failure).failure();
+    // 应用层拒绝与领域规则违反都是 BusinessRuleViolation，按同一类别比较。
+    private static Kind failureOf(Exception failure) {
+        return assertInstanceOf(BusinessRuleViolation.class, failure).kind();
     }
 
     private static void assertUnauthenticated(String token) {
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> identity(token));
+        assertFailure(Kind.UNAUTHENTICATED, () -> identity(token));
     }
 
     /**
@@ -178,7 +174,7 @@ class IdentityPersistenceIT {
         }
     }
 
-    private static void assertOneSucceeded(List<Object> results, IamFailure loserFailure) {
+    private static void assertOneSucceeded(List<Object> results, Kind loserFailure) {
         long failures = results.stream().filter(Exception.class::isInstance).count();
         assertEquals(1, failures, () -> "期望恰好一个失败: " + results);
         var loser = (Exception) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
@@ -188,7 +184,7 @@ class IdentityPersistenceIT {
     private static void assertOneRejected(List<Object> results) {
         assertOneSucceeded(results, null);
         var loser = (Exception) results.stream().filter(Exception.class::isInstance).findFirst().orElseThrow();
-        assertTrue(Set.of(IamFailure.CONFLICT, IamFailure.UNAUTHENTICATED).contains(failureOf(loser)),
+        assertTrue(Set.of(Kind.CONFLICT, Kind.UNAUTHENTICATED).contains(failureOf(loser)),
                 () -> "落败原因: " + loser);
     }
 
@@ -274,10 +270,10 @@ class IdentityPersistenceIT {
         var results = race(
                 () -> initializer.execute("first.admin", PASSWORD),
                 () -> initializer.execute("second.admin", PASSWORD));
-        assertOneSucceeded(results, IamFailure.CONFLICT);
+        assertOneSucceeded(results, Kind.CONFLICT);
         assertEquals(1, sql.accountCount("first.admin") + sql.accountCount("second.admin"));
         assertEquals(1, sql.auditCount("administrator.initialize"));
-        assertFailure(IamFailure.CONFLICT, () -> initializer.execute("third.admin", PASSWORD));
+        assertFailure(Kind.CONFLICT, () -> initializer.execute("third.admin", PASSWORD));
         assertEquals(1L, bean(AccountRepository.class).systemAdministrators());
     }
 
@@ -301,7 +297,7 @@ class IdentityPersistenceIT {
         var accept = bean(AcceptInvitation.class);
         Callable<Object> command = () -> accept.execute(secret, "race.member", PASSWORD);
         var results = race(command, command);
-        assertOneSucceeded(results, IamFailure.CONFLICT);
+        assertOneSucceeded(results, Kind.CONFLICT);
         assertEquals(1, sql.accountCount("race.member"));
         assertEquals(1, sql.auditCount("invitation.accept"));
     }
@@ -312,12 +308,12 @@ class IdentityPersistenceIT {
         String admin = login(ADMIN, PASSWORD);
         var accept = bean(AcceptInvitation.class);
         String secret = invite(admin, "bound.member").secret();
-        assertFailure(IamFailure.CONFLICT, () -> accept.execute(secret, "other.member", PASSWORD));
+        assertFailure(Kind.CONFLICT, () -> accept.execute(secret, "other.member", PASSWORD));
         String tampered = (secret.charAt(0) == 'A' ? "B" : "A") + secret.substring(1);
-        assertFailure(IamFailure.CONFLICT, () -> accept.execute(tampered, "bound.member", PASSWORD));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accept.execute("short", "bound.member", PASSWORD));
+        assertFailure(Kind.CONFLICT, () -> accept.execute(tampered, "bound.member", PASSWORD));
+        assertFailure(Kind.INVALID_REQUEST, () -> accept.execute("short", "bound.member", PASSWORD));
         sql.expireInvitation("bound.member");
-        assertFailure(IamFailure.CONFLICT, () -> accept.execute(secret, "bound.member", PASSWORD));
+        assertFailure(Kind.CONFLICT, () -> accept.execute(secret, "bound.member", PASSWORD));
         assertEquals(0, sql.accountCount("bound.member"));
         assertEquals(0, sql.accountCount("other.member"));
     }
@@ -352,7 +348,7 @@ class IdentityPersistenceIT {
         bean(ChangePassword.class).execute(identity(first), PASSWORD, NEW_PASSWORD);
         assertUnauthenticated(first);
         assertUnauthenticated(second);
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login(ADMIN, PASSWORD));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login(ADMIN, PASSWORD));
         assertEquals(account(ADMIN).id(), identity(login(ADMIN, NEW_PASSWORD)).accountId());
         assertEquals(1, sql.auditCount("account.password"));
     }
@@ -365,7 +361,7 @@ class IdentityPersistenceIT {
         String member = login("state.member", PASSWORD);
         setEnabled(admin, "state.member", false);
         assertUnauthenticated(member);
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login("state.member", PASSWORD));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login("state.member", PASSWORD));
         setEnabled(admin, "state.member", true);
         assertUnauthenticated(member);
         assertNotNull(identity(login("state.member", PASSWORD)));
@@ -380,7 +376,7 @@ class IdentityPersistenceIT {
         bean(Logout.class).execute(identity(first), first);
         assertUnauthenticated(first);
         assertNotNull(identity(second));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> bean(Logout.class).execute(identity(second), first));
+        assertFailure(Kind.INVALID_REQUEST, () -> bean(Logout.class).execute(identity(second), first));
         assertEquals(1, sql.auditCount("session.logout"));
     }
 
@@ -419,10 +415,10 @@ class IdentityPersistenceIT {
         manage.roles(adminDigest, limited.id(), limited.version(), Set.of(role));
         String digest = identity(login("limited.admin", PASSWORD)).tokenDigest();
         Account system = account(ADMIN);
-        assertFailure(IamFailure.FORBIDDEN, () -> manage.state(digest, system.id(), system.version(), false));
+        assertFailure(Kind.FORBIDDEN, () -> manage.state(digest, system.id(), system.version(), false));
         Account target = account("target.member");
-        assertFailure(IamFailure.FORBIDDEN, () -> manage.roles(digest, target.id(), target.version(), Set.of(role)));
-        assertFailure(IamFailure.CONFLICT, () -> manage.state(digest, target.id(), target.version() + 1, false));
+        assertFailure(Kind.FORBIDDEN, () -> manage.roles(digest, target.id(), target.version(), Set.of(role)));
+        assertFailure(Kind.CONFLICT, () -> manage.state(digest, target.id(), target.version() + 1, false));
         int audits = sql.auditCount("account.state");
         assertEquals(target.version(), manage.state(digest, target.id(), target.version(), true).version());
         assertEquals(audits, sql.auditCount("account.state"));
@@ -433,9 +429,9 @@ class IdentityPersistenceIT {
     @Test
     void loginRateLimitedAfterFailures() {
         for (int attempt = 0; attempt < 5; attempt++)
-            assertFailure(IamFailure.UNAUTHENTICATED, () -> login(ADMIN, NEW_PASSWORD));
+            assertFailure(Kind.UNAUTHENTICATED, () -> login(ADMIN, NEW_PASSWORD));
         IamException limited = assertThrows(IamException.class, () -> login(ADMIN, PASSWORD));
-        assertEquals(IamFailure.RATE_LIMITED, limited.failure());
+        assertEquals(Kind.RATE_LIMITED, limited.kind());
     }
 
     // 许可提交失败时不返回令牌，原生会话被清理，SQL 中没有许可。
@@ -501,7 +497,7 @@ class IdentityPersistenceIT {
         String winner = results.get(0) instanceof Exception ? other : NEW_PASSWORD;
         String loser = winner.equals(other) ? NEW_PASSWORD : other;
         assertNotNull(login(ADMIN, winner));
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login(ADMIN, loser));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login(ADMIN, loser));
         assertEquals(2, account(ADMIN).version());
     }
 
@@ -529,7 +525,7 @@ class IdentityPersistenceIT {
         var results = race(
                 () -> bean(IssueInvitation.class).execute(digest, "reissue.member", original.invitationId()),
                 () -> bean(AcceptInvitation.class).execute(original.secret(), "reissue.member", PASSWORD));
-        assertOneSucceeded(results, IamFailure.CONFLICT);
+        assertOneSucceeded(results, Kind.CONFLICT);
         boolean accepted = !(results.get(1) instanceof Exception);
         assertEquals(accepted ? 1 : 0, sql.accountCount("reissue.member"));
         assertEquals(accepted ? 1 : 2, sql.auditCount("invitation.issue"));

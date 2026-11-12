@@ -42,13 +42,13 @@ public final class IamCurrentSubjectSource implements CurrentSubjectSource {
             storage.set(PRIVATE_IDENTITY, new PrivateIdentity(token, identity));
             return subject;
         } catch (IamException failure) {
-            throw switch (failure.failure()) {
+            throw switch (failure.kind()) {
                 case UNAUTHENTICATED -> new AccessException(AccessFailure.UNAUTHENTICATED);
                 case FORBIDDEN -> new AccessException(AccessFailure.FORBIDDEN);
-                default -> new AccessUnavailableException();
+                default -> new AccessUnavailableException(failure);
             };
         } catch (RuntimeException failure) {
-            throw new AccessUnavailableException();
+            throw new AccessUnavailableException(failure);
         }
     }
 

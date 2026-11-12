@@ -5,6 +5,7 @@ import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.domainforge.servicecall.api.ServiceCallException;
 import org.domainforge.servicecall.api.ServiceCallFailure;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -40,7 +41,7 @@ public final class IdentityPropagation implements RequestInterceptor {
         }
     }
 
-    private static String currentAuthorization() {
+    private static @Nullable String currentAuthorization() {
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return null;
         String value = attributes.getRequest().getHeader(AUTHORIZATION);
         return value == null || value.isBlank() ? null : value;

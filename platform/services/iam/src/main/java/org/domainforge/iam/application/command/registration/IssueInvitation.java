@@ -2,7 +2,6 @@ package org.domainforge.iam.application.command.registration;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
@@ -58,7 +57,7 @@ public class IssueInvitation {
     public InvitationIssued execute(String tokenDigest, String loginName, Long replacement) {
         String name = new LoginName(loginName).value();
         var actor = authorization.require(tokenDigest, "iam:invitation:create");
-        if (accounts.findByLoginName(name) != null) throw new IamException(IamFailure.CONFLICT, "该登录名已不可邀请");
+        if (accounts.findByLoginName(name) != null) throw IamException.conflict("LOGIN_NAME_TAKEN", "该登录名已不可邀请");
         if (replacement != null) invalidate(replacement, name);
         String secret = secrets.newSecret();
         var invitation = new RegistrationInvitation(
@@ -79,8 +78,8 @@ public class IssueInvitation {
     private void invalidate(long id, String name) {
         RegistrationInvitation original = invitations.lock(id);
         if (original == null || !original.loginName().equals(name))
-            throw new IamException(IamFailure.CONFLICT, "原邀请不可重发");
-        if (accounts.invitationUsed(original.secretDigest())) throw new IamException(IamFailure.CONFLICT, "原邀请已被使用");
+            throw IamException.conflict("INVITATION_NOT_RESENDABLE", "原邀请不可重发");
+        if (accounts.invitationUsed(original.secretDigest())) throw IamException.conflict("INVITATION_USED", "原邀请已被使用");
         invitations.invalidate(original.invalidate());
     }
 }

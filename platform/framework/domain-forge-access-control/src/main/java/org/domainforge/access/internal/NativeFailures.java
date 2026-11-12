@@ -22,7 +22,7 @@ final class NativeFailures {
                 || failure instanceof NotRoleException
                 || failure instanceof AccessException)
             return failure;
-        return new AccessUnavailableException();
+        return new AccessUnavailableException(failure);
     }
 
     /**

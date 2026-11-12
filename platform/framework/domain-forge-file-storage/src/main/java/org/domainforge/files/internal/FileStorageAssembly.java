@@ -10,7 +10,6 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
@@ -18,7 +17,6 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Duration;
 
 /**
  * 按配置组装默认存储后端、存取实现与清理任务。
@@ -78,9 +76,6 @@ public final class FileStorageAssembly {
                 .credentialsProvider(credentials(config))
                 .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
                 .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
-                .httpClientBuilder(ApacheHttpClient.builder()
-                        .connectionTimeout(Duration.ofSeconds(2))
-                        .socketTimeout(config.socketTimeout()))
                 .overrideConfiguration(override -> override
                         .apiCallAttemptTimeout(config.attemptTimeout())
                         .apiCallTimeout(config.callTimeout()));

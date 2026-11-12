@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.options.KeysScanOptions;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -255,7 +256,8 @@ class NotificationIT {
         codes().issue("login", "13800138006");
         String code = lastCode();
         var redis = application.getBean(RedissonClient.class);
-        var keys = redis.getKeys().getKeysStreamByPattern("domainforge:verification:*").toList();
+        var keys = redis.getKeys().getKeysStream(KeysScanOptions.defaults().pattern("domainforge:verification:*"))
+                .toList();
         assertEquals(3, keys.size(), keys.toString());
         for (String key : keys) {
             assertFalse(key.contains("13800138006"), key);

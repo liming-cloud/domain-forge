@@ -1,7 +1,7 @@
 package org.domainforge.iam.infrastructure.query.access;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.IamUnavailableException;
 import org.domainforge.iam.application.query.access.AccessScope;
 import org.domainforge.iam.application.query.access.AccessScopes;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
@@ -48,9 +48,9 @@ public class SqlAccessScopes implements AccessScopes {
                 default -> units.computeIfAbsent(row.permission(), code -> new HashSet<>()).add(row.unitId());
             }
         }
-        if (!subject) throw new IamException(IamFailure.UNAUTHENTICATED, "需要有效登录");
+        if (!subject) throw IamException.unauthenticated("UNAUTHENTICATED", "需要有效登录");
         if (!scoped.containsAll(requested))
-            throw new IamException(IamFailure.INVALID_REQUEST, "权限不在目录中或不需要数据范围");
+            throw IamException.invalid("权限不在目录中或不需要数据范围");
         Map<String, AccessScope> result = new HashMap<>();
         for (String code : requested)
             result.put(code, scope(all.contains(code), self.contains(code), units.getOrDefault(code, Set.of())));
@@ -59,7 +59,7 @@ public class SqlAccessScopes implements AccessScopes {
 
     private static List<String> validated(List<String> permissions) {
         if (permissions == null || permissions.isEmpty() || permissions.size() > MAX_BATCH)
-            throw new IamException(IamFailure.INVALID_REQUEST, "一次须查询1至32个权限");
+            throw IamException.invalid("一次须查询1至32个权限");
         permissions.forEach(PermissionDefinition::requireCode);
         return permissions;
     }
@@ -67,7 +67,7 @@ public class SqlAccessScopes implements AccessScopes {
     private static AccessScope scope(boolean all, boolean self, Set<Long> unitIds) {
         Set<Long> visible = all ? Set.of() : unitIds;
         if (visible.size() > PermissionGrant.MAX_UNITS)
-            throw new IamException(IamFailure.UNAVAILABLE, "数据范围超过1000个组织，拒绝截断");
+            throw new IamUnavailableException("数据范围超过1000个组织，拒绝截断", null);
         return new AccessScope(all, self, visible);
     }
 }

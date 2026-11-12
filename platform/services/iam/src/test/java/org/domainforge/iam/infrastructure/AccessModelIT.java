@@ -15,15 +15,12 @@ import org.domainforge.iam.application.command.registration.AcceptInvitation;
 import org.domainforge.iam.application.command.registration.IssueInvitation;
 import org.domainforge.iam.application.command.role.GrantInput;
 import org.domainforge.iam.application.command.role.ManageRole;
-import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.query.access.AccessScope;
 import org.domainforge.iam.application.query.access.AccessScopes;
 import org.domainforge.iam.application.query.menu.MenuQueries;
 import org.domainforge.iam.application.query.menu.MenuView;
 import org.domainforge.iam.application.query.organization.OrganizationQueries;
-import org.domainforge.iam.domain.IamRuleViolation;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
 import org.domainforge.iam.domain.model.role.DataScope;
@@ -31,6 +28,7 @@ import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
 import org.domainforge.iam.infrastructure.persistence.fixture.IdentityFixtureMapper;
 import org.domainforge.shared.BusinessRuleViolation;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,16 +96,13 @@ class AccessModelIT {
         return identity(name).tokenDigest();
     }
 
-    private static void assertFailure(IamFailure expected, Executable command) {
+    private static void assertFailure(Kind expected, Executable command) {
         assertEquals(expected, failureOf(assertThrows(RuntimeException.class, command)));
     }
 
-    // 应用层拒绝与领域规则违反按同一分类比较：违反的 400／409 类别对应 INVALID_REQUEST／CONFLICT。
-    private static IamFailure failureOf(Exception failure) {
-        if (failure instanceof IamRuleViolation rule)
-            return rule.kind() == BusinessRuleViolation.Kind.CONFLICT ? IamFailure.CONFLICT
-                    : IamFailure.INVALID_REQUEST;
-        return assertInstanceOf(IamException.class, failure).failure();
+    // 应用层拒绝与领域规则违反都是 BusinessRuleViolation，按同一类别比较。
+    private static Kind failureOf(Exception failure) {
+        return assertInstanceOf(BusinessRuleViolation.class, failure).kind();
     }
 
     private static Account account(String name) {
@@ -184,13 +179,13 @@ class AccessModelIT {
         var manage = bean(ManageOrganization.class);
         long east = unit(OrganizationUnit.ROOT_ID, "华东");
         long shanghai = unit(east, "上海");
-        assertFailure(IamFailure.CONFLICT, () -> manage.create(admin, east, "上海"));
-        assertFailure(IamFailure.CONFLICT, () -> manage.move(admin, east, version(east), shanghai));
-        assertFailure(IamFailure.CONFLICT, () -> manage.state(admin, OrganizationUnit.ROOT_ID, 1, false));
-        assertFailure(IamFailure.CONFLICT, () -> manage.delete(admin, east, version(east)));
+        assertFailure(Kind.CONFLICT, () -> manage.create(admin, east, "上海"));
+        assertFailure(Kind.CONFLICT, () -> manage.move(admin, east, version(east), shanghai));
+        assertFailure(Kind.CONFLICT, () -> manage.state(admin, OrganizationUnit.ROOT_ID, 1, false));
+        assertFailure(Kind.CONFLICT, () -> manage.delete(admin, east, version(east)));
         member("org.member");
         place("org.member", shanghai);
-        assertFailure(IamFailure.CONFLICT, () -> manage.delete(admin, shanghai, version(shanghai)));
+        assertFailure(Kind.CONFLICT, () -> manage.delete(admin, shanghai, version(shanghai)));
         Account placed = account("org.member");
         bean(ManageAccount.class).memberships(admin, placed.id(), placed.version(), List.of());
         manage.delete(admin, shanghai, version(shanghai));
@@ -204,17 +199,17 @@ class AccessModelIT {
     void grantsFollowCatalog() {
         var manage = bean(ManageRole.class);
         long id = manage.create(admin, "SALES", "销售").targetId();
-        assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
+        assertFailure(Kind.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
                 List.of(grant("sales:order:delete", DataScope.ALL))));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
+        assertFailure(Kind.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
                 List.of(grant(READ, DataScope.NOT_APPLICABLE))));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
+        assertFailure(Kind.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
                 List.of(grant(EXPORT, DataScope.ALL))));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
+        assertFailure(Kind.INVALID_REQUEST, () -> manage.grants(admin, id, 1,
                 List.of(grant("iam:org:manage", DataScope.NOT_APPLICABLE))));
-        assertFailure(IamFailure.CONFLICT, () -> manage.grants(admin, id, 1,
+        assertFailure(Kind.UNPROCESSABLE, () -> manage.grants(admin, id, 1,
                 List.of(grant(READ, DataScope.CUSTOM_DEPARTMENTS, 999L))));
-        assertFailure(IamFailure.CONFLICT, () -> manage.create(admin, "sales", "重复代码"));
+        assertFailure(Kind.CONFLICT, () -> manage.create(admin, "sales", "重复代码"));
         assertEquals(2, manage.grants(admin, id, 1, List.of(grant(READ, DataScope.SELF))).version());
     }
 
@@ -257,9 +252,9 @@ class AccessModelIT {
         long all = role("ALL", grant(READ, DataScope.ALL));
         assign("scope.member", department, custom, all);
         assertTrue(scope("scope.member").all());
-        assertFailure(IamFailure.INVALID_REQUEST,
+        assertFailure(Kind.INVALID_REQUEST,
                 () -> bean(AccessScopes.class).scopes(digest("scope.member"), List.of(EXPORT)));
-        assertFailure(IamFailure.UNAUTHENTICATED,
+        assertFailure(Kind.UNAUTHENTICATED,
                 () -> bean(AccessScopes.class).scopes("0".repeat(64), List.of(READ)));
     }
 
@@ -270,8 +265,8 @@ class AccessModelIT {
         var install = bean(InstallPermissions.class);
         var readOnly = new PermissionInput(READ, "查询订单", true, false);
         assertEquals(1, install.install(admin, "sales", List.of(readOnly)));
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales", List.of()));
-        assertFailure(IamFailure.CONFLICT, () -> install.install(admin, "sales",
+        assertFailure(Kind.CONFLICT, () -> install.install(admin, "sales", List.of()));
+        assertFailure(Kind.CONFLICT, () -> install.install(admin, "sales",
                 List.of(new PermissionInput(READ, "查询订单", false, false))));
         assertEquals(1, sql.auditCount("catalog.install") - 1);
     }
@@ -285,7 +280,7 @@ class AccessModelIT {
         long page = manage.create(admin, new MenuInput(directory, "PAGE", "sales.orders", "订单", "/orders", 1,
                 READ)).targetId();
         manage.create(admin, new MenuInput(page, "BUTTON", "sales.orders.export", "导出", null, 0, EXPORT));
-        assertFailure(IamFailure.CONFLICT, () -> manage.create(admin,
+        assertFailure(Kind.CONFLICT, () -> manage.create(admin,
                 new MenuInput(directory, "BUTTON", "sales.bad", "坏按钮", null, 0, EXPORT)));
         var queries = bean(MenuQueries.class);
         assertEquals(List.of("sales", "sales.orders"), codes(queries.visible(Set.of(READ))));
@@ -294,7 +289,7 @@ class AccessModelIT {
         assertTrue(queries.visible(Set.of(EXPORT)).isEmpty());
         manage.state(admin, directory, 1, false);
         assertTrue(queries.visible(Set.of(READ, EXPORT)).isEmpty());
-        assertFailure(IamFailure.CONFLICT, () -> bean(InstallPermissions.class)
+        assertFailure(Kind.CONFLICT, () -> bean(InstallPermissions.class)
                 .install(admin, "sales", List.of()));
     }
 
@@ -307,12 +302,12 @@ class AccessModelIT {
     void systemAdministratorIsPreserved() {
         Account system = account(ADMIN);
         var manage = bean(ManageAccount.class);
-        assertFailure(IamFailure.CONFLICT, () -> manage.roles(admin, system.id(), system.version(), Set.of()));
-        assertFailure(IamFailure.CONFLICT, () -> bean(ManageRole.class).state(admin, SystemRole.ADMIN_ID, 1, false));
+        assertFailure(Kind.CONFLICT, () -> manage.roles(admin, system.id(), system.version(), Set.of()));
+        assertFailure(Kind.CONFLICT, () -> bean(ManageRole.class).state(admin, SystemRole.ADMIN_ID, 1, false));
         member("reader");
         assign("reader", role("ORG_READER", grant("iam:org:read", DataScope.NOT_APPLICABLE)));
         String reader = digest("reader");
-        assertFailure(IamFailure.FORBIDDEN, () -> bean(ManageOrganization.class)
+        assertFailure(Kind.FORBIDDEN, () -> bean(ManageOrganization.class)
                 .create(reader, OrganizationUnit.ROOT_ID, "越权"));
         assertEquals(1L, bean(AccountRepository.class).systemAdministrators());
     }
@@ -324,9 +319,9 @@ class AccessModelIT {
         long sales = role("SALES", grant(READ, DataScope.SELF));
         assign("holder", sales);
         var manage = bean(ManageRole.class);
-        assertFailure(IamFailure.CONFLICT, () -> manage.delete(admin, sales, 2));
+        assertFailure(Kind.CONFLICT, () -> manage.delete(admin, sales, 2));
         manage.state(admin, sales, 2, false);
-        assertFailure(IamFailure.CONFLICT, () -> manage.delete(admin, sales, 3));
+        assertFailure(Kind.CONFLICT, () -> manage.delete(admin, sales, 3));
         assign("holder");
         manage.delete(admin, sales, 3);
         assertEquals(1, sql.auditCount("role.delete"));

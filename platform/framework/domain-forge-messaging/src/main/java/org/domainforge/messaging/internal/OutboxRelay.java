@@ -8,6 +8,7 @@ import io.micrometer.tracing.Tracer;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.message.MessageBuilder;
 import org.apache.rocketmq.client.apis.producer.Producer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -133,9 +134,9 @@ public final class OutboxRelay implements SmartLifecycle {
         return new Batch(rows.size(), delivered, false);
     }
 
-    private Exception send(OutboxRow row) {
+    private @Nullable Exception send(OutboxRow row) {
         Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
-        try (Tracer.SpanInScope ignored = traces.scope(span)) {
+        try (Tracer.SpanInScope _ = traces.scope(span)) {
             producer.send(message(row, traces.inject(span)));
             return null;
         } catch (Exception failure) {

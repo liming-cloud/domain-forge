@@ -11,7 +11,7 @@
 
 | 任务涉及 | 规则卡 | 参考 |
 |---|---|---|
-| 写 Java 代码（任何改动） | [S-01、S-06](docs/rules/02-系统设计.md#职责与依赖)，[C-01–C-16](docs/rules/04-源码质量.md) | |
+| 写 Java 代码（任何改动） | [S-01、S-06](docs/rules/02-系统设计.md#职责与依赖)，[C-01–C-18](docs/rules/04-源码质量.md) | |
 | 新增或修改业务用例、领域模型 | [W-01–W-04](docs/workflow/01-开发流程.md#需求与设计)，[R-05–R-14](docs/rules/01-需求与领域建模.md)，[S-07–S-15](docs/rules/02-系统设计.md) | |
 | SQL、Mapper、迁移 | [P-01–P-18](docs/rules/05-持久化.md) | [持久化组件](docs/reference/components/persistence.md) |
 | 事务、一致性、集成事件 | [S-11、S-12、S-15、S-20–S-23](docs/rules/02-系统设计.md#事务与一致性) | [消息与 Outbox](docs/reference/components/messaging.md) |
@@ -50,6 +50,7 @@ scripts/smoke_service.sh <服务>                          # 单服务冒烟，�
 - [S-06](docs/rules/02-系统设计.md#s-06-用包划分边界跨边界只经公开合同) 跨上下文只引用 `application.contract`，不访问其他组件的 `internal` 包。
 - [P-03](docs/rules/05-持久化.md#p-03-sql-写在-mapper-xml) SQL 只写在 Mapper XML 或合法的 MyBatis-Plus 链式条件里。
 - [C-09](docs/rules/04-源码质量.md#c-09-每个生产类型都有中文说明) 每个生产类型有中文说明；[C-13](docs/rules/04-源码质量.md#c-13-方法复杂度上限) 圈复杂度 ≤ 10，可执行语句 ≤ 30。
+- [C-17](docs/rules/04-源码质量.md#c-17-空值用-jspecify-声明) 每个包的 `package-info.java` 标 `@NullMarked`；[C-18](docs/rules/04-源码质量.md#c-18-编译零告警) 编译零告警；领域层与应用层不抛通用异常；日志只用 slf4j。
 - [B-05](docs/rules/03-技术与构建.md#b-05-直接使用的依赖必须显式声明) 直接用到的依赖显式声明；[C-03](docs/rules/04-源码质量.md#c-03-统一代码格式) 格式以 Spotless 的输出为准。
 
 ## 需要先停下来问人的事

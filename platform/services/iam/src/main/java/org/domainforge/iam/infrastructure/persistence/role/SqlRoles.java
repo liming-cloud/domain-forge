@@ -1,11 +1,11 @@
 package org.domainforge.iam.infrastructure.persistence.role;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.role.Role;
 import org.domainforge.iam.domain.repository.RoleRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ public class SqlRoles implements RoleRepository {
     }
 
     @Override
-    public Role lock(long id) {
+    public @Nullable Role lock(long id) {
         RoleRow row = mapper.lock(id);
         if (row == null) return null;
         Map<String, String> scopes = new LinkedHashMap<>();
@@ -59,7 +59,7 @@ public class SqlRoles implements RoleRepository {
 
     @Override
     public void update(Role role, long expected) {
-        if (mapper.update(row(role), expected) != 1) throw new IamException(IamFailure.CONFLICT, "角色版本已变化");
+        if (mapper.update(row(role), expected) != 1) throw IamException.conflict("VERSION_CONFLICT", "角色版本已变化");
         mapper.deleteGrants(role.id());
         writeGrants(role);
     }

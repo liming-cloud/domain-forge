@@ -1,9 +1,9 @@
 package org.domainforge.iam.infrastructure.persistence.invitation;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 import org.domainforge.iam.domain.repository.InvitationRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -20,17 +20,17 @@ public class SqlInvitations implements InvitationRepository {
         this.mapper = mapper;
     }
 
-    private static RegistrationInvitation domain(InvitationRow row) {
+    private static @Nullable RegistrationInvitation domain(@Nullable InvitationRow row) {
         return row == null ? null : row.toDomain();
     }
 
     @Override
-    public RegistrationInvitation lockByDigest(String digest) {
+    public @Nullable RegistrationInvitation lockByDigest(String digest) {
         return domain(mapper.byDigest(digest));
     }
 
     @Override
-    public RegistrationInvitation lock(long id) {
+    public @Nullable RegistrationInvitation lock(long id) {
         return domain(mapper.lock(id));
     }
 
@@ -45,7 +45,7 @@ public class SqlInvitations implements InvitationRepository {
     @Override
     public void invalidate(RegistrationInvitation invitation) {
         if (mapper.invalidate(InvitationRow.from(invitation)) != 1) {
-            throw new IamException(IamFailure.CONFLICT, "邀请状态已变化");
+            throw IamException.conflict("VERSION_CONFLICT", "邀请状态已变化");
         }
     }
 }

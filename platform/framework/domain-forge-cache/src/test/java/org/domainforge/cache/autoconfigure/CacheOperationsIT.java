@@ -22,6 +22,7 @@ import org.springframework.transaction.support.AbstractPlatformTransactionManage
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.Serial;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -334,6 +335,9 @@ class CacheOperationsIT {
      * 不连接数据库的本地事务管理器，只驱动 Spring 事务同步。
      */
     static final class LocalTransactions extends AbstractPlatformTransactionManager {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         @Override
         protected Object doGetTransaction() {
             return new Object();

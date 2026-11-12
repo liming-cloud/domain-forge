@@ -1,8 +1,8 @@
 package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.InMemoryIam;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,8 +50,8 @@ class LogoutTest {
         String other = iam.nativeSessions.issue(USER);
         signedIn(other);
 
-        assertFailure(IamFailure.INVALID_REQUEST, () -> logout.execute(identity, other));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> logout.execute(identity, null));
+        assertFailure(Kind.INVALID_REQUEST, () -> logout.execute(identity, other));
+        assertFailure(Kind.INVALID_REQUEST, () -> logout.execute(identity, null));
         assertEquals(identity, iam.sessions.current(identity.tokenDigest()));
         assertTrue(iam.nativeSessions.live.containsKey(other));
         assertTrue(iam.writes.isEmpty());

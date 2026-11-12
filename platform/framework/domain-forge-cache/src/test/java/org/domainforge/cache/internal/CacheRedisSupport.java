@@ -27,12 +27,15 @@ final class CacheRedisSupport {
     }
 
     static RedissonClient client(String user, String password) {
-        var config = new Config().setProtocol(Protocol.RESP3).setThreads(2).setNettyThreads(2);
+        var config = new Config()
+                .setProtocol(Protocol.RESP3)
+                .setThreads(2)
+                .setNettyThreads(2)
+                .setUsername(user)
+                .setPassword(password);
         config
                 .useSingleServer()
                 .setAddress("redis://127.0.0.1:" + required("REDIS_PORT"))
-                .setUsername(user)
-                .setPassword(password)
                 .setRetryAttempts(0)
                 .setTimeout(1000)
                 .setConnectionMinimumIdleSize(1)

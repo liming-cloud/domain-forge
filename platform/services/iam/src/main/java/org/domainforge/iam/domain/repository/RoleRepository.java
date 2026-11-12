@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.role.Role;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 角色聚合仓储（含授予与自定义范围组织）。
@@ -9,6 +10,7 @@ public interface RoleRepository {
     /**
      * 锁定角色直到事务结束，不存在返回 null。
      */
+    @Nullable
     Role lock(long id);
 
     /**

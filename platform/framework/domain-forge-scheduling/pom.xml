@@ -9,6 +9,10 @@
     </parent>
     <artifactId>domain-forge-scheduling</artifactId>
     <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <!-- 只用 HTTP 通信：排除 akka 与 mu 传输实现。 -->
         <dependency>
             <groupId>tech.powerjob</groupId>

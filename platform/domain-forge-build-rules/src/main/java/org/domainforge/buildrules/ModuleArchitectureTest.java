@@ -38,7 +38,7 @@ class ModuleArchitectureTest {
      * 耦合度量只报告不拦截：写入 target/architecture-metrics.txt 并打印。
      */
     private static void writeMetricsReport(Path base, JavaClasses imported) {
-        String report = ComponentRules.report(imported);
+        String report = ComponentRules.report(ArchitectureRules.types(imported));
         if (report.isEmpty()) {
             return;
         }

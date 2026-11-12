@@ -1,5 +1,7 @@
 package @@PACKAGE@@.domain.model.order;
 
+import org.jspecify.annotations.Nullable;
+
 import @@PACKAGE@@.domain.event.OrderSubmitted;
 import org.jmolecules.ddd.annotation.AggregateRoot;
 import org.jmolecules.ddd.annotation.Identity;
@@ -28,13 +30,13 @@ public final class Order {
     @Identity
     private final long id;
     private final long ownerId;
-    private final Long unitId;
+    private final @Nullable Long unitId;
     private final OrderStatus status;
     private final List<OrderLine> lines;
     private final long version;
     private final OrderSubmitted submitted;
 
-    private Order(long id, long ownerId, Long unitId, OrderStatus status, List<OrderLine> lines, long version,
+    private Order(long id, long ownerId, @Nullable Long unitId, OrderStatus status, List<OrderLine> lines, long version,
                   OrderSubmitted submitted) {
         if (id <= 0 || ownerId <= 0 || version < 1 || (unitId != null && unitId <= 0) || status == null)
             throw OrderRuleViolation.invalid("订单身份、归属、状态或版本无效");
@@ -62,14 +64,14 @@ public final class Order {
     /**
      * 下单人在给定组织（或不归属组织）下新建草稿订单，可带初始订单行。
      */
-    public static Order draft(long id, long ownerId, Long unitId, List<OrderLine> lines) {
+    public static Order draft(long id, long ownerId, @Nullable Long unitId, List<OrderLine> lines) {
         return new Order(id, ownerId, unitId, OrderStatus.DRAFT, lines, 1, null);
     }
 
     /**
      * 从存储恢复；恢复也校验全部不变式。
      */
-    public static Order restore(long id, long ownerId, Long unitId, OrderStatus status, List<OrderLine> lines,
+    public static Order restore(long id, long ownerId, @Nullable Long unitId, OrderStatus status, List<OrderLine> lines,
                                 long version) {
         return new Order(id, ownerId, unitId, status, lines, version, null);
     }
@@ -146,7 +148,7 @@ public final class Order {
     /**
      * 所属组织 ID；不归属组织为 null。
      */
-    public Long unitId() {
+    public @Nullable Long unitId() {
         return unitId;
     }
 

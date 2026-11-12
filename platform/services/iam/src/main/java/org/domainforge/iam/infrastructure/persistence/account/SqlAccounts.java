@@ -1,10 +1,10 @@
 package org.domainforge.iam.infrastructure.persistence.account;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashSet;
@@ -24,18 +24,18 @@ public class SqlAccounts implements AccountRepository {
         this.mapper = mapper;
     }
 
-    private Account domain(AccountRow row) {
+    private @Nullable Account domain(@Nullable AccountRow row) {
         if (row == null) return null;
         return row.toDomain(new HashSet<>(mapper.roles(row.id())), new HashSet<>(mapper.memberships(row.id())));
     }
 
     @Override
-    public Account find(long id) {
+    public @Nullable Account find(long id) {
         return domain(mapper.find(id));
     }
 
     @Override
-    public Account findByLoginName(String name) {
+    public @Nullable Account findByLoginName(String name) {
         return domain(mapper.byName(name));
     }
 
@@ -62,7 +62,7 @@ public class SqlAccounts implements AccountRepository {
     @Override
     public void update(Account current, Account changed) {
         if (mapper.update(AccountRow.from(changed), current.version()) != 1) {
-            throw new IamException(IamFailure.CONFLICT, "账号版本已变化");
+            throw IamException.conflict("VERSION_CONFLICT", "账号版本已变化");
         }
         if (!changed.roleIds().equals(current.roleIds())) {
             mapper.deleteRoles(changed.id());
