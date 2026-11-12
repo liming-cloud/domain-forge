@@ -19,7 +19,7 @@
 
 ## 前提
 
-- Linux 主机，Docker Engine 与 Compose v2；JDK 21（用于构建 IAM 与网关 jar）；`python3`（`upgrade.sh` 读取 Compose 配置）；启用 HTTPS 时需要 `openssl`（`tls-reload.sh` 检查证书）。
+- Linux 主机，Docker Engine 与 Compose v2；JDK 25（用于构建 IAM 与网关 jar）；`python3`（`upgrade.sh` 读取 Compose 配置）；启用 HTTPS 时需要 `openssl`（`tls-reload.sh` 检查证书）。
 - 网段 `172.31.250.0/24` 未被主机其他网络占用。冲突时同步修改 `compose.yml` 中的网段、Nginx 与网关的固定地址、网关的 `GATEWAY_TRUSTED_PROXIES`（Nginx 地址）和 IAM 的 `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES`（网关地址）。
 
 ## 首次部署
@@ -94,6 +94,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env down   
 | PostgreSQL（IAM 与各业务服务的 schema，含对象属主） | `backup.sh` 在线逻辑备份 | 回到备份时刻，之后的变更丢失；业务服务数据库账号由其 `db-init` 按环境文件重建 |
 | 其他业务数据库（服务的附加数据源，如归档库 `<schema>_archive`） | `backup.sh` 逐个导出为同名 `.db.<库名>.dump` | `restore.sh` 按备份重建（保留属主，账号与库由服务的 db-init 先建好）；备份中没有的库保持不变 |
 | 业务服务的文件（命名卷 `<服务名>-files`） | `backup.sh` 在导出数据库之后打包为同名 `.files.<服务名>.tar` | `restore.sh` 用备份替换卷中的内容；备份时刻之后上传的文件消失，多出的对象由清理任务删除。备份中没有该文件（功能上线前的备份）时保留现有文件并提示 |
+| Java 服务的 AOT 缓存（命名卷 `<服务名>-aot`） | 不备份 | 不受恢复影响；卷丢失时下次启动重新训练（见[启动与 AOT 缓存](#启动与-aot-缓存)） |
 | RocketMQ 中的消息 | 不备份，消费进度不随恢复回退 | 恢复前须停止写入并等事件消费完毕（见[消息](#消息)） |
 | Redis（会话、登录防护计数、缓存） | 不备份 | 恢复时重启清空：所有用户需重新登录，恢复前的令牌全部失效 |
 | Nacos 配置（含控制台修改） | `backup.sh` 经管理接口导出为同名 `.nacos.json` | `restore.sh` 发布备份中的每项配置；Nacos 中存在而备份中没有的配置保持不变 |
@@ -157,6 +158,16 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 - 备份：`backup.sh` 经管理接口导出全部配置（含控制台修改），`restore.sh` 一并恢复，见[备份与恢复](#备份与恢复)。
 - IAM 的登录防护阈值由 Nacos 管理，环境变量 `IAM_LOGIN_*_ATTEMPTS`／`_WINDOW_SECONDS` 只在未启用配置中心的本地开发中生效。
 
+## 启动与 AOT 缓存
+
+Java 服务镜像（`jvm/Dockerfile`）解包运行，入口 `jvm/start.sh` 用 JVM AOT 缓存（JEP 483/514）缩短启动，取舍见[决定 0026](../docs/decisions/0026-升级Java25并启用AOT缓存.md)，效果见[性能基线](../docs/platform/性能基线.md#启动)：
+
+- **位置**：服务的命名卷 `<服务名>-aot`（容器内 `/var/lib/domain-forge/aot`），文件名是构建镜像时按 jar、依赖与 JDK 算出的指纹。缓存不进入备份，删掉卷只会让下次启动重新训练。
+- **训练**：容器启动时找不到本镜像的缓存，就先做一次训练运行：刷新完整上下文（连接数据库、Redis、Nacos，执行 Flyway）后在启动 Web 服务器之前退出，写出缓存，再正式启动。所以新镜像首次启动要多花一次上下文刷新的时间，之后重启直接用缓存。训练运行不在 Nacos 注册、不执行初始化管理员等启动任务；定时任务 worker 会短暂连上 PowerJob。
+- **日志**：训练输出写在卷中的 `training.log`，其中的 JSON 行同时转到容器日志（含 Flyway 迁移记录）。训练失败时不带缓存照常启动，只是慢一些。
+- **回退**：卷中保留最近两份缓存，应用回退到上一个镜像时直接命中。
+- **不匹配**：缓存与 jar 或 JDK 不符（文件被替换或损坏）时 JVM 忽略它照常启动，容器日志中出现 `[error][aot]` 开头的非 JSON 行；删除卷中该文件后重启即重新训练。
+
 ## 升级与回退
 
 镜像标签由环境文件中的 `IAM_IMAGE_TAG` 决定，建议使用应用版本号，旧版本镜像保留到确认不再回退。
@@ -170,7 +181,7 @@ IAM_IMAGE_TAG=<新版本> docker compose -f deploy/compose.yml --env-file /etc/d
 deploy/upgrade.sh /etc/domain-forge/df.env /var/backups/domain-forge
 ```
 
-替换期间入口返回 502；IAM 启动时 Flyway 执行新版本的迁移。脚本失败时以非零退出并打印升级前备份的路径。
+替换期间入口返回 502；旧容器停止后，新镜像首次启动的训练运行执行新版本的迁移（见[启动与 AOT 缓存](#启动与-aot-缓存)），正式启动时 Flyway 不再有待执行的迁移。脚本失败时以非零退出并打印升级前备份的路径。
 
 | 情况 | 回退方式 | 数据 |
 |---|---|---|

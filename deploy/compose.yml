@@ -252,6 +252,8 @@ services:
       IAM_SCHEDULING_ENABLED: "true"
       IAM_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
       IAM_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
+    volumes:
+      - iam-aot:/var/lib/domain-forge/aot
     networks: [backend]
     depends_on:
       postgres:
@@ -291,6 +293,8 @@ services:
       GATEWAY_TRUSTED_PROXIES: 172.31.250.10
       # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
       GATEWAY_MANAGEMENT_ADDRESS: 0.0.0.0
+    volumes:
+      - gateway-aot:/var/lib/domain-forge/aot
     networks:
       backend:
         ipv4_address: 172.31.250.11
@@ -346,3 +350,6 @@ volumes:
   nacos-data:
   # 消息存储：不进入备份。Outbox 在 PostgreSQL 中，是待发送事件的权威来源；丢失该卷会丢失已发送、尚未消费的消息。
   rocketmq-store:
+  # AOT 缓存（见 deploy/jvm/start.sh）：不进入备份，丢失后下次启动重新训练。
+  iam-aot:
+  gateway-aot:
