@@ -16,8 +16,8 @@ platform/                      Maven 工程（parent 与聚合入口：platform/
   domain-forge-bom/            平台组件的版本管理
   domain-forge-build-rules/    统一架构规则与 Checkstyle 配置，所有模块自动执行
   shared/                      纯共享类型
-  framework/                   12 个通用组件：web-support、persistence、cache、access-control、config、
-                               service-call、messaging、scheduling、tracing、file-storage、notification、idempotency
+  framework/                   13 个通用组件：web-support、persistence、cache、access-control、config、
+                               service-call、messaging、scheduling、tracing、file-storage、notification、idempotency、defaults
   services/                    平台服务：iam（身份权限）、gateway（API 网关）；业务服务也放在这里
   templates/ddd-service/       业务服务生成模板
 deploy/                        Docker Compose 部署参考

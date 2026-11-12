@@ -38,7 +38,7 @@ public final class TraceContexts {
      * 以给定 traceparent 为父开启子 span；没有父上下文时开启新链路。
      */
     Span start(String traceParent, String name, Span.Kind kind) {
-        if (traceParent == null) return tracer.nextSpan().name(name).start();
+        if (traceParent == null) return tracer.spanBuilder().name(name).kind(kind).start();
         Map<String, String> carrier = Map.of(TRACE_PARENT, traceParent);
         return propagator.extract(carrier, Map::get).name(name).kind(kind).start();
     }

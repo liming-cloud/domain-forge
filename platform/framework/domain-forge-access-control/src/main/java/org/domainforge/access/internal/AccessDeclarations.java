@@ -1,6 +1,14 @@
 package org.domainforge.access.internal;
 
-import cn.dev33.satoken.annotation.*;
+import cn.dev33.satoken.annotation.SaCheckDisable;
+import cn.dev33.satoken.annotation.SaCheckHttpBasic;
+import cn.dev33.satoken.annotation.SaCheckHttpDigest;
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckOr;
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaCheckSafe;
+import cn.dev33.satoken.annotation.SaIgnore;
 import cn.dev33.satoken.strategy.SaAnnotationStrategy;
 import org.springframework.web.method.HandlerMethod;
 
