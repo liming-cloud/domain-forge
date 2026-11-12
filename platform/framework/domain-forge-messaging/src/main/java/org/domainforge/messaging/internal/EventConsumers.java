@@ -73,7 +73,7 @@ public final class EventConsumers implements SmartLifecycle {
     ConsumeResult consume(EventHandler handler, MessageView message) {
         Span span = traces.start(message.getProperties().get(TraceContexts.TRACE_PARENT), "consume " + handler.topic(),
                 Span.Kind.CONSUMER).tag("messaging.consumer.group", handler.group());
-        try (Tracer.SpanInScope ignored = traces.scope(span)) {
+        try (Tracer.SpanInScope _ = traces.scope(span)) {
             return consume(handler, event(message), span);
         } finally {
             span.end();

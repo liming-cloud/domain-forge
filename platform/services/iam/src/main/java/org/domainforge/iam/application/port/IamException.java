@@ -1,9 +1,14 @@
 package org.domainforge.iam.application.port;
 
+import java.io.Serial;
+
 /**
  * 只携带可公开的稳定分类与说明；不将框架异常消息转交客户端。
  */
 public final class IamException extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final IamFailure failure;
     private final long retryAfterSeconds;
 

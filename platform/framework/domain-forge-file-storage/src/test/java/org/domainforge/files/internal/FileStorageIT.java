@@ -114,8 +114,7 @@ class FileStorageIT {
                 "--domainforge.files.s3.access-key=" + env("S3_ACCESS_KEY"),
                 "--domainforge.files.s3.secret-key=" + env("S3_SECRET_KEY"),
                 "--domainforge.files.s3.attempt-timeout=PT3S",
-                "--domainforge.files.s3.call-timeout=PT8S",
-                "--domainforge.files.s3.socket-timeout=PT3S"};
+                "--domainforge.files.s3.call-timeout=PT8S"};
     }
 
     private static ConfigurableApplicationContext start(String... storage) {

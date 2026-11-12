@@ -2,10 +2,15 @@ package org.domainforge.servicecall.api;
 
 import org.domainforge.shared.DependencyUnavailableException;
 
+import java.io.Serial;
+
 /**
  * 跨服务调用的失败；调用方不翻译时，web-support 统一按依赖不可用返回 503。消息为固定文本，不包含对方响应内容、地址或令牌。
  */
 public final class ServiceCallException extends DependencyUnavailableException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final ServiceCallFailure failure;
     private final String code;
 

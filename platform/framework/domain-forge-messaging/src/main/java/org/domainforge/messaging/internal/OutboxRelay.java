@@ -135,7 +135,7 @@ public final class OutboxRelay implements SmartLifecycle {
 
     private Exception send(OutboxRow row) {
         Span span = traces.start(row.traceParent(), "send " + row.topic(), Span.Kind.PRODUCER);
-        try (Tracer.SpanInScope ignored = traces.scope(span)) {
+        try (Tracer.SpanInScope _ = traces.scope(span)) {
             producer.send(message(row, traces.inject(span)));
             return null;
         } catch (Exception failure) {

@@ -2,10 +2,15 @@ package org.domainforge.files.api;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
+import java.io.Serial;
+
 /**
  * 上传不符合策略。组件把它按类别转为 4xx，代码见 {@link Reason}。
  */
 public final class FileRejected extends BusinessRuleViolation {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final Reason reason;
 
     /**

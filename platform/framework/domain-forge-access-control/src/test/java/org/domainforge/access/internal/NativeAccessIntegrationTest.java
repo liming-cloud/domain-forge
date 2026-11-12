@@ -145,7 +145,7 @@ class NativeAccessIntegrationTest {
 
     private static void assertStartupFails(Class<?> invalid) {
         assertThrows(RuntimeException.class, () -> {
-            try (var ignored = start(invalid)) {
+            try (var _ = start(invalid)) {
                 fail("非法声明不应启动成功：" + invalid.getSimpleName());
             }
         });

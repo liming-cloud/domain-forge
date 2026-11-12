@@ -13,6 +13,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 
+import java.io.Serial;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -102,18 +103,27 @@ class ProblemContractTest {
     }
 
     static final class Violation extends BusinessRuleViolation {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         Violation(Kind kind, String code, String message) {
             super(kind, code, message);
         }
     }
 
     static final class Unavailable extends DependencyUnavailableException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         Unavailable(String message) {
             super(message, null);
         }
     }
 
     static final class ForeignFailure extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
     }
 
     public static final class ForeignTranslator implements FailureTranslator {

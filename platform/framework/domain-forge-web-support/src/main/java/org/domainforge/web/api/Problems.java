@@ -3,6 +3,8 @@ package org.domainforge.web.api;
 import jakarta.servlet.http.HttpServletResponse;
 import org.domainforge.shared.BusinessRuleViolation;
 import org.domainforge.shared.DependencyUnavailableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -18,7 +20,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
-import java.util.logging.Logger;
 
 /**
  * 失败的唯一分派点：业务规则违反按类别返回 4xx，依赖不可用返回 503，其余一律 500；响应体为 RFC 9457 Problem Details，
@@ -27,7 +28,7 @@ import java.util.logging.Logger;
  * <p>组件和服务不注册自己的全局异常处理；需要自带处理器的入口（如 IAM）也用 {@link #dispatch(Exception)} 取得同一结果。
  */
 public final class Problems {
-    private static final Logger LOGGER = Logger.getLogger(Problems.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(Problems.class);
     private static final List<FailureTranslator> TRANSLATORS = loadTranslators();
     private static final int MAX_CAUSE_DEPTH = 4;
     private static final int MAX_FRAMES = 8;
@@ -54,7 +55,7 @@ public final class Problems {
             return of(status(violation.kind()), violation.code(), violation.getMessage());
         }
         if (failure instanceof DependencyUnavailableException) {
-            LOGGER.severe(() -> diagnostic("dependency-unavailable", failure));
+            LOGGER.atError().log(() -> diagnostic("dependency-unavailable", failure));
             return of(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "服务暂不可用");
         }
         if (failure instanceof MaxUploadSizeExceededException) {
@@ -66,7 +67,7 @@ public final class Problems {
                 || failure instanceof MultipartException) {
             return of(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "请求不合法");
         }
-        LOGGER.severe(() -> diagnostic("unhandled", failure));
+        LOGGER.atError().log(() -> diagnostic("unhandled", failure));
         return of(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务处理失败");
     }
 

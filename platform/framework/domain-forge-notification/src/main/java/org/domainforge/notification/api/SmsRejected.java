@@ -2,10 +2,15 @@ package org.domainforge.notification.api;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
+import java.io.Serial;
+
 /**
  * 服务商拒绝了这条短信（号码无效、频控）。组件按类别转为 4xx，代码见 {@link Reason}。
  */
 public final class SmsRejected extends BusinessRuleViolation {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final Reason reason;
 
     /**

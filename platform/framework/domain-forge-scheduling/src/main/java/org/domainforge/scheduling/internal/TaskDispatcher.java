@@ -59,7 +59,7 @@ public final class TaskDispatcher implements BasicProcessor {
         }
         Span span = tracer.nextSpan().name("task " + name).tag("task.instance", context.getInstanceId()).start();
         Timer.Sample sample = Timer.start(metrics);
-        try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+        try (Tracer.SpanInScope _ = tracer.withSpan(span)) {
             task.run(new TaskRun(context.getInstanceId(), parameters(context)));
             record(name, "success", sample);
             return new ProcessResult(true, "ok");
