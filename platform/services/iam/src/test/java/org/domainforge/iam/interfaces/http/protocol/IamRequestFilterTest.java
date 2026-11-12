@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 请求实际字节边界与媒体类型无关，不依赖声明的Content-Length。
@@ -23,7 +24,9 @@ class IamRequestFilterTest {
             var response = new MockHttpServletResponse();
             var reached = new AtomicBoolean();
             new IamRequestFilter().doFilter(request, response, (input, output) -> reached.set(true));
-            assertEquals(400, response.getStatus(), media);
+            assertEquals(413, response.getStatus(), media);
+            assertEquals("application/problem+json;charset=UTF-8", response.getContentType(), media);
+            assertTrue(response.getContentAsString().contains("\"code\":\"PAYLOAD_TOO_LARGE\""), media);
             assertFalse(reached.get(), media);
         }
     }

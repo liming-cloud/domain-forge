@@ -37,11 +37,4 @@ public record GatewaySettings(List<RouteSettings> routes, RateLimitSettings rate
         return routes.stream().filter(route -> route.specificity(path) >= 0)
                 .max(Comparator.comparingInt(route -> route.specificity(path)));
     }
-
-    /**
-     * 按标识查找当前路由。
-     */
-    public Optional<RouteSettings> route(String id) {
-        return routes.stream().filter(route -> route.id().equals(id)).findFirst();
-    }
 }

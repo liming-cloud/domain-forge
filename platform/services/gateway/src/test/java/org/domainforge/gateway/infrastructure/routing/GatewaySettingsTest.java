@@ -49,7 +49,7 @@ class GatewaySettingsTest {
         assertThrows(IllegalArgumentException.class, () -> new GatewaySettings(List.of(), LIMIT));
         assertThrows(IllegalArgumentException.class, () -> new RateLimitSettings(0, 10));
         assertThrows(IllegalArgumentException.class, () -> new RateLimitSettings(10, 5));
-        assertEquals("iam", new GatewaySettings(List.of(iam), LIMIT).route("iam").orElseThrow().id());
+        assertEquals("iam", new GatewaySettings(List.of(iam), LIMIT).routes().getFirst().id());
     }
 
     // 字面前缀越长越先匹配，业务服务的具体前缀优先于 IAM 的 /api/**。

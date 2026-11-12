@@ -239,7 +239,7 @@
     </dependencies>
     <build>
         <plugins>
-            <!-- 集成测试依赖：postgres,redis，配置见 platform parent。 -->
+            <!-- 集成测试依赖：postgres、redis、nacos，配置见 platform parent。 -->
             <plugin>
                 <groupId>io.fabric8</groupId>
                 <artifactId>docker-maven-plugin</artifactId>

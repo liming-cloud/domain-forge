@@ -18,11 +18,6 @@ import java.util.List;
  */
 @Component
 public class SettingsRouteLocator implements RouteLocator {
-    /**
-     * 路由元数据中的配置路由标识，过滤器据此查找匿名清单。
-     */
-    public static final String ROUTE_ID = "domainforge.route-id";
-
     private final DynamicSettings<GatewaySettings> settings;
 
     /**
@@ -61,7 +56,6 @@ public class SettingsRouteLocator implements RouteLocator {
                 .id(route.id() + "#" + index)
                 .uri(URI.create("lb://" + route.service()))
                 .order(-specificity(path))
-                .metadata(ROUTE_ID, route.id())
                 .predicate(exchange -> pattern.matches(exchange.getRequest().getPath().pathWithinApplication()))
                 .build();
     }

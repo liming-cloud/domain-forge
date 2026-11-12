@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.domainforge.web.api.Problems;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -11,7 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * IAM JSON输入有界且响应不缓存；对分块请求同样限制实际读取字节，不信任Content-Length。
+ * IAM JSON输入有界且响应不缓存；对分块请求同样限制实际读取字节，不信任Content-Length。超限返回 413 Problem Details。
  */
 @Component
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -27,12 +28,7 @@ public final class IamRequestFilter extends OncePerRequestFilter {
         response.setHeader("Pragma", "no-cache");
         byte[] bytes = request.getInputStream().readNBytes(16385);
         if (bytes.length > 16384) {
-            response.setStatus(400);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-            response
-                    .getWriter()
-                    .write("{\"code\":\"INVALID_REQUEST\",\"message\":\"请求内容过大\",\"data\":null}");
+            Problems.write(response, 413, "PAYLOAD_TOO_LARGE", "请求内容过大");
             return;
         }
         chain.doFilter(new BoundedJsonRequest(request, bytes), response);
