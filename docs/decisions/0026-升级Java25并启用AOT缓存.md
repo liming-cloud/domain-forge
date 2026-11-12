@@ -5,7 +5,7 @@
 
 ## 背景
 
-[启动基线](../platform/性能基线.md#启动)显示服务启动受 CPU 限制：1 核下 IAM `Started` 9.9 秒、order-service 10.5 秒，大头是 JVM 加载、链接约 2.2 万个类与 Spring 装配，没有单个外部依赖的等待超过 0.5 秒。Spring Boot 推荐在 Java 25 及以上用 JVM AOT 缓存（JEP 483/514）取代 CDS（[AOT Cache](https://docs.spring.io/spring-boot/reference/packaging/aot-cache.html)、[Efficient Deployments](https://docs.spring.io/spring-boot/reference/packaging/efficient.html)），它预先加载、链接类并记录方法画像，正对这部分开销。
+启动基线（平台仓库 `docs/platform/性能基线.md` 的“启动”一节）显示服务启动受 CPU 限制：1 核下 IAM `Started` 9.9 秒、order-service 10.5 秒，大头是 JVM 加载、链接约 2.2 万个类与 Spring 装配，没有单个外部依赖的等待超过 0.5 秒。Spring Boot 推荐在 Java 25 及以上用 JVM AOT 缓存（JEP 483/514）取代 CDS（[AOT Cache](https://docs.spring.io/spring-boot/reference/packaging/aot-cache.html)、[Efficient Deployments](https://docs.spring.io/spring-boot/reference/packaging/efficient.html)），它预先加载、链接类并记录方法画像，正对这部分开销。
 
 ## 决定
 
@@ -24,7 +24,7 @@
 
 ## 后果
 
-- 1 核 `Started`：IAM 9.9 → 3.5 秒，order-service 10.5 → 4.9 秒；容器启动到就绪 11.5 → 4.8 秒、12.3 → 6.3 秒；首个请求不高于基线，达到 #157 的目标（[性能基线](../platform/性能基线.md#结果java-25aot-缓存2026-11-12)）。启动期 GC 降到约 20 次、0.4 秒，运行镜像不显式设置初始堆或 GC（原 #167）。
+- 1 核 `Started`：IAM 9.9 → 3.5 秒，order-service 10.5 → 4.9 秒；容器启动到就绪 11.5 → 4.8 秒、12.3 → 6.3 秒；首个请求不高于基线，达到 #157 的目标（同一文件的“结果：Java 25＋AOT 缓存”）。启动期 GC 降到约 20 次、0.4 秒，运行镜像不显式设置初始堆或 GC（原 #167）。
 - 新镜像首次启动多一次上下文刷新（训练），之后的重启直接用缓存。迁移仍在旧容器停止后、由新镜像首次启动执行，升级与回退流程不变；应用回退到上一个镜像时命中卷中保留的旧缓存。
 - 训练运行中定时任务 worker 会短暂连上 PowerJob（它在 Bean 初始化时启动），不在 Nacos 注册、不执行 `ApplicationRunner`。
 - 缓存文件被替换或损坏时 JVM 忽略它照常启动（较慢），容器日志出现 `[error][aot]` 开头的非 JSON 行，作为异常信号保留；删除该文件后重启即重新训练。

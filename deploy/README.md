@@ -160,7 +160,7 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 
 ## 启动与 AOT 缓存
 
-Java 服务镜像（`jvm/Dockerfile`）解包运行，入口 `jvm/start.sh` 用 JVM AOT 缓存（JEP 483/514）缩短启动，取舍见[决定 0026](../docs/decisions/0026-升级Java25并启用AOT缓存.md)，效果见[性能基线](../docs/platform/性能基线.md#启动)：
+Java 服务镜像（`jvm/Dockerfile`）解包运行，入口 `jvm/start.sh` 用 JVM AOT 缓存（JEP 483/514）缩短启动，取舍见[决定 0026](../docs/decisions/0026-升级Java25并启用AOT缓存.md)，效果见性能基线（平台仓库 `docs/platform/性能基线.md` 的“启动”一节）：
 
 - **位置**：服务的命名卷 `<服务名>-aot`（容器内 `/var/lib/domain-forge/aot`），文件名是构建镜像时按 jar、依赖与 JDK 算出的指纹。缓存不进入备份，删掉卷只会让下次启动重新训练。
 - **训练**：容器启动时找不到本镜像的缓存，就先做一次训练运行：刷新完整上下文（连接数据库、Redis、Nacos，执行 Flyway）后在启动 Web 服务器之前退出，写出缓存，再正式启动。所以新镜像首次启动要多花一次上下文刷新的时间，之后重启直接用缓存。训练运行不在 Nacos 注册、不执行初始化管理员等启动任务；定时任务 worker 会短暂连上 PowerJob。
