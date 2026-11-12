@@ -2,10 +2,15 @@ package @@PACKAGE@@.domain.model.order;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
+import java.io.Serial;
+
 /**
  * 订单聚合的规则违反：错误码稳定，提示是固定说明，可以对外返回。
  */
 public final class OrderRuleViolation extends BusinessRuleViolation {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private OrderRuleViolation(Kind kind, String code, String message) {
         super(kind, code, message);
     }
