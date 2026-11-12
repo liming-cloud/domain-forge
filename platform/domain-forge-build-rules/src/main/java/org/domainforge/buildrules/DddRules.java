@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * DDD 规则：聚合引用与实体归属（jMolecules）、领域层不抛通用异常、应用层不翻译领域异常、仓储只针对聚合根、 一个用例方法只写一个聚合。
+ * DDD 规则：聚合引用与实体归属（jMolecules）、领域层与应用层不抛通用异常、应用层不翻译领域异常、仓储只针对聚合根、 一个用例方法只写一个聚合。
  *
  * <p>聚合根、实体、值对象由 jMolecules 注解或接口标识；仓储是 {@code domain.repository} 包中的类型。
  */
@@ -52,9 +52,10 @@ final class DddRules {
         for (JavaClass type : classes) {
             String layer = layer(type);
             if ("domain".equals(layer)) {
-                checkGenericExceptions(type, violations);
+                checkGenericExceptions(type, "领域层", violations);
                 checkRepository(type, violations);
             } else if ("application".equals(layer)) {
+                checkGenericExceptions(type, "应用层", violations);
                 checkCaughtDomainExceptions(type, violations);
                 checkSingleAggregateWrites(type, violations);
             }
@@ -73,16 +74,16 @@ final class DddRules {
         }
     }
 
-    private static void checkGenericExceptions(JavaClass type, List<String> violations) {
+    private static void checkGenericExceptions(JavaClass type, String layerName, List<String> violations) {
         type.getConstructorCallsFromSelf().stream()
                 .filter(call -> GENERIC_EXCEPTIONS.contains(call.getTargetOwner().getName()))
                 .forEach(call -> violations.add(
-                        "[领域异常] "
+                        "[通用异常] "
                                 + type.getName()
                                 + "." + call.getOrigin().getName()
-                                + "：领域层不得抛出 "
+                                + "：" + layerName + "不得抛出 "
                                 + call.getTargetOwner().getSimpleName()
-                                + "，应使用 BusinessRuleViolation 子类"));
+                                + "，应使用 BusinessRuleViolation 子类（输入无效用 INVALID_REQUEST）"));
     }
 
     private static void checkCaughtDomainExceptions(JavaClass type, List<String> violations) {

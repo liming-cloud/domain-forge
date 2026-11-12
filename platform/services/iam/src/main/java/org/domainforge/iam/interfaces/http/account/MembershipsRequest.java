@@ -1,6 +1,7 @@
 package org.domainforge.iam.interfaces.http.account;
 
 import org.domainforge.iam.application.command.account.MembershipInput;
+import org.domainforge.iam.interfaces.http.protocol.Ids;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,7 +26,7 @@ public record MembershipsRequest(long expectedVersion, List<AccountDetailRespons
      * 转为应用输入。
      */
     List<MembershipInput> toInput() {
-        return memberships.stream().map(item -> new MembershipInput(Long.parseLong(item.unitId()), item.primary()))
+        return memberships.stream().map(item -> new MembershipInput(Ids.parse(item.unitId()), item.primary()))
                 .toList();
     }
 }

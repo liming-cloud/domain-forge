@@ -1,8 +1,8 @@
 package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.InMemoryIam;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.SessionGrant;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
@@ -45,9 +45,9 @@ class LoginTest {
         iam.account(USER + 1, "disabled");
         iam.accounts.rows.put(USER + 1, iam.accounts.find(USER + 1).changeEnabled(false));
 
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login.execute("user", "wrong", "127.0.0.1"));
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login.execute("nobody", "secret", "127.0.0.1"));
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> login.execute("disabled", "secret", "127.0.0.1"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login.execute("user", "wrong", "127.0.0.1"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login.execute("nobody", "secret", "127.0.0.1"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> login.execute("disabled", "secret", "127.0.0.1"));
         assertTrue(iam.writes.isEmpty());
         assertTrue(iam.nativeSessions.live.isEmpty());
         assertEquals(3, iam.protection.pending.size(), "失败保留预占计数");
@@ -56,7 +56,7 @@ class LoginTest {
     @Test
     void rateLimitedAttemptDoesNotCheckPassword() {
         iam.protection.limited = true;
-        assertFailure(IamFailure.RATE_LIMITED, () -> login.execute("user", "secret", "127.0.0.1"));
+        assertFailure(Kind.RATE_LIMITED, () -> login.execute("user", "secret", "127.0.0.1"));
         assertTrue(iam.writes.isEmpty());
         assertTrue(iam.nativeSessions.live.isEmpty());
     }
@@ -74,7 +74,7 @@ class LoginTest {
         Login racing = new Login(iam.accounts, iam.passwords, iam.protection, iam.nativeSessions,
                 iam.sessions, iam.secrets, changedFirst, iam.clock);
 
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> racing.execute("user", "secret", "127.0.0.1"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> racing.execute("user", "secret", "127.0.0.1"));
         assertTrue(iam.sessions.grants.isEmpty());
         assertTrue(iam.nativeSessions.live.isEmpty());
     }

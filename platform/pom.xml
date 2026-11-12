@@ -516,8 +516,7 @@
                             <goal>analyze-only</goal>
                         </goals>
                         <configuration>
-                            <!-- 零告警：只排除 processing（注解处理器不认领 Spring、JUnit 等注解时必然告警，无法在源码中消除）。 -->
-                        <failOnWarning>true</failOnWarning>
+                            <failOnWarning>true</failOnWarning>
                             <ignoreNonCompile>false</ignoreNonCompile>
                             <ignoreAllNonTestScoped>true</ignoreAllNonTestScoped>
                             <ignoredUnusedDeclaredDependencies>

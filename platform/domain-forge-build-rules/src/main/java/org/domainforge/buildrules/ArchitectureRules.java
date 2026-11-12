@@ -1,10 +1,12 @@
 package org.domainforge.buildrules;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,6 +49,9 @@ public final class ArchitectureRules {
 
     /** 领域层可用的 shared 类型：只有业务规则违反基类，其余 shared 类型带有传输或主体语义。 */
     private static final Set<String> DOMAIN_ALLOWED_TYPES = Set.of("org.domainforge.shared.BusinessRuleViolation");
+
+    /** JSpecify 空值注解：只是类型元数据，领域层与应用层都可使用。 */
+    private static final String NULLNESS = "org.jspecify.annotations";
 
     private static final List<String> FORBIDDEN_JDK = List.of("java.sql", "java.net.http");
 
@@ -98,7 +103,8 @@ public final class ArchitectureRules {
      * @param classes 同一模块的生产类
      * @return 违规说明
      */
-    public static List<String> check(JavaClasses classes) {
+    public static List<String> check(JavaClasses imported) {
+        JavaClasses classes = types(imported);
         Set<String> roots =
                 classes.stream()
                         .map(type -> locate(type.getPackageName()))
@@ -118,13 +124,22 @@ public final class ArchitectureRules {
         ComponentRules.check(classes, violations);
         DddRules.check(classes, violations);
         AutoConfigurationRules.check(classes, violations);
+        ConventionRules.check(classes, violations);
         return violations.stream().distinct().sorted().toList();
+    }
+
+    /**
+     * 去掉 package-info：它只承载包注解，不是类型，不参与依赖、职责与度量规则。
+     */
+    static JavaClasses types(JavaClasses imported) {
+        return imported.that(DescribedPredicate.describe("不是 package-info",
+                type -> !"package-info".equals(type.getSimpleName())));
     }
 
     /**
      * 找到第一个职责段，职责段之前为上下文根。
      */
-    static Location locate(String packageName) {
+    static @Nullable Location locate(String packageName) {
         List<String> segments = Arrays.asList(packageName.split("\\."));
         for (int index = 1; index < segments.size(); index++) {
             if (LAYERS.contains(segments.get(index))) {
@@ -195,18 +210,19 @@ public final class ArchitectureRules {
         }
     }
 
-    private static String technicalProblem(String layer, JavaClass target) {
+    private static @Nullable String technicalProblem(String layer, JavaClass target) {
         String name = target.getName();
         String targetPackage = target.getPackageName();
         return switch (layer) {
             case "domain" -> domainAllowed(name, targetPackage)
                     ? null
-                    : "领域只能依赖 JDK、shared.BusinessRuleViolation 与 org.jmolecules.ddd";
+                    : "领域只能依赖 JDK、shared.BusinessRuleViolation、org.jmolecules.ddd 与 JSpecify 空值注解";
             case "application" -> sharedOrJdk(targetPackage)
                     || componentApi(targetPackage)
                     || APPLICATION_SPRING_TYPES.contains(name)
+                    || inside(targetPackage, NULLNESS)
                             ? null
-                            : "应用层只能依赖 JDK、shared、组件 api 包及允许的 Spring 装配／事务类型";
+                            : "应用层只能依赖 JDK、shared、组件 api 包、JSpecify 空值注解及允许的 Spring 装配／事务类型";
             case "interfaces" -> startsWithAny(targetPackage, INTERFACES_FORBIDDEN)
                     ? "入口层不得直接使用 SQL／Mapper／Redis 客户端"
                     : null;
@@ -216,7 +232,7 @@ public final class ArchitectureRules {
 
     private static boolean domainAllowed(String name, String targetPackage) {
         return jdk(targetPackage) || DOMAIN_ALLOWED_TYPES.contains(outerName(name))
-                || inside(targetPackage, "org.jmolecules.ddd");
+                || inside(targetPackage, "org.jmolecules.ddd") || inside(targetPackage, NULLNESS);
     }
 
     private static String outerName(String name) {

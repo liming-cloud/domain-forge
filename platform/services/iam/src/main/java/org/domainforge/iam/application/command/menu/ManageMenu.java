@@ -4,7 +4,6 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -61,9 +60,10 @@ public class ManageMenu {
                 input.path(),
                 input.sortOrder(), input.permission());
         requirePermission(item.permission());
-        if (menus.codeTaken(item.code())) throw new IamException(IamFailure.CONFLICT, "菜单代码已存在");
+        if (menus.codeTaken(item.code())) throw IamException.conflict("MENU_CODE_TAKEN", "菜单代码已存在");
         MenuItem parent = input.parentId() == null ? null : menus.lock(input.parentId());
-        if (input.parentId() != null && parent == null) throw new IamException(IamFailure.CONFLICT, "父菜单不存在");
+        if (input.parentId() != null && parent == null)
+            throw IamException.unprocessable("MENU_PARENT_UNKNOWN", "父菜单不存在");
         item.requireParent(parent);
         menus.insert(item);
         record(actor, item.id(), "menu.create");
@@ -96,7 +96,7 @@ public class ManageMenu {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         MenuItem current = lock(id, version);
         MenuItem parent = parentId == null ? null : menus.lock(parentId);
-        if (parentId != null && parent == null) throw new IamException(IamFailure.CONFLICT, "父菜单不存在");
+        if (parentId != null && parent == null) throw IamException.unprocessable("MENU_PARENT_UNKNOWN", "父菜单不存在");
         current.requireParent(parent);
         List<Long> ancestors = parentId == null ? List.of() : menus.ancestors(parentId);
         return save(actor, current, current.moveTo(parentId, ancestors), "menu.move");
@@ -123,19 +123,19 @@ public class ManageMenu {
         menus.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         lock(id, version);
-        if (menus.hasChildren(id)) throw new IamException(IamFailure.CONFLICT, "菜单仍有下级");
+        if (menus.hasChildren(id)) throw IamException.conflict("MENU_IN_USE", "菜单仍有下级");
         menus.delete(id);
         record(actor, id, "menu.delete");
     }
 
     private void requirePermission(String permission) {
         if (permission != null && catalog.find(List.of(permission)).isEmpty())
-            throw new IamException(IamFailure.CONFLICT, "关联的权限不在目录中");
+            throw IamException.unprocessable("MENU_PERMISSION_UNKNOWN", "关联的权限不在目录中");
     }
 
     private MenuItem lock(long id, long version) {
         MenuItem item = menus.lock(id);
-        return ExpectedVersion.current(item, item == null ? 0 : item.version(), version);
+        return ExpectedVersion.current(item, MenuItem::version, version, "MENU_NOT_FOUND");
     }
 
     private CommandResult save(CurrentIdentity actor, MenuItem current, MenuItem changed, String action) {

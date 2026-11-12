@@ -1,5 +1,7 @@
 package org.domainforge.iam.application.port.authentication;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * 会话许可和当前账号的SQL交集，不信任只存在于Redis的令牌。
  */
@@ -12,6 +14,7 @@ public interface SessionStore {
     /**
      * 用本次新语句读取主库状态；无有效交集返回null。
      */
+    @Nullable
     CurrentIdentity current(String tokenDigest);
 
     /**

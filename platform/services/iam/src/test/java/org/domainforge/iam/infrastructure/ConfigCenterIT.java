@@ -6,10 +6,10 @@ import ch.qos.logback.core.status.StatusUtil;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.bootstrap.IamApplication;
 import org.domainforge.iam.infrastructure.configuration.LoginProtectionSettings;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -164,7 +164,7 @@ class ConfigCenterIT {
             try {
                 bean(LoginProtection.class).reserve(name, "127.0.0.20");
             } catch (IamException limited) {
-                assertEquals(IamFailure.RATE_LIMITED, limited.failure());
+                assertEquals(Kind.RATE_LIMITED, limited.kind());
                 return attempt;
             }
         }

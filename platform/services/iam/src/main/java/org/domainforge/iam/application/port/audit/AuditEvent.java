@@ -1,5 +1,7 @@
 package org.domainforge.iam.application.port.audit;
 
+import org.domainforge.iam.application.port.IamException;
+
 /**
  * 一次已完成的关键管理变更：可信操作者、目标对象和固定动作名，不携带请求内容或凭据。
  *
@@ -13,7 +15,7 @@ public record AuditEvent(String actor, long targetId, String action) {
      */
     public AuditEvent {
         if (actor == null || actor.isBlank() || targetId <= 0 || action == null || action.isBlank()) {
-            throw new IllegalArgumentException("审计事件不完整");
+            throw IamException.invalid("审计事件不完整");
         }
     }
 }

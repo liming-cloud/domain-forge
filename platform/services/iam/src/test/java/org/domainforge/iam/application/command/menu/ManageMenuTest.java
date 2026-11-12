@@ -2,9 +2,9 @@ package org.domainforge.iam.application.command.menu;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.menu.MenuItem;
 import org.domainforge.iam.domain.model.menu.MenuType;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -51,11 +51,14 @@ class ManageMenuTest {
         iam.writes.clear();
         String operator = iam.actor(20, false, "iam:menu:manage");
 
-        assertFailure(IamFailure.CONFLICT, () -> create(null, "PAGE", "orders", "/o", "sales:order:delete"));
-        assertFailure(IamFailure.CONFLICT, () -> create(null, "DIRECTORY", "sales", null, null));
-        assertFailure(IamFailure.CONFLICT, () -> create(404L, "PAGE", "orders", "/o", READ));
+        assertEquals("MENU_PERMISSION_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> create(null, "PAGE", "orders", "/o", "sales:order:delete"))
+                        .code());
+        assertFailure(Kind.CONFLICT, () -> create(null, "DIRECTORY", "sales", null, null));
+        assertEquals("MENU_PARENT_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> create(404L, "PAGE", "orders", "/o", READ)).code());
         assertRule("MENU_BUTTON_PARENT", () -> create(directory, "BUTTON", "export", null, READ));
-        assertFailure(IamFailure.FORBIDDEN, () -> menus.create(operator,
+        assertFailure(Kind.FORBIDDEN, () -> menus.create(operator,
                 new MenuInput(null, "DIRECTORY", "other", "其他", null, 0, null)));
         assertEquals(1, iam.menus.rows.size());
         assertTrue(iam.writes.isEmpty());
@@ -66,8 +69,11 @@ class ManageMenuTest {
         long page = create(null, "PAGE", "orders", "/orders", READ);
         iam.writes.clear();
 
-        assertFailure(IamFailure.CONFLICT, () -> menus.update(admin, page, 1, "订单", "/o", 1, "sales:x:y"));
-        assertFailure(IamFailure.CONFLICT, () -> menus.update(admin, page, 2, "订单", "/o", 1, READ));
+        assertEquals("MENU_PERMISSION_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> menus.update(admin, page, 1, "订单", "/o", 1, "sales:x:y"))
+                        .code());
+        assertEquals("VERSION_CONFLICT",
+                assertFailure(Kind.CONFLICT, () -> menus.update(admin, page, 2, "订单", "/o", 1, READ)).code());
         assertTrue(iam.writes.isEmpty());
 
         assertEquals(new CommandResult(page, 2), menus.update(admin, page, 1, "订单", "/o", 1, READ));
@@ -95,7 +101,7 @@ class ManageMenuTest {
         long child = create(top, "DIRECTORY", "child", null, null);
         iam.writes.clear();
 
-        assertFailure(IamFailure.CONFLICT, () -> menus.delete(admin, top, 1));
+        assertFailure(Kind.CONFLICT, () -> menus.delete(admin, top, 1));
         assertTrue(iam.writes.isEmpty());
 
         menus.delete(admin, child, 1);

@@ -1,6 +1,7 @@
 package org.domainforge.iam.domain.repository;
 
 import org.domainforge.iam.domain.model.menu.MenuItem;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -13,6 +14,7 @@ public interface MenuRepository {
      */
     void lockStructure();
 
+    @Nullable
     MenuItem lock(long id);
 
     /**

@@ -1,5 +1,7 @@
 package org.domainforge.iam.application.port.authentication;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * 原生会话技术出口，只有SQL许可交集成立后才可对外确认身份。
  */
@@ -12,6 +14,7 @@ public interface NativeSessions {
     /**
      * 验证当前原生状态，返回登录的账号 ID；会话失效返回 null，存储不可用必须报告故障。
      */
+    @Nullable
     Long subject(String token);
 
     /**

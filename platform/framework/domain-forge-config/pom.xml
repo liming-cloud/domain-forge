@@ -9,6 +9,10 @@
     </parent>
     <artifactId>domain-forge-config</artifactId>
     <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <!-- 加载本组件 META-INF/domain-forge/*-defaults.yml 的默认值。 -->
         <dependency>
             <groupId>org.domainforge</groupId>

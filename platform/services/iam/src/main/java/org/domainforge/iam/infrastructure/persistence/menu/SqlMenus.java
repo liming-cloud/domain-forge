@@ -1,10 +1,10 @@
 package org.domainforge.iam.infrastructure.persistence.menu;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.menu.MenuItem;
 import org.domainforge.iam.domain.repository.MenuRepository;
 import org.domainforge.iam.infrastructure.persistence.operation.Coordination;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,7 +31,7 @@ public class SqlMenus implements MenuRepository {
     }
 
     @Override
-    public MenuItem lock(long id) {
+    public @Nullable MenuItem lock(long id) {
         MenuRow row = mapper.lock(id);
         return row == null ? null : row.toDomain();
     }
@@ -54,7 +54,7 @@ public class SqlMenus implements MenuRepository {
     @Override
     public void update(MenuItem item, long expected) {
         if (mapper.update(MenuRow.from(item), expected) != 1)
-            throw new IamException(IamFailure.CONFLICT, "菜单版本已变化");
+            throw IamException.conflict("VERSION_CONFLICT", "菜单版本已变化");
     }
 
     @Override

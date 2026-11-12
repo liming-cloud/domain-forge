@@ -2,6 +2,7 @@ package org.domainforge.files.internal;
 
 import org.domainforge.files.api.FileStorageUnavailableException;
 import org.domainforge.files.api.ObjectStorage;
+import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -56,7 +57,7 @@ final class S3ObjectStorage implements ObjectStorage, AutoCloseable {
     }
 
     @Override
-    public InputStream read(String key) {
+    public @Nullable InputStream read(String key) {
         try {
             return client.getObject(request -> request.bucket(bucket).key(prefix + key));
         } catch (NoSuchKeyException missing) {

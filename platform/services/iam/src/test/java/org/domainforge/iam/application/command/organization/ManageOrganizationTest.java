@@ -2,10 +2,10 @@ package org.domainforge.iam.application.command.organization;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.account.Membership;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,9 +40,10 @@ class ManageOrganizationTest {
     void createRejectsMissingParentDuplicateNameOrNonSystemOperator() {
         iam.unit(2, ROOT, "销售部");
         String operator = iam.actor(20, false, "iam:org:manage");
-        assertFailure(IamFailure.CONFLICT, () -> units.create(admin, 404, "研发部"));
-        assertFailure(IamFailure.CONFLICT, () -> units.create(admin, ROOT, "销售部"));
-        assertFailure(IamFailure.FORBIDDEN, () -> units.create(operator, ROOT, "研发部"));
+        assertEquals("ORG_PARENT_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> units.create(admin, 404, "研发部")).code());
+        assertEquals("ORG_NAME_TAKEN", assertFailure(Kind.CONFLICT, () -> units.create(admin, ROOT, "销售部")).code());
+        assertFailure(Kind.FORBIDDEN, () -> units.create(operator, ROOT, "研发部"));
         assertEquals(2, iam.organizations.rows.size());
         assertTrue(iam.writes.isEmpty());
     }
@@ -55,7 +56,8 @@ class ManageOrganizationTest {
 
         assertRule("ORG_MOVE_CYCLE", () -> units.move(admin, 2, 1, 3));
         assertRule("ORG_ROOT_MOVE", () -> units.move(admin, ROOT, 1, 2));
-        assertFailure(IamFailure.CONFLICT, () -> units.move(admin, 3, 1, 404));
+        assertEquals("ORG_PARENT_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> units.move(admin, 3, 1, 404)).code());
         assertTrue(iam.writes.isEmpty());
 
         assertEquals(new CommandResult(3, 2), units.move(admin, 3, 1, 4));
@@ -70,7 +72,7 @@ class ManageOrganizationTest {
         assertFalse(iam.organizations.lock(2).enabled());
         iam.writes.clear();
         assertRule("ORG_ROOT_DISABLE", () -> units.state(admin, ROOT, 1, false));
-        assertFailure(IamFailure.CONFLICT, () -> units.rename(admin, 2, 1, "旧版本"));
+        assertFailure(Kind.CONFLICT, () -> units.rename(admin, 2, 1, "旧版本"));
         assertTrue(iam.writes.isEmpty());
     }
 
@@ -79,7 +81,7 @@ class ManageOrganizationTest {
         iam.unit(2, ROOT, "销售部");
         iam.accounts.rows.put(20L, new Account(20, "user", "hash:secret", 1, 1, true, Set.of(),
                 Set.of(new Membership(2, true))));
-        assertFailure(IamFailure.CONFLICT, () -> units.delete(admin, 2, 1));
+        assertFailure(Kind.CONFLICT, () -> units.delete(admin, 2, 1));
         assertRule("ORG_ROOT_DELETE", () -> units.delete(admin, ROOT, 1));
         assertTrue(iam.organizations.rows.containsKey(2L));
         assertTrue(iam.writes.isEmpty());

@@ -1,7 +1,6 @@
 package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.LoginProtection;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
 import org.domainforge.iam.application.port.authentication.Passwords;
@@ -55,7 +54,7 @@ public final class Login {
     }
 
     private static IamException rejected() {
-        return new IamException(IamFailure.UNAUTHENTICATED, "登录凭据无效");
+        return IamException.unauthenticated("LOGIN_FAILED", "登录凭据无效");
     }
 
     /**

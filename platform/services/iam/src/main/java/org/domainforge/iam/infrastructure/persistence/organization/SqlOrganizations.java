@@ -1,10 +1,10 @@
 package org.domainforge.iam.infrastructure.persistence.organization;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
 import org.domainforge.iam.domain.repository.OrganizationRepository;
 import org.domainforge.iam.infrastructure.persistence.operation.Coordination;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -32,7 +32,7 @@ public class SqlOrganizations implements OrganizationRepository {
     }
 
     @Override
-    public OrganizationUnit lock(long id) {
+    public @Nullable OrganizationUnit lock(long id) {
         OrganizationUnitRow row = mapper.lock(id);
         return row == null ? null : row.toDomain();
     }
@@ -60,7 +60,7 @@ public class SqlOrganizations implements OrganizationRepository {
     @Override
     public void update(OrganizationUnit unit, long expected) {
         if (mapper.update(OrganizationUnitRow.from(unit), expected) != 1)
-            throw new IamException(IamFailure.CONFLICT, "组织版本已变化");
+            throw IamException.conflict("VERSION_CONFLICT", "组织版本已变化");
     }
 
     @Override

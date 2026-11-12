@@ -1,7 +1,6 @@
 package org.domainforge.iam.infrastructure.query.audit;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.query.audit.AuditQueries;
 import org.domainforge.iam.application.query.audit.AuditView;
 import org.springframework.stereotype.Repository;
@@ -28,7 +27,7 @@ public class SqlAuditQueries implements AuditQueries {
     @Override
     public List<AuditView> list(long after, int limit) {
         if (after < 0 || limit < 1 || limit > 100)
-            throw new IamException(IamFailure.INVALID_REQUEST, "审计分页输入无效");
+            throw IamException.invalid("审计分页输入无效");
         return mapper.list(after, limit).stream().map(AuditProjection::view).toList();
     }
 }

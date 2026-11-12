@@ -8,6 +8,7 @@ import org.domainforge.files.api.FileUpload;
 import org.domainforge.files.api.ObjectStorage;
 import org.domainforge.files.api.StoredFile;
 import org.domainforge.files.api.UploadPolicy;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -132,7 +133,7 @@ public final class SqlFileStore implements FileStore {
         return valid(fileId) && files.markDeleted(fileId) == 1;
     }
 
-    private FileRow row(String fileId) {
+    private @Nullable FileRow row(String fileId) {
         return valid(fileId) ? files.find(fileId) : null;
     }
 

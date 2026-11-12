@@ -92,7 +92,19 @@ def load_assets(with_example, values, call_peer=None, source=None):
         assets.append((entry.get('root', 'service'), target,
                        render((TEMPLATE / entry['source']).read_text(encoding='utf-8'), values),
                        entry.get('mode', 'create')))
-    return manifest['version'], assets
+    return manifest['version'], assets + package_infos(assets)
+
+
+def package_infos(assets):
+    """每个生成的 Java 生产包补一个标注 @NullMarked 的 package-info，清单不逐包登记（包随示例开关组合而变）。"""
+    main = Path('src/main/java')
+    targets = {target for _, target, _, _ in assets}
+    packages = sorted({target.parent for kind, target, _, _ in assets
+                       if kind == 'service' and target.suffix == '.java' and main in target.parents})
+    return [('service', directory / 'package-info.java',
+             '@NullMarked\npackage ' + '.'.join(directory.relative_to(main).parts)
+             + ';\n\nimport org.jspecify.annotations.NullMarked;\n', 'create')
+            for directory in packages if directory / 'package-info.java' not in targets]
 
 
 def optional_dependencies(with_example, source):

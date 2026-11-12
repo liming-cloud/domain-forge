@@ -23,6 +23,10 @@
         </dependencies>
     </dependencyManagement>
     <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <!-- S3 兼容存储：官方 AWS SDK v2，只用同步客户端及其默认 HTTP 客户端（s3 自带的 apache5-client），不引入 Netty。 -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

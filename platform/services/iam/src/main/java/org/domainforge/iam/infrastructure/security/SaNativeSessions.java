@@ -4,9 +4,9 @@ import cn.dev33.satoken.stp.StpLogic;
 import cn.dev33.satoken.stp.parameter.SaLoginParameter;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.IamUnavailableException;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -24,8 +24,8 @@ public final class SaNativeSessions implements NativeSessions {
         this.cleanupFailures = metrics.counter("iam.session.cleanup.failures");
     }
 
-    private static IamException unavailable() {
-        return new IamException(IamFailure.UNAVAILABLE, "会话存储暂不可用");
+    private static IamUnavailableException unavailable(RuntimeException cause) {
+        return new IamUnavailableException("会话存储暂不可用", cause);
     }
 
     /**
@@ -37,7 +37,7 @@ public final class SaNativeSessions implements NativeSessions {
             return nativeLogic.createLoginSession(
                     Long.toString(accountId), new SaLoginParameter().setTimeout(28800).setIsShare(false));
         } catch (RuntimeException e) {
-            throw unavailable();
+            throw unavailable(e);
         }
     }
 
@@ -45,14 +45,14 @@ public final class SaNativeSessions implements NativeSessions {
      * 原生状态无效返回null，Redis故障与认证失败不混淆。
      */
     @Override
-    public Long subject(String token) {
+    public @Nullable Long subject(String token) {
         try {
             Object id = nativeLogic.getLoginIdByToken(token);
             return id == null ? null : Long.valueOf(id.toString());
         } catch (IllegalArgumentException e) {
             return null;
         } catch (RuntimeException e) {
-            throw unavailable();
+            throw unavailable(e);
         }
     }
 
@@ -61,7 +61,7 @@ public final class SaNativeSessions implements NativeSessions {
         try {
             nativeLogic.logoutByTokenValue(token);
         } catch (RuntimeException e) {
-            throw unavailable();
+            throw unavailable(e);
         }
     }
 

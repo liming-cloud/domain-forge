@@ -1,5 +1,7 @@
 package @@PACKAGE@@.interfaces.http.order;
 
+import org.jspecify.annotations.Nullable;
+
 import @@PACKAGE@@.application.query.order.OrderView;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -9,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 public record OrderResponse(
         @JsonFormat(shape = JsonFormat.Shape.STRING) long id,
         @JsonFormat(shape = JsonFormat.Shape.STRING) long ownerId,
-        @JsonFormat(shape = JsonFormat.Shape.STRING) Long unitId,
+        @JsonFormat(shape = JsonFormat.Shape.STRING) @Nullable Long unitId,
         String status,
         long totalCents,
         long version) {

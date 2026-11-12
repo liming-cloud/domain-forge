@@ -1,5 +1,7 @@
 package @@PACKAGE@@.infrastructure.persistence.order;
 
+import org.jspecify.annotations.Nullable;
+
 import @@PACKAGE@@.domain.model.order.Money;
 import @@PACKAGE@@.domain.model.order.Order;
 import @@PACKAGE@@.domain.model.order.OrderLine;
@@ -22,12 +24,12 @@ public class SqlOrders implements OrderRepository {
     }
 
     @Override
-    public Order lock(long id) {
+    public @Nullable Order lock(long id) {
         return restore(mapper.lock(id));
     }
 
     @Override
-    public Order find(long id) {
+    public @Nullable Order find(long id) {
         return restore(mapper.find(id));
     }
 
@@ -45,7 +47,7 @@ public class SqlOrders implements OrderRepository {
         return true;
     }
 
-    private Order restore(OrderRow row) {
+    private @Nullable Order restore(@Nullable OrderRow row) {
         if (row == null) return null;
         var lines = mapper.lines(row.id()).stream()
                 .map(line -> new OrderLine(line.id(), line.sku(), line.quantity(), new Money(line.unitPriceCents())))

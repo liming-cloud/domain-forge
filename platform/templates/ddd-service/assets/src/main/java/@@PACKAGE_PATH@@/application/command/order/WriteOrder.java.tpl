@@ -1,5 +1,7 @@
 package @@PACKAGE@@.application.command.order;
 
+import org.jspecify.annotations.Nullable;
+
 import @@PACKAGE@@.application.port.access.DataScopes;
 import @@PACKAGE@@.application.port.operation.Identifiers;
 import @@PACKAGE@@.domain.model.order.Money;
@@ -41,7 +43,7 @@ public class WriteOrder {
      * 新建草稿订单：不归属组织时需要本人范围，归属组织时该组织须在写范围内。
      */
     @Transactional
-    public OrderChange create(Long unitId, List<LineInput> lines) {
+    public OrderChange create(@Nullable Long unitId, List<LineInput> lines) {
         long account = access.current().accountId();
         CurrentScope scope = scopes.scope(OrderPermissions.WRITE);
         if (!OrderAccess.creatable(unitId, scope)) throw new AccessException(AccessFailure.FORBIDDEN);

@@ -1,7 +1,6 @@
 package org.domainforge.iam.application.command.account;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.Passwords;
@@ -50,7 +49,7 @@ public final class InitializeAdministrator {
         String name = new LoginName(loginName).value();
         String digest = passwords.encode(password);
         Long created = transactions.execute(status -> {
-            if (guard.lock()) throw new IamException(IamFailure.CONFLICT, "项目已经初始化");
+            if (guard.lock()) throw IamException.conflict("ALREADY_INITIALIZED", "项目已经初始化");
             Account account = Account.administrator(identifiers.next(), name, digest);
             accounts.insert(account);
             guard.markInitialized();

@@ -61,6 +61,15 @@ class GenerateTest(unittest.TestCase):
             if path.is_file():
                 self.assertNotIn('@@', path.read_text(encoding='utf-8'), path)
 
+    def test_every_generated_package_is_null_marked(self):
+        generate.generate(self.root, 'order-service', 'com.company.order', with_example=True, source='peer-service')
+        main = self.root / 'platform/services/order-service/src/main/java'
+        packages = {path.parent for path in main.rglob('*.java')}
+        self.assertTrue(packages)
+        for directory in packages:
+            info = (directory / 'package-info.java').read_text(encoding='utf-8')
+            self.assertIn('@NullMarked\npackage ' + '.'.join(directory.relative_to(main).parts) + ';', info)
+
     def test_example_uses_namespace_schema_and_environment_prefix(self):
         generate.generate(self.root, 'retail-order', 'com.company.retail', 'retail', with_example=True)
         output = self.root / 'platform' / 'services' / 'retail-order'

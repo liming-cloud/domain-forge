@@ -4,7 +4,6 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -48,7 +47,7 @@ public class ManageOrganization {
     public CommandResult create(String tokenDigest, long parentId, String name) {
         units.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
-        if (units.lock(parentId) == null) throw new IamException(IamFailure.CONFLICT, "父组织不存在");
+        if (units.lock(parentId) == null) throw IamException.unprocessable("ORG_PARENT_UNKNOWN", "父组织不存在");
         OrganizationUnit unit = OrganizationUnit.create(identifiers.next(), parentId, name);
         requireUniqueName(unit);
         units.insert(unit);
@@ -80,7 +79,7 @@ public class ManageOrganization {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
         var ancestors = units.ancestors(parentId);
-        if (ancestors.isEmpty()) throw new IamException(IamFailure.CONFLICT, "父组织不存在");
+        if (ancestors.isEmpty()) throw IamException.unprocessable("ORG_PARENT_UNKNOWN", "父组织不存在");
         OrganizationUnit changed = current.moveTo(parentId, ancestors);
         requireUniqueName(changed);
         return save(actor, current, changed, "org.move");
@@ -108,19 +107,19 @@ public class ManageOrganization {
         var actor = authorization.requireSystem(tokenDigest, PERMISSION);
         OrganizationUnit current = lock(id, version);
         current.requireDeletable();
-        if (units.referenced(id)) throw new IamException(IamFailure.CONFLICT, "组织仍有下级、成员或范围引用");
+        if (units.referenced(id)) throw IamException.conflict("ORG_IN_USE", "组织仍有下级、成员或范围引用");
         units.delete(id);
         record(actor, id, "org.delete");
     }
 
     private void requireUniqueName(OrganizationUnit unit) {
         if (unit.parentId() != null && units.nameTaken(unit.parentId(), unit.name(), unit.id()))
-            throw new IamException(IamFailure.CONFLICT, "同级已有同名组织");
+            throw IamException.conflict("ORG_NAME_TAKEN", "同级已有同名组织");
     }
 
     private OrganizationUnit lock(long id, long version) {
         OrganizationUnit unit = units.lock(id);
-        return ExpectedVersion.current(unit, unit == null ? 0 : unit.version(), version);
+        return ExpectedVersion.current(unit, OrganizationUnit::version, version, "ORG_NOT_FOUND");
     }
 
     private CommandResult save(

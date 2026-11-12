@@ -1,7 +1,6 @@
 package org.domainforge.iam.application.authorization;
 
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.authentication.NativeSessions;
 import org.domainforge.iam.application.port.authentication.SecretOperations;
@@ -28,7 +27,7 @@ public final class CurrentAuthorization {
     }
 
     private static IamException unauthenticated() {
-        return new IamException(IamFailure.UNAUTHENTICATED, "需要有效登录");
+        return IamException.unauthenticated("UNAUTHENTICATED", "需要有效登录");
     }
 
     /**
@@ -50,7 +49,7 @@ public final class CurrentAuthorization {
         CurrentIdentity current = sessions.current(tokenDigest);
         if (current == null) throw unauthenticated();
         if (permission != null && !current.permissions().contains(permission))
-            throw new IamException(IamFailure.FORBIDDEN, "无权执行该操作");
+            throw IamException.forbidden("无权执行该操作");
         return current;
     }
 
@@ -59,7 +58,7 @@ public final class CurrentAuthorization {
      */
     public CurrentIdentity requireSystem(String tokenDigest, String permission) {
         CurrentIdentity current = require(tokenDigest, permission);
-        if (!current.systemAdministrator()) throw new IamException(IamFailure.FORBIDDEN, "仅系统管理员可执行该操作");
+        if (!current.systemAdministrator()) throw IamException.forbidden("仅系统管理员可执行该操作");
         return current;
     }
 }

@@ -7,6 +7,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.library.metrics.ArchitectureMetrics;
 import com.tngtech.archunit.library.metrics.ComponentDependencyMetrics;
 import com.tngtech.archunit.library.metrics.MetricsComponents;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -38,7 +39,7 @@ final class ComponentRules {
     /**
      * 组件标识：服务为“上下文根:职责段”，框架组件为“组件根:子包段”；不属于任何组件的类返回 null。
      */
-    static String component(JavaClass type) {
+    static @Nullable String component(JavaClass type) {
         String packageName = type.getPackageName();
         ArchitectureRules.Location location = ArchitectureRules.locate(packageName);
         if (location != null) {

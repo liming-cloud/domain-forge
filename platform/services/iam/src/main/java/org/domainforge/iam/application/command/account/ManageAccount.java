@@ -4,7 +4,6 @@ import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
 import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
@@ -67,7 +66,7 @@ public class ManageAccount {
         var actor = authorization.require(tokenDigest, "iam:account:state");
         Account current = currentAccount(target, version);
         if (current.roleIds().contains(SystemRole.ADMIN_ID) && !actor.systemAdministrator())
-            throw new IamException(IamFailure.FORBIDDEN, "只有系统管理员可以修改系统管理员账号");
+            throw IamException.forbidden("只有系统管理员可以修改系统管理员账号");
         return save(current, current.changeEnabled(enabled), actor, "account.state");
     }
 
@@ -78,13 +77,13 @@ public class ManageAccount {
     public CommandResult roles(String tokenDigest, long target, long version, Set<Long> roleIds) {
         ExpectedVersion.require(target, version);
         if (roleIds == null || roleIds.size() > Account.MAX_ROLES)
-            throw new IamException(IamFailure.INVALID_REQUEST, "角色分配无效");
+            throw IamException.invalid("角色分配无效");
         guard.lock();
         var actor = authorization.requireSystem(tokenDigest, "iam:account:role");
         Account current = currentAccount(target, version);
         for (long roleId : new TreeSet<>(roleIds)) {
             Role role = roles.lock(roleId);
-            if (role == null || !role.enabled()) throw new IamException(IamFailure.CONFLICT, "角色不存在或已停用");
+            if (role == null || !role.enabled()) throw IamException.unprocessable("ROLE_UNAVAILABLE", "角色不存在或已停用");
         }
         return save(current, current.changeRoles(roleIds), actor, "account.roles");
     }
@@ -95,7 +94,7 @@ public class ManageAccount {
     @Transactional
     public CommandResult memberships(String tokenDigest, long target, long version, List<MembershipInput> inputs) {
         ExpectedVersion.require(target, version);
-        if (inputs == null) throw new IamException(IamFailure.INVALID_REQUEST, "成员归属无效");
+        if (inputs == null) throw IamException.invalid("成员归属无效");
         Set<Membership> memberships = toMemberships(inputs);
         organizations.lockStructure();
         var actor = authorization.requireSystem(tokenDigest, "iam:member:manage");
@@ -103,7 +102,7 @@ public class ManageAccount {
         Account changed = current.changeMemberships(memberships);
         var units = changed.memberships().stream().map(Membership::unitId).toList();
         if (organizations.existing(units) != units.size())
-            throw new IamException(IamFailure.CONFLICT, "组织不存在");
+            throw IamException.unprocessable("MEMBERSHIP_UNIT_UNKNOWN", "组织不存在");
         return save(current, changed, actor, "account.memberships");
     }
 
@@ -111,7 +110,7 @@ public class ManageAccount {
         Set<Membership> values = new HashSet<>();
         for (MembershipInput input : inputs) {
             if (!values.add(new Membership(input.unitId(), input.primary())))
-                throw new IllegalArgumentException("成员归属重复");
+                throw IamException.invalid("成员归属重复");
         }
         return values;
     }
@@ -121,7 +120,7 @@ public class ManageAccount {
      */
     private Account currentAccount(long target, long version) {
         Account account = accounts.find(target);
-        return ExpectedVersion.current(account, account == null ? 0 : account.version(), version);
+        return ExpectedVersion.current(account, Account::version, version, "ACCOUNT_NOT_FOUND");
     }
 
     /**
@@ -131,7 +130,7 @@ public class ManageAccount {
         if (current.isSystemAdministrator()
                 && !changed.isSystemAdministrator()
                 && accounts.systemAdministrators() <= 1) {
-            throw new IamException(IamFailure.CONFLICT, "必须保留至少一名启用的系统管理员");
+            throw IamException.conflict("LAST_ADMINISTRATOR", "必须保留至少一名启用的系统管理员");
         }
         if (changed != current) {
             accounts.update(current, changed);

@@ -2,20 +2,20 @@ package org.domainforge.iam.application.command.role;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.shared.SystemRole;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
 
 import static org.domainforge.iam.application.FailureAssertions.assertFailure;
+import static org.domainforge.iam.application.FailureAssertions.assertInvalidRequest;
 import static org.domainforge.iam.domain.RuleAssertions.assertRule;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -49,8 +49,8 @@ class ManageRoleTest {
     @Test
     void createRejectsTakenCodeOrNonSystemOperator() {
         String operator = iam.actor(20, false, "iam:role:manage");
-        assertFailure(IamFailure.CONFLICT, () -> roles.create(admin, "sales", "重复"));
-        assertFailure(IamFailure.FORBIDDEN, () -> roles.create(operator, "Support", "客服"));
+        assertEquals("ROLE_CODE_TAKEN", assertFailure(Kind.CONFLICT, () -> roles.create(admin, "sales", "重复")).code());
+        assertFailure(Kind.FORBIDDEN, () -> roles.create(operator, "Support", "客服"));
         assertEquals(2, iam.roles.rows.size());
         assertTrue(iam.writes.isEmpty());
     }
@@ -58,7 +58,7 @@ class ManageRoleTest {
     @Test
     void renameAndStateFollowVersion() {
         assertEquals(new CommandResult(SALES, 2), roles.rename(admin, SALES, 1, "销售"));
-        assertFailure(IamFailure.CONFLICT, () -> roles.state(admin, SALES, 1, false));
+        assertFailure(Kind.CONFLICT, () -> roles.state(admin, SALES, 1, false));
         assertEquals(new CommandResult(SALES, 3), roles.state(admin, SALES, 2, false));
         assertFalse(iam.roles.lock(SALES).enabled());
         assertEquals(List.of("role.update 30", "audit role.update", "role.update 30", "audit role.state"),
@@ -82,21 +82,22 @@ class ManageRoleTest {
         var missingUnit = new GrantInput(READ, "CUSTOM_DEPARTMENTS", Set.of(404L));
         var notApplicable = new GrantInput(READ, "NOT_APPLICABLE", Set.of());
         assertRule("GRANT_PERMISSION_UNKNOWN", () -> roles.grants(admin, SALES, 1, List.of(unknown)));
-        assertFailure(IamFailure.CONFLICT, () -> roles.grants(admin, SALES, 1, List.of(missingUnit)));
+        assertEquals("GRANT_UNIT_UNKNOWN",
+                assertFailure(Kind.UNPROCESSABLE, () -> roles.grants(admin, SALES, 1, List.of(missingUnit))).code());
         assertRule("GRANT_SCOPE_MISMATCH", () -> roles.grants(admin, SALES, 1, List.of(notApplicable)));
         assertRule("ROLE_SYSTEM_GRANTS", () -> roles.grants(admin, SystemRole.ADMIN_ID, 1, List.of()));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> roles.grants(admin, SALES, 1, null));
+        assertFailure(Kind.INVALID_REQUEST, () -> roles.grants(admin, SALES, 1, null));
         assertTrue(iam.roles.lock(SALES).grants().isEmpty());
         assertTrue(iam.writes.isEmpty());
     }
 
-    // 现状：未知或缺失的范围名称抛 IllegalArgumentException，经协议层会成为 500；修复见 #138，本测试只锁定现状。
+    // 未知或缺失的范围名称是非法输入（400），不是 500。
     @Test
-    void unknownScopeCurrentlyEscapesAsIllegalArgument() {
+    void unknownOrMissingScopeIsInvalidRequest() {
         var unknownScope = new GrantInput(READ, "EVERYTHING", Set.of());
         var missingScope = new GrantInput(READ, null, Set.of());
-        assertThrows(IllegalArgumentException.class, () -> roles.grants(admin, SALES, 1, List.of(unknownScope)));
-        assertThrows(IllegalArgumentException.class, () -> roles.grants(admin, SALES, 1, List.of(missingScope)));
+        assertInvalidRequest(() -> roles.grants(admin, SALES, 1, List.of(unknownScope)));
+        assertInvalidRequest(() -> roles.grants(admin, SALES, 1, List.of(missingScope)));
         assertTrue(iam.writes.isEmpty());
     }
 
@@ -106,7 +107,7 @@ class ManageRoleTest {
         roles.state(admin, SALES, 1, false);
         iam.account(20, "user", SALES);
         iam.writes.clear();
-        assertFailure(IamFailure.CONFLICT, () -> roles.delete(admin, SALES, 2));
+        assertFailure(Kind.CONFLICT, () -> roles.delete(admin, SALES, 2));
         assertTrue(iam.writes.isEmpty());
 
         iam.accounts.rows.remove(20L);

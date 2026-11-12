@@ -2,18 +2,19 @@ package org.domainforge.iam.application.command.catalog;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
 import org.domainforge.iam.domain.model.permission.PermissionDefinition;
 import org.domainforge.iam.domain.model.permission.PermissionNamespace;
 import org.domainforge.iam.domain.repository.PermissionCatalog;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,7 +42,8 @@ public class InstallPermissions {
      * 整体替换命名空间内容，返回安装后的权限数；内容不变时不写入也不审计。
      */
     @Transactional
-    public int install(String tokenDigest, String namespace, List<PermissionInput> inputs) {
+    public int install(String tokenDigest, String namespace, @Nullable List<PermissionInput> inputs) {
+        if (inputs == null || inputs.stream().anyMatch(Objects::isNull)) throw IamException.invalid("权限目录输入无效");
         Set<PermissionDefinition> definitions = new HashSet<>();
         for (PermissionInput input : inputs)
             definitions.add(new PermissionDefinition(input.code(), input.name(), input.scoped(), input.systemOnly()));
@@ -51,7 +53,7 @@ public class InstallPermissions {
         PermissionNamespace current = catalog.namespace(next.namespace());
         if (current.equals(next)) return next.permissions().size();
         if (catalog.countOutside(next.namespace()) + next.permissions().size() > PermissionCatalog.MAX_TOTAL)
-            throw new IamException(IamFailure.CONFLICT, "权限目录总数超过1000");
+            throw IamException.conflict("CATALOG_TOO_LARGE", "权限目录总数超过1000");
         requireReferencesKept(current, next);
         catalog.replace(next);
         audit.record(new AuditEvent(Long.toString(actor.accountId()), actor.accountId(), "catalog.install"));
@@ -70,6 +72,6 @@ public class InstallPermissions {
             if (kept == null || kept.scoped() != before.scoped()) changed.add(before.code());
         }
         if (!catalog.referenced(changed).isEmpty())
-            throw new IamException(IamFailure.CONFLICT, "被角色或菜单引用的权限不能移除或改变范围声明");
+            throw IamException.conflict("PERMISSION_IN_USE", "被角色或菜单引用的权限不能移除或改变范围声明");
     }
 }

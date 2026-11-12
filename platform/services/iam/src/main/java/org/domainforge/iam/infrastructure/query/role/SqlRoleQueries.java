@@ -3,6 +3,7 @@ package org.domainforge.iam.infrastructure.query.role;
 import org.domainforge.iam.application.query.role.RoleDetail;
 import org.domainforge.iam.application.query.role.RoleQueries;
 import org.domainforge.iam.application.query.role.RoleView;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ public class SqlRoleQueries implements RoleQueries {
     }
 
     @Override
-    public RoleDetail detail(long id) {
+    public @Nullable RoleDetail detail(long id) {
         RoleView role = mapper.find(id);
         if (role == null) return null;
         var scopes = new LinkedHashMap<String, String>();

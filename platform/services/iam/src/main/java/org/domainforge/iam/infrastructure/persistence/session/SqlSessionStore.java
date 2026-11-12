@@ -1,10 +1,10 @@
 package org.domainforge.iam.infrastructure.persistence.session;
 
-import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
+import org.domainforge.iam.application.port.IamUnavailableException;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
 import org.domainforge.iam.application.port.authentication.SessionGrant;
 import org.domainforge.iam.application.port.authentication.SessionStore;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -42,10 +42,10 @@ public class SqlSessionStore implements SessionStore {
      * 每次都运行新SQL；预算设置不缓存任何身份结果。
      */
     @Override
-    public CurrentIdentity current(String digest) {
+    public @Nullable CurrentIdentity current(String digest) {
         Integer isolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
         if (isolation != null && isolation != TransactionDefinition.ISOLATION_READ_COMMITTED) {
-            throw new IamException(IamFailure.UNAVAILABLE, "身份校验不接受旧事务快照");
+            throw new IamUnavailableException("身份校验不接受旧事务快照", null);
         }
         return read.execute(
                 status -> {

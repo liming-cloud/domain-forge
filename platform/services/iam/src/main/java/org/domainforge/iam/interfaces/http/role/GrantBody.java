@@ -1,6 +1,7 @@
 package org.domainforge.iam.interfaces.http.role;
 
 import org.domainforge.iam.application.command.role.GrantInput;
+import org.domainforge.iam.interfaces.http.protocol.Ids;
 
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +26,7 @@ public record GrantBody(String permission, String scope, List<String> unitIds) {
      */
     GrantInput toInput() {
         var units = new HashSet<Long>();
-        for (String unit : unitIds) units.add(Long.parseLong(unit));
+        for (String unit : unitIds) units.add(Ids.parse(unit));
         return new GrantInput(permission, scope, units);
     }
 }

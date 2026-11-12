@@ -2,9 +2,9 @@ package org.domainforge.iam.application.command.registration;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -65,7 +65,7 @@ class AcceptInvitationTest {
         invite(60, false);
         assertRule("INVITATION_UNUSABLE", () -> accept.execute(SECRET, "other.user", "secret"));
         assertRule("INVITATION_UNUSABLE", () -> accept.execute("b".repeat(43), "new.user", "secret"));
-        assertFailure(IamFailure.INVALID_REQUEST, () -> accept.execute("short", "new.user", "secret"));
+        assertFailure(Kind.INVALID_REQUEST, () -> accept.execute("short", "new.user", "secret"));
         assertTrue(iam.accounts.rows.isEmpty());
         assertTrue(iam.writes.isEmpty());
     }

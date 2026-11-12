@@ -1,5 +1,7 @@
 package org.domainforge.iam.application.query.role;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -14,5 +16,6 @@ public interface RoleQueries {
     /**
      * 角色详情，不存在返回 null。
      */
+    @Nullable
     RoleDetail detail(long id);
 }

@@ -4,6 +4,7 @@ import feign.Response;
 import feign.codec.ErrorDecoder;
 import org.domainforge.servicecall.api.ServiceCallException;
 import org.domainforge.servicecall.api.ServiceCallFailure;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +38,7 @@ public final class ResponseClassifier implements ErrorDecoder {
         return new ServiceCallException(failure, code, null);
     }
 
-    private static String code(Response response) {
+    private static @Nullable String code(Response response) {
         if (response.body() == null) return null;
         try (InputStream body = response.body().asInputStream()) {
             var matcher = CODE.matcher(new String(body.readNBytes(BODY_LIMIT), StandardCharsets.UTF_8));

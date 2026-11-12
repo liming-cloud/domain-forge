@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.domainforge.iam.application.FailureAssertions.assertInvalidRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 成员归属请求转为应用输入：组织 ID 以字符串传入。
@@ -18,10 +18,10 @@ class MembershipsRequestTest {
         assertEquals(List.of(new MembershipInput(2, true)), request.toInput());
     }
 
-    // 现状：非数字组织 ID 抛 NumberFormatException，经协议层会成为 500；修复见 #138，本测试只锁定现状。
+    // 非数字组织 ID 是非法输入（400），不是 500。
     @Test
-    void nonNumericUnitIdCurrentlyEscapesAsNumberFormat() {
+    void nonNumericUnitIdIsInvalidRequest() {
         var request = new MembershipsRequest(1, List.of(new AccountDetailResponse.MembershipBody("x", true)));
-        assertThrows(NumberFormatException.class, request::toInput);
+        assertInvalidRequest(request::toInput);
     }
 }

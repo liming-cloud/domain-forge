@@ -2,8 +2,8 @@ package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.InMemoryIam;
 import org.domainforge.iam.application.command.CommandResult;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentity;
+import org.domainforge.shared.BusinessRuleViolation.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,9 +40,9 @@ class ChangePasswordTest {
 
     @Test
     void wrongOldPasswordOrEndedSessionIsRejected() {
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> change.execute(identity, "wrong", "next"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> change.execute(identity, "wrong", "next"));
         iam.sessions.identities.remove(digest);
-        assertFailure(IamFailure.UNAUTHENTICATED, () -> change.execute(identity, "secret", "next"));
+        assertFailure(Kind.UNAUTHENTICATED, () -> change.execute(identity, "secret", "next"));
         assertEquals("hash:secret", iam.accounts.find(USER).credentialDigest());
         assertTrue(iam.writes.isEmpty());
     }

@@ -1,5 +1,7 @@
 package @@PACKAGE@@.bootstrap;
 
+import org.jspecify.annotations.Nullable;
+
 import ch.qos.logback.classic.AsyncAppender;
 import ch.qos.logback.classic.LoggerContext;
 import io.micrometer.core.instrument.Gauge;
@@ -29,7 +31,7 @@ public class LoggingState implements HealthIndicator, MeterBinder {
     /**
      * 返回模板固定出口；不创建新的线程、队列或第二套日志系统。
      */
-    private AsyncAppender appender() {
+    private @Nullable AsyncAppender appender() {
         var context = (LoggerContext) LoggerFactory.getILoggerFactory();
         var target = context.getLogger(Logger.ROOT_LOGGER_NAME).getAppender("ASYNC");
         return target instanceof AsyncAppender async ? async : null;

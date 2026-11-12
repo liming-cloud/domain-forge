@@ -4,7 +4,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.iam.application.command.role.ManageRole;
 import org.domainforge.iam.application.port.IamException;
-import org.domainforge.iam.application.port.IamFailure;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
 import org.domainforge.iam.application.query.role.RoleQueries;
 import org.domainforge.iam.interfaces.http.protocol.ChangeResponse;
@@ -61,7 +60,7 @@ public final class RoleController {
     @Operation(summary = "读取角色详情")
     public RoleDetailResponse role(@PathVariable long id) {
         var detail = queries.detail(id);
-        if (detail == null) throw new IamException(IamFailure.CONFLICT, "角色不存在");
+        if (detail == null) throw IamException.notFound("ROLE_NOT_FOUND", "角色不存在");
         return RoleDetailResponse.of(detail);
     }
 

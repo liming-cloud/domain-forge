@@ -17,4 +17,13 @@ public final class AccessUnavailableException extends DependencyUnavailableExcep
     public AccessUnavailableException() {
         super("身份服务暂不可用", null);
     }
+
+    /**
+     * 包装身份事实源或会话存储的故障；原因只进内部诊断。
+     *
+     * @param cause 原因
+     */
+    public AccessUnavailableException(Throwable cause) {
+        super("身份服务暂不可用", cause);
+    }
 }
