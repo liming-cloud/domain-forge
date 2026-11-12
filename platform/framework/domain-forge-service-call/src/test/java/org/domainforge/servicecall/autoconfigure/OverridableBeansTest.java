@@ -4,60 +4,37 @@ import feign.Capability;
 import feign.RequestInterceptor;
 import feign.Retryer;
 import feign.codec.ErrorDecoder;
+import org.domainforge.buildrules.testsupport.OverridableBeansContract;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.Map;
 
 /**
  * 四个全局 Feign Bean 都可以被业务的 Bean 替换（按名称覆盖的与默认 Bean 同名）；业务不提供时回归默认实现。
  */
-class OverridableBeansTest {
-    private static final List<Class<?>> TYPES =
-            List.of(RequestInterceptor.class, ErrorDecoder.class, Capability.class, Retryer.class);
-
-    private static AnnotationConfigApplicationContext start(Class<?>... configurations) {
-        var context = new AnnotationConfigApplicationContext();
-        context.register(configurations);
-        context.addBeanFactoryPostProcessor(
-                factory -> {
-                    for (String name : factory.getBeanDefinitionNames()) {
-                        factory.getBeanDefinition(name).setLazyInit(true);
-                    }
-                });
-        context.refresh();
-        return context;
+class OverridableBeansTest extends OverridableBeansContract {
+    @Override
+    protected List<Class<?>> types() {
+        return List.of(RequestInterceptor.class, ErrorDecoder.class, Capability.class, Retryer.class);
     }
 
-    // 每种类型的 Bean 定义都来自指定的配置类。
-    private static void assertProvidedBy(
-            AnnotationConfigApplicationContext context, Class<?> type, Class<?> source) {
-        var names = context.getBeanNamesForType(type, true, false);
-        assertTrue(names.length > 0, type + " 没有 Bean");
-        for (String name : names) {
-            assertEquals(
-                    context.getBeanNamesForType(source, true, false)[0],
-                    context.getBeanFactory().getBeanDefinition(name).getFactoryBeanName());
-        }
+    @Override
+    protected List<Class<?>> configurations() {
+        return List.of(ServiceCallAutoConfiguration.class);
+    }
+
+    @Override
+    protected Class<?> user() {
+        return User.class;
     }
 
     @Test
-    void userBeansReplaceDefaults() {
-        try (var context = start(User.class, ServiceCallAutoConfiguration.class)) {
-            TYPES.forEach(type -> assertProvidedBy(context, type, User.class));
-        }
-    }
-
-    @Test
-    void defaultsApplyWithoutUserBeans() {
-        try (var context = start(ServiceCallAutoConfiguration.class)) {
-            TYPES.forEach(type -> assertProvidedBy(context, type, ServiceCallAutoConfiguration.class));
-        }
+    void defaultsComeFromAutoConfiguration() {
+        var context = start(Map.of(), ServiceCallAutoConfiguration.class);
+        types().forEach(type -> assertProvidedBy(context, type, ServiceCallAutoConfiguration.class));
     }
 
     /**

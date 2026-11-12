@@ -56,6 +56,12 @@
             <artifactId>junit-jupiter-engine</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- 只供 test-jar 中的公共测试支持（OverridableBeansContract）编译；规则本身不依赖 Spring。 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -83,6 +89,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
+                <executions>
+                    <!-- 各组件按 test 范围依赖的公共测试支持；只打包 testsupport，不带本模块的测试与 fixture。 -->
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>org/domainforge/buildrules/testsupport/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!--
               本模块不继承 platform parent，需自行接入与 parent 相同的 Checkstyle 检查（版本保持一致）。
