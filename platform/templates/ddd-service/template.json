@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.17.0",
+  "version": "0.18.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -83,13 +83,13 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderPermissions.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderPermissions.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/order/OrderPermissions.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/order/OrderPermissions.java",
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderRejected.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderRejected.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/order/OrderRejected.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/order/OrderRejected.java",
       "example": true
     },
     {
@@ -200,6 +200,11 @@
     {
       "source": "assets/src/test/java/@@PACKAGE_PATH@@/domain/model/order/OrderTest.java.tpl",
       "target": "src/test/java/@@PACKAGE_PATH@@/domain/model/order/OrderTest.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycleTest.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycleTest.java",
       "example": true
     },
     {
@@ -339,13 +344,18 @@
       "example": true
     },
     {
-      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderAccess.java.tpl",
-      "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderAccess.java",
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/order/OrderAccess.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/application/order/OrderAccess.java",
       "example": true
     },
     {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycle.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/application/command/order/OrderLifecycle.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/domain/event/OrderEvent.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/domain/event/OrderEvent.java",
       "example": true
     },
     {

@@ -140,7 +140,7 @@ public class ManageMenu {
 
     private CommandResult save(CurrentIdentity actor, MenuItem current, MenuItem changed, String action) {
         if (changed != current) {
-            menus.update(changed, current.version());
+            ExpectedVersion.saved(menus.update(changed, current.version()), "菜单版本已变化");
             record(actor, changed.id(), action);
         }
         return new CommandResult(changed.id(), changed.version());

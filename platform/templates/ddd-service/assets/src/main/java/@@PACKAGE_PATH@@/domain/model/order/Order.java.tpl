@@ -2,19 +2,19 @@ package @@PACKAGE@@.domain.model.order;
 
 import org.jspecify.annotations.Nullable;
 
+import @@PACKAGE@@.domain.event.OrderEvent;
 import @@PACKAGE@@.domain.event.OrderSubmitted;
 import org.jmolecules.ddd.annotation.AggregateRoot;
 import org.jmolecules.ddd.annotation.Identity;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 示例聚合：一张订单属于下单人，可选归属一个组织；订单行是聚合内部的子实体，总额等跨行约束由聚合维护。
  *
  * <p>生命周期：草稿 → 已提交 → 已支付；草稿与已提交可取消，其余转换一律拒绝。每次变化返回新的订单，原订单不变；
- * 提交产生的领域事件随返回的订单暂存，由应用层取出。数据范围（谁能读写）是授权决定，不在领域内。
+ * 变化产生的领域事件随返回的订单暂存（不可变列表），应用层发布后用 {@link #withoutEvents()} 得到不含事件的订单。数据范围（谁能读写）是授权决定，不在领域内。
  */
 @AggregateRoot
 public final class Order {
@@ -34,10 +34,10 @@ public final class Order {
     private final OrderStatus status;
     private final List<OrderLine> lines;
     private final long version;
-    private final OrderSubmitted submitted;
+    private final List<OrderEvent> events;
 
     private Order(long id, long ownerId, @Nullable Long unitId, OrderStatus status, List<OrderLine> lines, long version,
-                  OrderSubmitted submitted) {
+                  List<OrderEvent> events) {
         if (id <= 0 || ownerId <= 0 || version < 1 || (unitId != null && unitId <= 0) || status == null)
             throw OrderRuleViolation.invalid("订单身份、归属、状态或版本无效");
         this.id = id;
@@ -46,7 +46,7 @@ public final class Order {
         this.status = status;
         this.lines = List.copyOf(lines);
         this.version = version;
-        this.submitted = submitted;
+        this.events = List.copyOf(events);
         checkLines(this.lines);
     }
 
@@ -65,7 +65,7 @@ public final class Order {
      * 下单人在给定组织（或不归属组织）下新建草稿订单，可带初始订单行。
      */
     public static Order draft(long id, long ownerId, @Nullable Long unitId, List<OrderLine> lines) {
-        return new Order(id, ownerId, unitId, OrderStatus.DRAFT, lines, 1, null);
+        return new Order(id, ownerId, unitId, OrderStatus.DRAFT, lines, 1, List.of());
     }
 
     /**
@@ -73,7 +73,7 @@ public final class Order {
      */
     public static Order restore(long id, long ownerId, @Nullable Long unitId, OrderStatus status, List<OrderLine> lines,
                                 long version) {
-        return new Order(id, ownerId, unitId, status, lines, version, null);
+        return new Order(id, ownerId, unitId, status, lines, version, List.of());
     }
 
     /**
@@ -83,7 +83,7 @@ public final class Order {
         require(OrderStatus.DRAFT, "修改订单行");
         List<OrderLine> next = new ArrayList<>(lines);
         next.add(line);
-        return new Order(id, ownerId, unitId, status, next, version + 1, null);
+        return new Order(id, ownerId, unitId, status, next, version + 1, List.of());
     }
 
     /**
@@ -93,7 +93,7 @@ public final class Order {
         require(OrderStatus.DRAFT, "提交");
         if (lines.isEmpty()) throw OrderRuleViolation.empty();
         return new Order(id, ownerId, unitId, OrderStatus.SUBMITTED, lines, version + 1,
-                new OrderSubmitted(id, ownerId, total().cents()));
+                List.of(new OrderSubmitted(id, ownerId, total().cents())));
     }
 
     /**
@@ -101,7 +101,7 @@ public final class Order {
      */
     public Order pay() {
         require(OrderStatus.SUBMITTED, "支付");
-        return new Order(id, ownerId, unitId, OrderStatus.PAID, lines, version + 1, null);
+        return new Order(id, ownerId, unitId, OrderStatus.PAID, lines, version + 1, List.of());
     }
 
     /**
@@ -110,7 +110,7 @@ public final class Order {
     public Order cancel() {
         if (status != OrderStatus.DRAFT && status != OrderStatus.SUBMITTED)
             throw OrderRuleViolation.illegalTransition("取消");
-        return new Order(id, ownerId, unitId, OrderStatus.CANCELLED, lines, version + 1, null);
+        return new Order(id, ownerId, unitId, OrderStatus.CANCELLED, lines, version + 1, List.of());
     }
 
     private void require(OrderStatus expected, String action) {
@@ -125,10 +125,17 @@ public final class Order {
     }
 
     /**
-     * 本次变化产生的提交事件；只有 {@link #submit()} 返回的订单带有，从存储恢复的订单没有。
+     * 本次变化产生的领域事件；新建、恢复和 {@link #withoutEvents()} 得到的订单没有事件。
      */
-    public Optional<OrderSubmitted> submitted() {
-        return Optional.ofNullable(submitted);
+    public List<OrderEvent> events() {
+        return events;
+    }
+
+    /**
+     * 取出事件之后使用的订单：状态与版本不变，不再带事件，避免同一事件被发布两次。
+     */
+    public Order withoutEvents() {
+        return new Order(id, ownerId, unitId, status, lines, version, List.of());
     }
 
     /**

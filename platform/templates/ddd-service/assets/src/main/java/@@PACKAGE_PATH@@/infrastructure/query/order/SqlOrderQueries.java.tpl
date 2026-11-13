@@ -1,6 +1,6 @@
 package @@PACKAGE@@.infrastructure.query.order;
 
-import @@PACKAGE@@.application.command.order.OrderRejected;
+import @@PACKAGE@@.application.order.OrderRejected;
 import @@PACKAGE@@.application.query.order.OrderFilter;
 import @@PACKAGE@@.application.query.order.OrderQueries;
 import @@PACKAGE@@.application.query.order.OrderView;

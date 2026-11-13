@@ -1,8 +1,8 @@
 package @@PACKAGE@@.application.usecase.order;
 
-import @@PACKAGE@@.application.command.order.OrderAccess;
-import @@PACKAGE@@.application.command.order.OrderPermissions;
-import @@PACKAGE@@.application.command.order.OrderRejected;
+import @@PACKAGE@@.application.order.OrderAccess;
+import @@PACKAGE@@.application.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderRejected;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import @@PACKAGE@@.application.port.attachment.OrderAttachments;
 import @@PACKAGE@@.domain.model.order.Order;

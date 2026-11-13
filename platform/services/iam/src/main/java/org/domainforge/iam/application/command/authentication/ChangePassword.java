@@ -2,6 +2,7 @@ package org.domainforge.iam.application.command.authentication;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
 import org.domainforge.iam.application.command.CommandResult;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
@@ -52,7 +53,7 @@ public final class ChangePassword {
                 throw IamException.unauthenticated("PASSWORD_MISMATCH", "当前凭据无效");
             // 按校验时读到的版本条件更新：其间账号有任何修改（含改密、禁用）都以 409 拒绝，无需行锁。
             var changed = verified.changePassword(digest);
-            accounts.update(verified, changed);
+            ExpectedVersion.saved(accounts.update(verified, changed), "账号版本已变化");
             audit.record(new AuditEvent(Long.toString(actor.accountId()), verified.id(), "account.password"));
             return new CommandResult(changed.id(), changed.version());
         });

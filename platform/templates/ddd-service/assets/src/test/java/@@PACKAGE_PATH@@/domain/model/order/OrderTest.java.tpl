@@ -1,5 +1,6 @@
 package @@PACKAGE@@.domain.model.order;
 
+import @@PACKAGE@@.domain.event.OrderSubmitted;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -36,13 +37,13 @@ class OrderTest {
     void happyPathDraftSubmittedPaid() {
         Order submitted = draft().submit();
         assertEquals(OrderStatus.SUBMITTED, submitted.status());
-        var event = submitted.submitted().orElseThrow();
-        assertEquals(1, event.orderId());
-        assertEquals(7, event.ownerId());
-        assertEquals(3000, event.totalCents());
+        assertEquals(List.of(new OrderSubmitted(1, 7, 3000)), submitted.events());
+        Order taken = submitted.withoutEvents();
+        assertTrue(taken.events().isEmpty(), "取出后不再带事件");
+        assertEquals(submitted.version(), taken.version());
         Order paid = submitted.pay();
         assertEquals(OrderStatus.PAID, paid.status());
-        assertTrue(paid.submitted().isEmpty(), "事件只随提交产生");
+        assertTrue(paid.events().isEmpty(), "事件只随提交产生");
         assertEquals(3, paid.version());
     }
 

@@ -125,7 +125,7 @@ public class ManageOrganization {
     private CommandResult save(
             CurrentIdentity actor, OrganizationUnit current, OrganizationUnit changed, String action) {
         if (changed != current) {
-            units.update(changed, current.version());
+            ExpectedVersion.saved(units.update(changed, current.version()), "组织版本已变化");
             record(actor, changed.id(), action);
         }
         return new CommandResult(changed.id(), changed.version());

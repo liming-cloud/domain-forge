@@ -4,7 +4,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.core.status.StatusUtil;
 import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.stp.StpLogic;
-import @@PACKAGE@@.application.command.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderPermissions;
 import @@PACKAGE@@.bootstrap.@@APP_CLASS@@;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -317,7 +317,7 @@ class OrderServiceIT {
         var added = call("POST", "/api/orders/" + id + "/lines", writer,
                 "{\"expectedVersion\":1,\"sku\":\"B-1\",\"quantity\":1,\"unitPriceCents\":100}");
         assertEquals(2, json(added).get("version").asInt());
-        assertProblem(409, "ORDER_CONFLICT", call("POST", "/api/orders/" + id + "/submit", writer, version(1)));
+        assertProblem(409, "VERSION_CONFLICT", call("POST", "/api/orders/" + id + "/submit", writer, version(1)));
         String other = user(203, BOTH, scope(false, true, ""), scope(false, true, ""));
         assertProblem(404, "ORDER_NOT_FOUND", call("POST", "/api/orders/" + id + "/submit", other, version(2)));
         assertProblem(400, "ORDER_INVALID", call("POST", "/api/orders", writer,

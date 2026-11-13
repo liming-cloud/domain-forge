@@ -180,11 +180,12 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void update(Account current, Account changed) {
+        public boolean update(Account current, Account changed) {
             Account stored = rows.get(changed.id());
-            if (stored == null || stored.version() != current.version()) throw conflict();
+            if (stored == null || stored.version() != current.version()) return false;
             rows.put(changed.id(), changed);
             write("account.update " + changed.id());
+            return true;
         }
 
         @Override
@@ -216,11 +217,12 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void update(Role role, long expectedVersion) {
+        public boolean update(Role role, long expectedVersion) {
             Role current = rows.get(role.id());
-            if (current == null || current.version() != expectedVersion) throw conflict();
+            if (current == null || current.version() != expectedVersion) return false;
             rows.put(role.id(), role);
             write("role.update " + role.id());
+            return true;
         }
 
         @Override
@@ -279,11 +281,12 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void update(OrganizationUnit unit, long expectedVersion) {
+        public boolean update(OrganizationUnit unit, long expectedVersion) {
             OrganizationUnit current = rows.get(unit.id());
-            if (current == null || current.version() != expectedVersion) throw conflict();
+            if (current == null || current.version() != expectedVersion) return false;
             rows.put(unit.id(), unit);
             write("org.update " + unit.id());
+            return true;
         }
 
         @Override
@@ -340,11 +343,12 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void update(MenuItem item, long expectedVersion) {
+        public boolean update(MenuItem item, long expectedVersion) {
             MenuItem current = rows.get(item.id());
-            if (current == null || current.version() != expectedVersion) throw conflict();
+            if (current == null || current.version() != expectedVersion) return false;
             rows.put(item.id(), item);
             write("menu.update " + item.id());
+            return true;
         }
 
         @Override
@@ -429,9 +433,10 @@ public final class InMemoryIam {
         }
 
         @Override
-        public void invalidate(RegistrationInvitation invitation) {
+        public boolean invalidate(RegistrationInvitation invitation) {
             rows.put(invitation.id(), invitation);
             write("invitation.invalidate " + invitation.id());
+            return true;
         }
     }
 

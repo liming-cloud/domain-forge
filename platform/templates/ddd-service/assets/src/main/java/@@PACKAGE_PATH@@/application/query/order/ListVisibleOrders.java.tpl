@@ -1,6 +1,6 @@
 package @@PACKAGE@@.application.query.order;
 
-import @@PACKAGE@@.application.command.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderPermissions;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.shared.CurrentScope;

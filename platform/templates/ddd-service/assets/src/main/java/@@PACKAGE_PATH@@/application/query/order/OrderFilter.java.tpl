@@ -1,6 +1,6 @@
 package @@PACKAGE@@.application.query.order;
 
-import @@PACKAGE@@.application.command.order.OrderRejected;
+import @@PACKAGE@@.application.order.OrderRejected;
 
 import java.util.Set;
 

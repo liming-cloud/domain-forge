@@ -1,4 +1,4 @@
-package @@PACKAGE@@.application.command.order;
+package @@PACKAGE@@.application.order;
 
 import org.domainforge.shared.BusinessRuleViolation;
 
@@ -28,6 +28,13 @@ public final class OrderRejected extends BusinessRuleViolation {
      */
     public static OrderRejected conflict(String code, String message) {
         return new OrderRejected(Kind.CONFLICT, code, message);
+    }
+
+    /**
+     * 订单版本与请求不符，或保存时已被他人修改（409 {@code VERSION_CONFLICT}，与 IAM 相同）。
+     */
+    public static OrderRejected versionConflict() {
+        return conflict("VERSION_CONFLICT", "订单已被修改，请刷新后重试");
     }
 
     /**

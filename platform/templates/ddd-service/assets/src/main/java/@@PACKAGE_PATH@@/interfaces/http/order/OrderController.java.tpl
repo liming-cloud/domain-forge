@@ -4,7 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import @@PACKAGE@@.application.command.order.LineInput;
 import @@PACKAGE@@.application.command.order.OrderLifecycle;
-import @@PACKAGE@@.application.command.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderPermissions;
 import @@PACKAGE@@.application.command.order.WriteOrder;
 import @@PACKAGE@@.application.query.order.ListVisibleOrders;
 import @@PACKAGE@@.application.query.order.OrderQueries;

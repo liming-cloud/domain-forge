@@ -25,7 +25,7 @@ public interface InvitationRepository {
     void insert(RegistrationInvitation invitation);
 
     /**
-     * 保存失效终态；调用方必须先锁定仍有效的原状态。
+     * 保存失效终态；调用方必须先锁定仍有效的原状态，邀请已结束（零行）返回 false。
      */
-    void invalidate(RegistrationInvitation invitation);
+    boolean invalidate(RegistrationInvitation invitation);
 }

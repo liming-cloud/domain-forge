@@ -47,6 +47,12 @@
             <artifactId>jmolecules-ddd</artifactId>
             <version>1.10.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.jmolecules</groupId>
+            <artifactId>jmolecules-events</artifactId>
+            <version>1.10.0</version>
+            <scope>test</scope>
+        </dependency>
         <!-- 本模块与 fixture 的 package-info 使用 @NullMarked；版本由 Spring Boot 管理。 -->
         <dependency>
             <groupId>org.jspecify</groupId>
