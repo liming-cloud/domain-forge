@@ -1,6 +1,5 @@
 package org.domainforge.iam.infrastructure.persistence.organization;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.domain.model.organization.OrganizationUnit;
 import org.domainforge.iam.domain.repository.OrganizationRepository;
 import org.domainforge.iam.infrastructure.persistence.operation.Coordination;
@@ -58,9 +57,8 @@ public class SqlOrganizations implements OrganizationRepository {
     }
 
     @Override
-    public void update(OrganizationUnit unit, long expected) {
-        if (mapper.update(OrganizationUnitRow.from(unit), expected) != 1)
-            throw IamException.conflict("VERSION_CONFLICT", "组织版本已变化");
+    public boolean update(OrganizationUnit unit, long expected) {
+        return mapper.update(OrganizationUnitRow.from(unit), expected) == 1;
     }
 
     @Override

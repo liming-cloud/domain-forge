@@ -35,4 +35,14 @@ public final class ExpectedVersion {
             throw IamException.conflict("VERSION_CONFLICT", "版本已变化，请重新读取后再操作");
         return current;
     }
+
+    /**
+     * 仓储按版本条件保存未写入，说明目标在读取之后已被他人修改：返回冲突，不当作成功。
+     *
+     * @param saved   仓储是否写入
+     * @param message 冲突说明
+     */
+    public static void saved(boolean saved, String message) {
+        if (!saved) throw IamException.conflict("VERSION_CONFLICT", message);
+    }
 }

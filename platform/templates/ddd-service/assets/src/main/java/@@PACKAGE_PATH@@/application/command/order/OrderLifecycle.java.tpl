@@ -1,8 +1,12 @@
 package @@PACKAGE@@.application.command.order;
 
 import @@PACKAGE@@.application.contract.event.OrderSubmitted;
+import @@PACKAGE@@.application.order.OrderAccess;
+import @@PACKAGE@@.application.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderRejected;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import @@PACKAGE@@.application.port.event.OrderEvents;
+import @@PACKAGE@@.domain.event.OrderEvent;
 import @@PACKAGE@@.domain.model.order.Order;
 import @@PACKAGE@@.domain.repository.OrderRepository;
 import org.domainforge.access.api.CurrentAccess;
@@ -15,7 +19,10 @@ import java.util.function.UnaryOperator;
 /**
  * 订单的状态迁移命令：提交、支付、取消。迁移是否合法由订单聚合判断，这里只做范围核对、版本核对与保存。
  *
- * <p>提交成功时在同一事务内发布集成事件 {@link OrderSubmitted}：事件与订单一起提交，回滚时一并消失。
+ * <p>不加锁：读取时核对版本，保存时以原版本为条件更新；条件不满足说明订单已被他人修改，返回冲突。
+ *
+ * <p>保存成功后在同一事务内把聚合暂存的领域事件映射为集成事件发布（提交产生 {@link OrderSubmitted}）：事件与订单一起提交，
+ * 回滚时一并消失。
  */
 @Service
 public class OrderLifecycle {
@@ -39,10 +46,7 @@ public class OrderLifecycle {
      */
     @Transactional
     public OrderChange submit(long id, long version) {
-        Order changed = change(id, version, Order::submit);
-        changed.submitted().ifPresent(fact -> events.submitted(
-                new OrderSubmitted(fact.orderId(), fact.ownerId(), fact.totalCents())));
-        return result(changed);
+        return result(change(id, version, Order::submit));
     }
 
     /**
@@ -64,14 +68,21 @@ public class OrderLifecycle {
     private Order change(long id, long version, UnaryOperator<Order> transition) {
         long account = access.current().accountId();
         CurrentScope scope = scopes.scope(OrderPermissions.WRITE);
-        Order current = orders.lock(id);
+        Order current = orders.find(id);
         if (current == null || !OrderAccess.within(current, account, scope))
             throw OrderRejected.notFound("ORDER_NOT_FOUND", "订单不存在");
-        if (current.version() != version) throw OrderRejected.conflict("ORDER_CONFLICT", "订单已被修改，请刷新后重试");
+        if (current.version() != version) throw OrderRejected.versionConflict();
         Order changed = transition.apply(current);
-        if (!orders.update(changed, current.version()))
-            throw OrderRejected.conflict("ORDER_CONFLICT", "订单已被修改，请刷新后重试");
-        return changed;
+        if (!orders.update(changed, version)) throw OrderRejected.versionConflict();
+        changed.events().forEach(this::publish);
+        return changed.withoutEvents();
+    }
+
+    private void publish(OrderEvent event) {
+        switch (event) {
+            case @@PACKAGE@@.domain.event.OrderSubmitted fact ->
+                    events.submitted(new OrderSubmitted(fact.orderId(), fact.ownerId(), fact.totalCents()));
+        }
     }
 
     private static OrderChange result(Order order) {

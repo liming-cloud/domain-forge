@@ -1,6 +1,7 @@
 package org.domainforge.iam.application.command.registration;
 
 import org.domainforge.iam.application.authorization.CurrentAuthorization;
+import org.domainforge.iam.application.command.ExpectedVersion;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.audit.AuditEvent;
 import org.domainforge.iam.application.port.audit.AuditTrail;
@@ -80,6 +81,6 @@ public class IssueInvitation {
         if (original == null || !original.loginName().equals(name))
             throw IamException.conflict("INVITATION_NOT_RESENDABLE", "原邀请不可重发");
         if (accounts.invitationUsed(original.secretDigest())) throw IamException.conflict("INVITATION_USED", "原邀请已被使用");
-        invitations.invalidate(original.invalidate());
+        ExpectedVersion.saved(invitations.invalidate(original.invalidate()), "邀请状态已变化");
     }
 }

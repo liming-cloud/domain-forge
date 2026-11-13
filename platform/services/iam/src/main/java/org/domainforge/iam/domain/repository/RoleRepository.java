@@ -24,9 +24,9 @@ public interface RoleRepository {
     void insert(Role role);
 
     /**
-     * 按原版本保存名称、状态与授予，零行报告冲突。
+     * 按原版本保存名称、状态与授予，版本已变化（零行）返回 false。
      */
-    void update(Role role, long expectedVersion);
+    boolean update(Role role, long expectedVersion);
 
     /**
      * 删除角色及其授予。

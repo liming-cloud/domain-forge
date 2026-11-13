@@ -2,7 +2,7 @@ package @@PACKAGE@@.interfaces.http.order;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import @@PACKAGE@@.application.command.order.AttachOrderFile;
-import @@PACKAGE@@.application.command.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderPermissions;
 import @@PACKAGE@@.application.usecase.order.ReadOrderFiles;
 import org.domainforge.files.api.FileResponses;
 import org.domainforge.web.api.PlatformJsonApi;

@@ -35,9 +35,9 @@ public interface AccountRepository {
     boolean invitationUsed(String invitationDigest);
 
     /**
-     * 按读取时快照的版本保存转换结果，零行必须报告冲突；角色与成员归属只在相对该快照变化时重写。
+     * 按读取时快照的版本保存转换结果，版本已变化（零行）返回 false；角色与成员归属只在相对该快照变化时重写。
      */
-    void update(Account current, Account changed);
+    boolean update(Account current, Account changed);
 
     /**
      * 启用且持有系统管理员角色的账号数；须在管理守卫内使用。

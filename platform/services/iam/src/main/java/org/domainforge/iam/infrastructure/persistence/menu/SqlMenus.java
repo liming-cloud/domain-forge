@@ -1,6 +1,5 @@
 package org.domainforge.iam.infrastructure.persistence.menu;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.domain.model.menu.MenuItem;
 import org.domainforge.iam.domain.repository.MenuRepository;
 import org.domainforge.iam.infrastructure.persistence.operation.Coordination;
@@ -52,9 +51,8 @@ public class SqlMenus implements MenuRepository {
     }
 
     @Override
-    public void update(MenuItem item, long expected) {
-        if (mapper.update(MenuRow.from(item), expected) != 1)
-            throw IamException.conflict("VERSION_CONFLICT", "菜单版本已变化");
+    public boolean update(MenuItem item, long expected) {
+        return mapper.update(MenuRow.from(item), expected) == 1;
     }
 
     @Override

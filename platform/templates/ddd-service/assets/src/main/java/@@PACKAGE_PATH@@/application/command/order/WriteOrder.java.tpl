@@ -2,6 +2,9 @@ package @@PACKAGE@@.application.command.order;
 
 import org.jspecify.annotations.Nullable;
 
+import @@PACKAGE@@.application.order.OrderAccess;
+import @@PACKAGE@@.application.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderRejected;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import @@PACKAGE@@.application.port.operation.Identifiers;
 import @@PACKAGE@@.domain.model.order.Money;
@@ -53,19 +56,18 @@ public class WriteOrder {
     }
 
     /**
-     * 给草稿订单增加一行：范围外的对象按不存在处理；版本不符为业务冲突。
+     * 给草稿订单增加一行：范围外的对象按不存在处理；版本不符或保存时已被他人修改为版本冲突。
      */
     @Transactional
     public OrderChange addLine(long id, long version, LineInput input) {
         long account = access.current().accountId();
         CurrentScope scope = scopes.scope(OrderPermissions.WRITE);
-        Order current = orders.lock(id);
+        Order current = orders.find(id);
         if (current == null || !OrderAccess.within(current, account, scope))
             throw OrderRejected.notFound("ORDER_NOT_FOUND", "订单不存在");
-        if (current.version() != version) throw OrderRejected.conflict("ORDER_CONFLICT", "订单已被修改，请刷新后重试");
+        if (current.version() != version) throw OrderRejected.versionConflict();
         Order changed = current.addLine(line(input));
-        if (!orders.update(changed, current.version()))
-            throw OrderRejected.conflict("ORDER_CONFLICT", "订单已被修改，请刷新后重试");
+        if (!orders.update(changed, version)) throw OrderRejected.versionConflict();
         return new OrderChange(changed.id(), changed.version(), changed.status().name());
     }
 

@@ -9,19 +9,19 @@ import @@PACKAGE@@.domain.model.order.Order;
  */
 public interface OrderRepository {
     /**
-     * 锁定订单直到事务结束。
+     * 锁定订单直到事务结束；只用于版本条件更新保证不了的约束（如凭证数上限），普通修改用 {@link #find}。
      */
     @Nullable Order lock(long id);
 
     /**
-     * 读取订单，不加锁（只用于读取前的范围判断）。
+     * 读取订单，不加锁。
      */
     @Nullable Order find(long id);
 
     void insert(Order order);
 
     /**
-     * 按原版本保存，零行返回 false。
+     * 以原版本为条件保存；订单已被他人修改（零行）返回 false，由应用层判定为冲突。
      */
     boolean update(Order order, long expectedVersion);
 }

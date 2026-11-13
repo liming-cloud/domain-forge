@@ -216,7 +216,7 @@ public final class ArchitectureRules {
         return switch (layer) {
             case "domain" -> domainAllowed(name, targetPackage)
                     ? null
-                    : "领域只能依赖 JDK、shared.BusinessRuleViolation、org.jmolecules.ddd 与 JSpecify 空值注解";
+                    : "领域只能依赖 JDK、shared.BusinessRuleViolation、org.jmolecules.ddd／event 与 JSpecify 空值注解";
             case "application" -> sharedOrJdk(targetPackage)
                     || componentApi(targetPackage)
                     || APPLICATION_SPRING_TYPES.contains(name)
@@ -232,7 +232,8 @@ public final class ArchitectureRules {
 
     private static boolean domainAllowed(String name, String targetPackage) {
         return jdk(targetPackage) || DOMAIN_ALLOWED_TYPES.contains(outerName(name))
-                || inside(targetPackage, "org.jmolecules.ddd") || inside(targetPackage, NULLNESS);
+                || inside(targetPackage, "org.jmolecules.ddd") || inside(targetPackage, "org.jmolecules.event")
+                || inside(targetPackage, NULLNESS);
     }
 
     private static String outerName(String name) {

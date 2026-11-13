@@ -1,6 +1,5 @@
 package org.domainforge.iam.infrastructure.persistence.account;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.domain.model.account.Account;
 import org.domainforge.iam.domain.model.shared.SystemRole;
 import org.domainforge.iam.domain.repository.AccountRepository;
@@ -60,10 +59,8 @@ public class SqlAccounts implements AccountRepository {
      * 零行写入是版本冲突，不能默认为已完成；子表只在相对读取快照变化时整体替换。
      */
     @Override
-    public void update(Account current, Account changed) {
-        if (mapper.update(AccountRow.from(changed), current.version()) != 1) {
-            throw IamException.conflict("VERSION_CONFLICT", "账号版本已变化");
-        }
+    public boolean update(Account current, Account changed) {
+        if (mapper.update(AccountRow.from(changed), current.version()) != 1) return false;
         if (!changed.roleIds().equals(current.roleIds())) {
             mapper.deleteRoles(changed.id());
             writeRoles(changed);
@@ -72,6 +69,7 @@ public class SqlAccounts implements AccountRepository {
             mapper.deleteMemberships(changed.id());
             writeMemberships(changed);
         }
+        return true;
     }
 
     private void writeChildren(Account account) {

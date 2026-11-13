@@ -148,7 +148,7 @@ public class ManageRole {
 
     private CommandResult save(CurrentIdentity actor, Role current, Role changed, String action) {
         if (changed != current) {
-            roles.update(changed, current.version());
+            ExpectedVersion.saved(roles.update(changed, current.version()), "角色版本已变化");
             record(actor, changed.id(), action);
         }
         return new CommandResult(changed.id(), changed.version());

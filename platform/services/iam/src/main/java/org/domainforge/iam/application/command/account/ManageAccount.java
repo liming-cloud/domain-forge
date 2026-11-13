@@ -133,7 +133,7 @@ public class ManageAccount {
             throw IamException.conflict("LAST_ADMINISTRATOR", "必须保留至少一名启用的系统管理员");
         }
         if (changed != current) {
-            accounts.update(current, changed);
+            ExpectedVersion.saved(accounts.update(current, changed), "账号版本已变化");
             audit.record(new AuditEvent(Long.toString(actor.accountId()), changed.id(), action));
         }
         return new CommandResult(changed.id(), changed.version());

@@ -1,4 +1,4 @@
-package @@PACKAGE@@.application.command.order;
+package @@PACKAGE@@.application.order;
 
 import org.jspecify.annotations.Nullable;
 

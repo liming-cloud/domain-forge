@@ -29,7 +29,10 @@ public interface MenuRepository {
 
     void insert(MenuItem item);
 
-    void update(MenuItem item, long expectedVersion);
+    /**
+     * 按原版本保存，版本已变化（零行）返回 false。
+     */
+    boolean update(MenuItem item, long expectedVersion);
 
     void delete(long id);
 

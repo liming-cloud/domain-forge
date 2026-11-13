@@ -1,6 +1,5 @@
 package org.domainforge.iam.infrastructure.persistence.invitation;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.domain.model.invitation.RegistrationInvitation;
 import org.domainforge.iam.domain.repository.InvitationRepository;
 import org.jspecify.annotations.Nullable;
@@ -43,9 +42,7 @@ public class SqlInvitations implements InvitationRepository {
      * 已结束的邀请不能被第二次写入覆盖。
      */
     @Override
-    public void invalidate(RegistrationInvitation invitation) {
-        if (mapper.invalidate(InvitationRow.from(invitation)) != 1) {
-            throw IamException.conflict("VERSION_CONFLICT", "邀请状态已变化");
-        }
+    public boolean invalidate(RegistrationInvitation invitation) {
+        return mapper.invalidate(InvitationRow.from(invitation)) == 1;
     }
 }

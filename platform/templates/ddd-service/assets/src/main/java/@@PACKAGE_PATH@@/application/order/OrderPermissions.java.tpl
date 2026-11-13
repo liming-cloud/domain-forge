@@ -1,4 +1,4 @@
-package @@PACKAGE@@.application.command.order;
+package @@PACKAGE@@.application.order;
 
 /**
  * 本服务在 IAM 权限目录中的命名空间与权限码；安装内容见 resources/iam/permissions.json。

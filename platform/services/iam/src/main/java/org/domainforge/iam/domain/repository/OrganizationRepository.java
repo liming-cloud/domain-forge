@@ -39,9 +39,9 @@ public interface OrganizationRepository {
     void insert(OrganizationUnit unit);
 
     /**
-     * 按原版本保存，零行报告冲突。
+     * 按原版本保存，版本已变化（零行）返回 false。
      */
-    void update(OrganizationUnit unit, long expectedVersion);
+    boolean update(OrganizationUnit unit, long expectedVersion);
 
     void delete(long id);
 

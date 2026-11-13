@@ -1,5 +1,8 @@
 package @@PACKAGE@@.application.command.order;
 
+import @@PACKAGE@@.application.order.OrderAccess;
+import @@PACKAGE@@.application.order.OrderPermissions;
+import @@PACKAGE@@.application.order.OrderRejected;
 import @@PACKAGE@@.application.port.access.DataScopes;
 import @@PACKAGE@@.application.port.attachment.OrderAttachments;
 import @@PACKAGE@@.domain.model.order.Order;
@@ -20,6 +23,8 @@ import java.io.InputStream;
  *
  * <p>上传内容在进入用例前已由 Servlet 容器完整接收；保存文件发生在事务内。时限依次为：S3 调用 10 秒 &lt;
  * 本事务 12 秒 &lt; 网关下游响应 15 秒，保证超时由服务先判定并回滚，而不是网关返回 504 后服务仍然提交。
+ *
+ * <p>这里锁定订单是版本条件更新的例外：凭证数上限是“先计数再插入”，只有按订单串行化才能保证并发上传不超限。
  */
 @Service
 public class AttachOrderFile {

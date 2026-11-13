@@ -1,6 +1,5 @@
 package org.domainforge.iam.infrastructure.persistence.role;
 
-import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.domain.model.role.DataScope;
 import org.domainforge.iam.domain.model.role.PermissionGrant;
 import org.domainforge.iam.domain.model.role.Role;
@@ -58,10 +57,11 @@ public class SqlRoles implements RoleRepository {
     }
 
     @Override
-    public void update(Role role, long expected) {
-        if (mapper.update(row(role), expected) != 1) throw IamException.conflict("VERSION_CONFLICT", "角色版本已变化");
+    public boolean update(Role role, long expected) {
+        if (mapper.update(row(role), expected) != 1) return false;
         mapper.deleteGrants(role.id());
         writeGrants(role);
+        return true;
     }
 
     private static RoleRow row(Role role) {
