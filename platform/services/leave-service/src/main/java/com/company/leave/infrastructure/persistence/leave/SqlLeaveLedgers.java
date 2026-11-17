@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
- * MyBatis 年假账户仓储：账户与申请一起读写。保存时先以版本为条件更新账户行，写入成功后再写入申请（新申请插入，已有申请更新状态）。
+ * MyBatis 年假账户仓储：账户与申请一起读写。保存时先以版本为条件更新账户行，写入成功后再写入申请（新申请插入，已有申请更新状态与版本）。
  */
 @Repository
 public class SqlLeaveLedgers implements LeaveLedgerRepository {
@@ -53,14 +53,15 @@ public class SqlLeaveLedgers implements LeaveLedgerRepository {
         if (row == null) return null;
         var requests = mapper.requests(row.accountId()).stream()
                 .map(r -> new LeaveRequest(r.id(), r.unitId(), new LeavePeriod(r.startDate(), r.endDate()),
-                        LeaveStatus.valueOf(r.status())))
+                        LeaveStatus.valueOf(r.status()), r.version()))
                 .toList();
         return LeaveLedger.restore(row.accountId(), row.remainingDays(), requests, row.version());
     }
 
     private void saveRequests(LeaveLedger ledger) {
         ledger.requests().forEach(r -> mapper.saveRequest(ledger.accountId(),
-                new RequestRow(r.id(), r.unitId(), r.period().start(), r.period().end(), r.status().name())));
+                new RequestRow(r.id(), r.unitId(), r.period().start(), r.period().end(), r.status().name(),
+                        r.version())));
     }
 
     private static LedgerRow row(LeaveLedger ledger) {

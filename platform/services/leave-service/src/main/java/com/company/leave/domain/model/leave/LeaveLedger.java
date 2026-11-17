@@ -81,7 +81,7 @@ public final class LeaveLedger {
     public LeaveLedger draft(long requestId, long unitId, LeavePeriod period) {
         if (request(requestId) != null) throw LeaveRuleViolation.invalid("请假申请身份重复");
         List<LeaveRequest> next = new ArrayList<>(requests);
-        next.add(new LeaveRequest(requestId, unitId, period, LeaveStatus.DRAFT));
+        next.add(new LeaveRequest(requestId, unitId, period, LeaveStatus.DRAFT, 1));
         return new LeaveLedger(accountId, remainingDays, next, version + 1);
     }
 

@@ -3,14 +3,16 @@
 <!-- 列的顺序与投影记录的构造参数一致（MyBatis 按类型顺序匹配记录构造器）；天数含起止两天。 -->
 <mapper namespace="com.company.leave.infrastructure.query.leave.LeaveQueryMapper">
     <select id="mine" resultType="com.company.leave.application.query.leave.LeaveRequestView">
-        SELECT id, account_id AS applicant_id, unit_id, start_date, end_date, end_date - start_date + 1 AS days, status
+        SELECT id, account_id AS applicant_id, unit_id, start_date, end_date, end_date - start_date + 1 AS days, status,
+               version
         FROM leave_request
         WHERE account_id = #{applicant} AND id &gt; #{after}
         ORDER BY id LIMIT #{limit}
     </select>
     <!-- 范围映射：ALL 不加部门条件；否则只取范围内部门。两者都没有时调用方不会执行本查询。 -->
     <select id="pending" resultType="com.company.leave.application.query.leave.LeaveRequestView">
-        SELECT id, account_id AS applicant_id, unit_id, start_date, end_date, end_date - start_date + 1 AS days, status
+        SELECT id, account_id AS applicant_id, unit_id, start_date, end_date, end_date - start_date + 1 AS days, status,
+               version
         FROM leave_request
         WHERE status = 'PENDING' AND id &gt; #{filter.after}
         <if test="!filter.all()">

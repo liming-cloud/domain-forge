@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LeaveCommandsTest {
     private static final long APPLICANT = 7;
     private static final long OTHER = 8;
+    private static final long APPROVER = 9;
     private static final long UNIT = 10;
     private static final LocalDate FIRST = LocalDate.of(2026, 12, 1);
     private static final LocalDate THIRD = LocalDate.of(2026, 12, 3);
@@ -38,8 +39,8 @@ class LeaveCommandsTest {
     private final Map<String, CurrentScope> scopes = new HashMap<>();
     private final ApplyLeave apply = new ApplyLeave(() -> new CurrentSubject(current, Set.of()),
             permission -> scopes.getOrDefault(permission, CurrentScope.none()), ledgers, ids::incrementAndGet);
-    private final ApproveLeave approve =
-            new ApproveLeave(permission -> scopes.getOrDefault(permission, CurrentScope.none()), ledgers);
+    private final ApproveLeave approve = new ApproveLeave(() -> new CurrentSubject(current, Set.of()),
+            permission -> scopes.getOrDefault(permission, CurrentScope.none()), ledgers);
     private final GrantLeave grant =
             new GrantLeave(permission -> scopes.getOrDefault(permission, CurrentScope.none()), ledgers);
 
@@ -47,11 +48,12 @@ class LeaveCommandsTest {
         return new CurrentScope(false, false, Set.of(units));
     }
 
-    // 申请人余额 10 天，在 UNIT 部门有一份 3 天的待审申请，返回申请 ID。
+    // 申请人余额 10 天，在 UNIT 部门有一份 3 天的待审申请（申请版本 2），返回申请 ID；当前主体切换为审批人。
     private long pendingRequest() {
         ledgers.saved.put(APPLICANT, LeaveLedger.open(APPLICANT).grant(10)
                 .draft(1, UNIT, new LeavePeriod(FIRST, THIRD)).submit(1));
         ledgers.writes = 0;
+        current = APPROVER;
         return 1;
     }
 
@@ -71,10 +73,10 @@ class LeaveCommandsTest {
 
         LeaveChange change = apply.draft(UNIT, FIRST, THIRD);
 
-        assertEquals(new LeaveChange(101, "DRAFT"), change);
+        assertEquals(new LeaveChange(101, 1, "DRAFT"), change);
         assertEquals(1, ledgers.writes);
         assertEquals(0, ledgers.saved.get(APPLICANT).remainingDays());
-        assertEquals("PENDING", apply.submit(101).status());
+        assertEquals(new LeaveChange(101, 2, "PENDING"), apply.submit(101, 1));
     }
 
     @Test
@@ -96,6 +98,7 @@ class LeaveCommandsTest {
     @Test
     void overlappingDraftIsRejectedByLedger() {
         pendingRequest();
+        current = APPLICANT;
         scopes.put(LeavePermissions.APPLY, units(UNIT));
 
         assertRejected("LEAVE_PERIOD_OVERLAP", () -> apply.draft(UNIT, THIRD, THIRD.plusDays(1)));
@@ -105,10 +108,10 @@ class LeaveCommandsTest {
     void applicantWithdrawsOwnRequestButNotSomeoneElses() {
         long id = pendingRequest();
         current = OTHER;
-        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> apply.withdraw(id));
+        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> apply.withdraw(id, 2));
 
         current = APPLICANT;
-        assertEquals("WITHDRAWN", apply.withdraw(id).status());
+        assertEquals("WITHDRAWN", apply.withdraw(id, 2).status());
         assertEquals(10, ledgers.saved.get(APPLICANT).remainingDays());
     }
 
@@ -117,7 +120,7 @@ class LeaveCommandsTest {
         long id = pendingRequest();
         scopes.put(LeavePermissions.APPROVE, units(UNIT));
 
-        assertEquals(new LeaveChange(id, "APPROVED"), approve.approve(id));
+        assertEquals(new LeaveChange(id, 3, "APPROVED"), approve.approve(id, 2));
         assertEquals(7, ledgers.saved.get(APPLICANT).remainingDays());
     }
 
@@ -126,9 +129,9 @@ class LeaveCommandsTest {
         long id = pendingRequest();
         scopes.put(LeavePermissions.APPROVE, new CurrentScope(false, true, Set.of(20L)));
 
-        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.approve(id));
-        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.reject(id));
-        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.approve(999));
+        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.approve(id, 2));
+        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.reject(id, 2));
+        assertRejected("LEAVE_REQUEST_NOT_FOUND", () -> approve.approve(999, 2));
         assertEquals(10, ledgers.saved.get(APPLICANT).remainingDays());
     }
 
@@ -138,7 +141,31 @@ class LeaveCommandsTest {
         scopes.put(LeavePermissions.APPROVE, new CurrentScope(true, false, Set.of()));
         ledgers.afterRead = () -> ledgers.saved.computeIfPresent(APPLICANT, (account, ledger) -> ledger.grant(1));
 
-        assertRejected("VERSION_CONFLICT", () -> approve.approve(id));
+        assertRejected("VERSION_CONFLICT", () -> approve.approve(id, 2));
+    }
+
+    @Test
+    void staleRequestVersionIsConflictForEveryStateCommand() {
+        long id = pendingRequest();
+        scopes.put(LeavePermissions.APPROVE, units(UNIT));
+
+        assertRejected("VERSION_CONFLICT", () -> approve.approve(id, 1));
+        assertRejected("VERSION_CONFLICT", () -> approve.reject(id, 3));
+        current = APPLICANT;
+        assertRejected("VERSION_CONFLICT", () -> apply.withdraw(id, 1));
+        assertRejected("VERSION_CONFLICT", () -> apply.submit(id, 1));
+        assertEquals(10, ledgers.saved.get(APPLICANT).remainingDays());
+    }
+
+    @Test
+    void applicantCannotApproveOrRejectOwnRequestEvenWithScope() {
+        long id = pendingRequest();
+        current = APPLICANT;
+        scopes.put(LeavePermissions.APPROVE, new CurrentScope(true, false, Set.of()));
+
+        assertForbidden(() -> approve.approve(id, 2));
+        assertForbidden(() -> approve.reject(id, 2));
+        assertEquals(10, ledgers.saved.get(APPLICANT).remainingDays());
     }
 
     @Test

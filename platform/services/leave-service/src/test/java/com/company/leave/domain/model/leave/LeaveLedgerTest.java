@@ -135,10 +135,21 @@ class LeaveLedgerTest {
     }
 
     @Test
+    void requestVersionStartsAtOneAndGrowsWithEveryTransition() {
+        LeaveLedger pending = withDraft().submit(1);
+
+        assertEquals(1, withDraft().request(1).version());
+        assertEquals(2, pending.request(1).version());
+        assertEquals(3, pending.approve(1).request(1).version());
+        assertEquals(3, pending.withdraw(1).request(1).version());
+        assertViolation("LEAVE_INVALID", () -> new LeaveRequest(1, UNIT, days(1, 1), LeaveStatus.DRAFT, 0));
+    }
+
+    @Test
     void restoreChecksInvariants() {
-        var first = new LeaveRequest(1, UNIT, days(1, 3), LeaveStatus.APPROVED);
-        var overlapping = new LeaveRequest(2, UNIT, days(2, 4), LeaveStatus.PENDING);
-        var withdrawn = new LeaveRequest(3, UNIT, days(2, 4), LeaveStatus.WITHDRAWN);
+        var first = new LeaveRequest(1, UNIT, days(1, 3), LeaveStatus.APPROVED, 3);
+        var overlapping = new LeaveRequest(2, UNIT, days(2, 4), LeaveStatus.PENDING, 2);
+        var withdrawn = new LeaveRequest(3, UNIT, days(2, 4), LeaveStatus.WITHDRAWN, 2);
 
         assertEquals(2, LeaveLedger.restore(ACCOUNT, 0, List.of(first, withdrawn), 3).requests().size());
         assertViolation("LEAVE_PERIOD_OVERLAP", () -> LeaveLedger.restore(ACCOUNT, 0, List.of(first, overlapping), 3));

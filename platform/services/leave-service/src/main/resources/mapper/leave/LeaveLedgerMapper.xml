@@ -10,7 +10,7 @@
         WHERE r.id = #{requestId}
     </select>
     <select id="requests" resultType="com.company.leave.infrastructure.persistence.leave.RequestRow">
-        SELECT id, unit_id, start_date, end_date, status FROM leave_request WHERE account_id = #{accountId} ORDER BY id
+        SELECT id, unit_id, start_date, end_date, status, version FROM leave_request WHERE account_id = #{accountId} ORDER BY id
     </select>
     <!-- 同一员工的账户被并发开立时不写入（零行），由应用层判定为冲突。 -->
     <insert id="insert">
@@ -23,12 +23,12 @@
         SET remaining_days = #{row.remainingDays}, version = #{row.version}
         WHERE account_id = #{row.accountId} AND version = #{expected}
     </update>
-    <!-- 只在账户行已按版本写入后调用：新申请插入，已有申请只更新状态（时段与部门创建后不变）。 -->
+    <!-- 只在账户行已按版本写入后调用：新申请插入，已有申请只更新状态与版本（时段与部门创建后不变）。 -->
     <insert id="saveRequest">
-        INSERT INTO leave_request (id, account_id, unit_id, start_date, end_date, status)
+        INSERT INTO leave_request (id, account_id, unit_id, start_date, end_date, status, version)
         VALUES (#{request.id}, #{accountId}, #{request.unitId}, #{request.startDate}, #{request.endDate},
-                #{request.status})
-        ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status
-        WHERE leave_request.status &lt;&gt; EXCLUDED.status
+                #{request.status}, #{request.version})
+        ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version
+        WHERE leave_request.version &lt;&gt; EXCLUDED.version
     </insert>
 </mapper>

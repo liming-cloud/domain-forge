@@ -7,7 +7,7 @@ CREATE TABLE leave_ledger
     version        bigint NOT NULL CHECK (version > 0)
 );
 
--- 请假申请属于年假账户，随账户一起读写；起止日期都包含在内。
+-- 请假申请属于年假账户，随账户一起读写；起止日期都包含在内；version 是申请级版本，客户端提交命令时核对。
 CREATE TABLE leave_request
 (
     id         bigint PRIMARY KEY,
@@ -16,6 +16,7 @@ CREATE TABLE leave_request
     start_date date        NOT NULL,
     end_date   date        NOT NULL,
     status     varchar(16) NOT NULL CHECK (status IN ('DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN')),
+    version    bigint      NOT NULL CHECK (version > 0),
     CHECK (end_date >= start_date)
 );
 CREATE INDEX leave_request_account ON leave_request (account_id, id);

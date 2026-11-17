@@ -23,7 +23,14 @@ public final class LeaveRejected extends BusinessRuleViolation {
     }
 
     /**
-     * 同一员工的年假账户已被并发修改（409 {@code VERSION_CONFLICT}，与平台相同），客户端刷新后重试。
+     * 命令携带的申请版本与当前不符（409 {@code VERSION_CONFLICT}，与平台相同），客户端刷新后重试。
+     */
+    public static LeaveRejected staleRequest() {
+        return new LeaveRejected(Kind.CONFLICT, "VERSION_CONFLICT", "请假申请已被修改，请刷新后重试");
+    }
+
+    /**
+     * 同一员工的年假账户在读取后已被修改（409 {@code VERSION_CONFLICT}，与平台相同），客户端刷新后重试。
      */
     public static LeaveRejected versionConflict() {
         return new LeaveRejected(Kind.CONFLICT, "VERSION_CONFLICT", "年假账户已被修改，请刷新后重试");

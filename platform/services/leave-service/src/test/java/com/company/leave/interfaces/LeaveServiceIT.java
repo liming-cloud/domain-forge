@@ -186,6 +186,12 @@ class LeaveServiceIT {
         assertEquals(code, json(response).get("code").asString());
     }
 
+    // 状态命令：携带读取时的申请版本。
+    private static HttpResponse<String> act(String id, String command, String token, long version) throws Exception {
+        return call("POST", "/api/leave-requests/" + id + "/" + command, token,
+                "{\"expectedVersion\":" + version + "}");
+    }
+
     private static HttpResponse<String> draft(String token, long unit, String start, String end) throws Exception {
         return call("POST", "/api/leave-requests", token,
                 "{\"unitId\":\"" + unit + "\",\"startDate\":\"" + start + "\",\"endDate\":\"" + end + "\"}");
@@ -196,7 +202,7 @@ class LeaveServiceIT {
         var drafted = draft(token, unit, start, end);
         assertEquals(200, drafted.statusCode(), drafted.body());
         String id = json(drafted).get("id").asString();
-        var submitted = call("POST", "/api/leave-requests/" + id + "/submit", token, null);
+        var submitted = act(id, "submit", token, 1);
         assertEquals("PENDING", json(submitted).get("status").asString(), submitted.body());
         return id;
     }
@@ -237,7 +243,7 @@ class LeaveServiceIT {
         assertEquals(id, queue.get(0).get("id").asString());
         assertEquals("101", queue.get(0).get("applicantId").asString());
         assertEquals(3, queue.get(0).get("days").asInt());
-        var approved = call("POST", "/api/leave-requests/" + id + "/approve", manager, null);
+        var approved = act(id, "approve", manager, 2);
 
         assertEquals("APPROVED", json(approved).get("status").asString(), approved.body());
         assertEquals(7, balance(alice));
@@ -247,7 +253,7 @@ class LeaveServiceIT {
         assertEquals("2026-12-01", mine.get(0).get("startDate").asString());
         assertEquals(0, json(call("GET", "/api/leave-requests/pending", manager, null)).size());
         assertProblem(409, "LEAVE_STATE_CONFLICT",
-                call("POST", "/api/leave-requests/" + id + "/withdraw", alice, null));
+                act(id, "withdraw", alice, 3));
     }
 
     // 提交 → 撤回：余额不变，撤回后不能再审批，时段被释放。驳回同样不动余额。
@@ -258,12 +264,12 @@ class LeaveServiceIT {
         grant(101, 10);
         String withdrawn = pending(alice, 10, "2026-12-01", "2026-12-03");
 
-        assertEquals("WITHDRAWN", json(call("POST", "/api/leave-requests/" + withdrawn + "/withdraw", alice, null))
+        assertEquals("WITHDRAWN", json(act(withdrawn, "withdraw", alice, 2))
                 .get("status").asString());
         assertProblem(409, "LEAVE_STATE_CONFLICT",
-                call("POST", "/api/leave-requests/" + withdrawn + "/approve", manager, null));
+                act(withdrawn, "approve", manager, 3));
         String rejected = pending(alice, 10, "2026-12-01", "2026-12-03");
-        assertEquals("REJECTED", json(call("POST", "/api/leave-requests/" + rejected + "/reject", manager, null))
+        assertEquals("REJECTED", json(act(rejected, "reject", manager, 2))
                 .get("status").asString());
 
         assertEquals(10, balance(alice));
@@ -294,13 +300,13 @@ class LeaveServiceIT {
         String id = pending(alice, 10, "2026-12-01", "2026-12-03");
 
         assertProblem(404, "LEAVE_REQUEST_NOT_FOUND",
-                call("POST", "/api/leave-requests/" + id + "/approve", otherManager, null));
+                act(id, "approve", otherManager, 2));
         assertProblem(404, "LEAVE_REQUEST_NOT_FOUND",
-                call("POST", "/api/leave-requests/" + id + "/reject", otherManager, null));
+                act(id, "reject", otherManager, 2));
         assertEquals(0, json(call("GET", "/api/leave-requests/pending", otherManager, null)).size());
-        assertEquals(403, call("POST", "/api/leave-requests/" + id + "/approve", colleague, null).statusCode());
+        assertEquals(403, act(id, "approve", colleague, 2).statusCode());
         assertProblem(404, "LEAVE_REQUEST_NOT_FOUND",
-                call("POST", "/api/leave-requests/" + id + "/withdraw", colleague, null));
+                act(id, "withdraw", colleague, 2));
         assertEquals(403, draft(alice, 20, "2026-12-10", "2026-12-10").statusCode());
         assertEquals(403, call("POST", "/api/leave-balances/101/grants", alice, "{\"days\":5}").statusCode());
 
@@ -316,7 +322,7 @@ class LeaveServiceIT {
         String id = pending(alice, 10, "2026-12-01", "2026-12-03");
 
         assertProblem(422, "LEAVE_BALANCE_INSUFFICIENT",
-                call("POST", "/api/leave-requests/" + id + "/approve", manager, null));
+                act(id, "approve", manager, 2));
         assertEquals("PENDING", status(id));
         assertEquals(2, balance(alice));
     }
@@ -333,8 +339,8 @@ class LeaveServiceIT {
         String b = pending(alice, 10, "2026-12-10", "2026-12-12");
 
         List<HttpResponse<String>> responses = raceBehindLedgerLock(101,
-                () -> call("POST", "/api/leave-requests/" + a + "/approve", first, null),
-                () -> call("POST", "/api/leave-requests/" + b + "/approve", second, null));
+                () -> act(a, "approve", first, 2),
+                () -> act(b, "approve", second, 2));
 
         assertEquals(1, responses.stream().filter(r -> r.statusCode() == 200).count());
         assertProblem(409, "VERSION_CONFLICT", responses.stream().filter(r -> r.statusCode() != 200).findFirst()
@@ -358,6 +364,38 @@ class LeaveServiceIT {
         assertEquals(1, jdbc().queryForObject("SELECT count(*) FROM leave_request", Integer.class));
     }
 
+    // 自批：申请人即使有全部审批范围，也不能通过或驳回自己的申请（403），申请与余额不变。
+    @Test
+    void applicantCannotDecideOwnRequest() throws Exception {
+        String alice = user(101, unit(10), ALL, NONE);
+        grant(101, 10);
+        String id = pending(alice, 10, "2026-12-01", "2026-12-03");
+
+        assertEquals(403, act(id, "approve", alice, 2).statusCode());
+        assertEquals(403, act(id, "reject", alice, 2).statusCode());
+        assertEquals(1, json(call("GET", "/api/leave-requests/pending", alice, null)).size());
+        assertEquals("PENDING", status(id));
+        assertEquals(10, balance(alice));
+    }
+
+    // 申请级版本：命令携带的版本与当前不符时 409 VERSION_CONFLICT，不改变申请；查询返回的版本可直接用于下一次命令。
+    @Test
+    void staleRequestVersionIsConflict() throws Exception {
+        String alice = user(101, unit(10), NONE, NONE);
+        String manager = user(201, NONE, unit(10), NONE);
+        grant(101, 10);
+        String id = pending(alice, 10, "2026-12-01", "2026-12-03");
+
+        assertProblem(409, "VERSION_CONFLICT", act(id, "approve", manager, 1));
+        assertProblem(409, "VERSION_CONFLICT", act(id, "reject", manager, 3));
+        assertProblem(409, "VERSION_CONFLICT", act(id, "withdraw", alice, 1));
+        assertEquals("PENDING", status(id));
+        long current = json(call("GET", "/api/leave-requests/pending", manager, null)).get(0).get("version").asLong();
+        var approved = act(id, "approve", manager, current);
+        assertEquals(3, json(approved).get("version").asLong(), approved.body());
+        assertEquals(7, balance(alice));
+    }
+
     @Test
     void iamFailureIsDependencyUnavailable() throws Exception {
         String alice = user(101, unit(10), NONE, NONE);
@@ -365,7 +403,7 @@ class LeaveServiceIT {
         String id = pending(alice, 10, "2026-12-01", "2026-12-03");
         IAM_DOWN.set(true);
 
-        assertEquals(503, call("POST", "/api/leave-requests/" + id + "/approve", manager, null).statusCode());
+        assertEquals(503, act(id, "approve", manager, 2).statusCode());
         assertEquals("PENDING", status(id));
     }
 

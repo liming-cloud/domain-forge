@@ -23,8 +23,8 @@ import java.util.function.BiFunction;
 /**
  * 申请人的命令：起草、提交、撤回。申请人只能操作自己账户中的申请，别人的申请按不存在处理；时段重叠等规则由年假账户判断。
  *
- * <p>不加锁：保存时以读取到的账户版本为条件更新，同一人的并发修改只有一个成功，其余返回 409 {@code VERSION_CONFLICT}。
- * 申请提交后内容不再变化，状态迁移由聚合按状态机判断，因此客户端不需要携带版本。
+ * <p>不加锁：提交与撤回须携带读取时的申请版本，不符返回 409 {@code VERSION_CONFLICT}；保存时以读取到的账户版本为条件更新，
+ * 同一人的并发修改只有一个成功，其余同样返回 409。
  */
 @Service
 public class ApplyLeave {
@@ -63,24 +63,27 @@ public class ApplyLeave {
     }
 
     /**
-     * 本人的草稿提交审批。
+     * 本人的草稿提交审批，须携带读取时的申请版本。
      */
     @Transactional
-    public LeaveChange submit(long requestId) {
-        return own(requestId, LeaveLedger::submit);
+    public LeaveChange submit(long requestId, long expectedVersion) {
+        return own(requestId, expectedVersion, LeaveLedger::submit);
     }
 
     /**
-     * 本人在审批前撤回申请（草稿或待审）。
+     * 本人在审批前撤回申请（草稿或待审），须携带读取时的申请版本。
      */
     @Transactional
-    public LeaveChange withdraw(long requestId) {
-        return own(requestId, LeaveLedger::withdraw);
+    public LeaveChange withdraw(long requestId, long expectedVersion) {
+        return own(requestId, expectedVersion, LeaveLedger::withdraw);
     }
 
-    private LeaveChange own(long requestId, BiFunction<LeaveLedger, Long, LeaveLedger> transition) {
+    private LeaveChange own(long requestId, long expectedVersion,
+            BiFunction<LeaveLedger, Long, LeaveLedger> transition) {
         LeaveLedger current = ledgers.find(access.current().accountId());
-        if (current == null || current.request(requestId) == null) throw LeaveRejected.requestNotFound();
+        LeaveRequest request = current == null ? null : current.request(requestId);
+        if (current == null || request == null) throw LeaveRejected.requestNotFound();
+        if (request.version() != expectedVersion) throw LeaveRejected.staleRequest();
         LeaveLedger changed = transition.apply(current, requestId);
         if (!ledgers.update(changed, current.version())) throw LeaveRejected.versionConflict();
         return result(changed, requestId);
@@ -89,6 +92,6 @@ public class ApplyLeave {
     static LeaveChange result(LeaveLedger ledger, long requestId) {
         LeaveRequest request = ledger.request(requestId);
         if (request == null) throw LeaveRejected.requestNotFound();
-        return new LeaveChange(requestId, request.status().name());
+        return new LeaveChange(requestId, request.version(), request.status().name());
     }
 }

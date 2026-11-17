@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * 请假申请入口：申请人起草、提交、撤回，审批人通过、驳回；查询本人的申请与待我审批的申请。
  *
- * <p>权限码由原生注解在入口检查；申请归属与审批部门范围由应用用例按对象核对。
+ * <p>权限码由原生注解在入口检查；申请归属、审批部门范围与申请版本由应用用例按对象核对。状态命令须携带读取时的申请版本。
  */
 @RestController
 @PlatformJsonApi
@@ -58,8 +58,8 @@ public class LeaveRequestController {
      */
     @SaCheckPermission(LeavePermissions.APPLY)
     @PostMapping("/api/leave-requests/{id}/submit")
-    public LeaveChangeResponse submit(@PathVariable long id) {
-        return LeaveChangeResponse.of(apply.submit(id));
+    public LeaveChangeResponse submit(@PathVariable long id, @RequestBody LeaveVersionRequest input) {
+        return LeaveChangeResponse.of(apply.submit(id, input.expectedVersion()));
     }
 
     /**
@@ -67,26 +67,26 @@ public class LeaveRequestController {
      */
     @SaCheckPermission(LeavePermissions.APPLY)
     @PostMapping("/api/leave-requests/{id}/withdraw")
-    public LeaveChangeResponse withdraw(@PathVariable long id) {
-        return LeaveChangeResponse.of(apply.withdraw(id));
+    public LeaveChangeResponse withdraw(@PathVariable long id, @RequestBody LeaveVersionRequest input) {
+        return LeaveChangeResponse.of(apply.withdraw(id, input.expectedVersion()));
     }
 
     /**
-     * 命令：审批通过范围内部门的待审申请，扣减申请人的余额。
+     * 命令：审批通过范围内部门的待审申请，扣减申请人的余额；不能审批本人的申请。
      */
     @SaCheckPermission(LeavePermissions.APPROVE)
     @PostMapping("/api/leave-requests/{id}/approve")
-    public LeaveChangeResponse approve(@PathVariable long id) {
-        return LeaveChangeResponse.of(approve.approve(id));
+    public LeaveChangeResponse approve(@PathVariable long id, @RequestBody LeaveVersionRequest input) {
+        return LeaveChangeResponse.of(approve.approve(id, input.expectedVersion()));
     }
 
     /**
-     * 命令：驳回范围内部门的待审申请。
+     * 命令：驳回范围内部门的待审申请；不能驳回本人的申请。
      */
     @SaCheckPermission(LeavePermissions.APPROVE)
     @PostMapping("/api/leave-requests/{id}/reject")
-    public LeaveChangeResponse reject(@PathVariable long id) {
-        return LeaveChangeResponse.of(approve.reject(id));
+    public LeaveChangeResponse reject(@PathVariable long id, @RequestBody LeaveVersionRequest input) {
+        return LeaveChangeResponse.of(approve.reject(id, input.expectedVersion()));
     }
 
     /**
