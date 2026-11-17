@@ -11,5 +11,6 @@
     <modules>
         <module>iam</module>
         <module>gateway</module>
+        <module>leave-service</module>
     </modules>
 </project>

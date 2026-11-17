@@ -5,12 +5,12 @@ labels: ["kind/result", "status/needs-decision"]
 body:
   - type: markdown
     attributes:
-      value: 描述是唯一的事实来源，进度和决定更新在描述里，不靠评论。流程见 AGENTS.md。建好后选里程碑；未决问题全部答复后，把 `status/needs-decision` 换成 `status/ready`。
+      value: 描述是唯一的事实来源，进度和决定更新在描述里，不靠评论。流程见 AGENTS.md。未决问题全部答复后，把 `status/needs-decision` 换成 `status/ready`。
   - type: textarea
     id: goal
     attributes:
       label: 目标
-      description: 交付什么结果、解决什么问题、为什么现在做；对应哪个里程碑或产品验收场景
+      description: 交付什么结果、解决什么问题、为什么现在做；对应哪项业务需求或验收场景
     validations:
       required: true
   - type: textarea

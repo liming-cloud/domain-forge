@@ -1,0 +1,93 @@
+# leave-service 的部署覆盖文件，与 deploy/compose.yml 一起使用（见 deploy/README.md 的“接入业务服务”）。
+# 环境文件需增加 LEAVE_SERVICE_DB_PASSWORD（本服务数据库账号的密码）。
+services:
+  leave-service-db-init:
+    # 一次性任务：建立本服务专用的数据库账号与同名 schema，可重复执行，每次把密码同步为环境文件中的值。
+    # 账号只拥有自己的 schema，读不到 IAM 和其他服务的表。镜像与生成时 deploy/compose.yml 的 postgres 一致。
+    image: postgres:18.4-alpine3.24@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGUSER: domainforge
+      PGDATABASE: domainforge
+      PGPASSWORD: ${POSTGRES_PASSWORD:?provide POSTGRES_PASSWORD}
+      SERVICE_DB_PASSWORD: ${LEAVE_SERVICE_DB_PASSWORD:?provide LEAVE_SERVICE_DB_PASSWORD}
+    entrypoint: [sh, -c]
+    command:
+      - |
+        set -e
+        psql -v ON_ERROR_STOP=1 -q <<'SQL'
+        \getenv service_password SERVICE_DB_PASSWORD
+        SELECT 'CREATE ROLE leave_service' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'leave_service') \gexec
+        ALTER ROLE leave_service WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD :'service_password';
+        CREATE SCHEMA IF NOT EXISTS leave_service AUTHORIZATION leave_service;
+        SQL
+        echo "leave_service database account ready"
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  leave-service:
+    image: domain-forge/leave-service:${LEAVE_SERVICE_IMAGE_TAG:-local}
+    build:
+      context: ./jvm
+      additional_contexts:
+        dist: ../platform/services/leave-service/target
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+    environment:
+      LEAVE_SERVICE_DB_URL: jdbc:postgresql://postgres:5432/domainforge?currentSchema=leave_service
+      LEAVE_SERVICE_DB_USER: leave_service
+      LEAVE_SERVICE_DB_PASSWORD: ${LEAVE_SERVICE_DB_PASSWORD:?provide LEAVE_SERVICE_DB_PASSWORD}
+      SPRING_FLYWAY_SCHEMAS: leave_service
+      LEAVE_SERVICE_REDIS_HOST: redis
+      LEAVE_SERVICE_REDIS_PORT: "6379"
+      LEAVE_SERVICE_REDIS_PASSWORD: ${REDIS_PASSWORD:?provide REDIS_PASSWORD}
+      # IAM 地址留空：经 Nacos 发现名为 iam 的服务。
+      LEAVE_SERVICE_DISCOVERY_ENABLED: "true"
+      # 配置中心：读取 Nacos 中的 leave-service.yaml（种子见 deploy/nacos/config/）。
+      SPRING_PROFILES_ACTIVE: config-center
+      LEAVE_SERVICE_NACOS_SERVER_ADDR: nacos:8848
+      LEAVE_SERVICE_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
+      LEAVE_SERVICE_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
+      # 消息：只在发布或消费事件时连接；主题与消费组由 rocketmq-init 按 deploy/rocketmq/topics.conf 创建。
+      LEAVE_SERVICE_MESSAGING_ENDPOINTS: rocketmq-broker:8081
+      # 定时任务：应用 leave-service 由 powerjob-init 按 deploy/powerjob/apps.conf 注册。
+      LEAVE_SERVICE_SCHEDULING_ENABLED: "true"
+      LEAVE_SERVICE_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
+      LEAVE_SERVICE_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
+      # 文件存储（启用时）：本地目录在命名卷 leave-service-files 中，backup.sh／restore.sh 按挂载点识别并一同备份恢复。
+      LEAVE_SERVICE_FILES_ROOT: /var/lib/domain-forge/files
+      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
+      LEAVE_SERVICE_MANAGEMENT_ADDRESS: 0.0.0.0
+    volumes:
+      - leave-service-files:/var/lib/domain-forge/files
+      # AOT 缓存（见 deploy/jvm/start.sh）：不进入备份，丢失后下次启动重新训练。
+      - leave-service-aot:/var/lib/domain-forge/aot
+    networks: [backend]
+    depends_on:
+      leave-service-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nacos-init:
+        condition: service_completed_successfully
+      rocketmq-init:
+        condition: service_completed_successfully
+      powerjob-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # 健康检查在容器内执行。
+      test: [CMD-SHELL, 'curl -sf http://127.0.0.1:9092/actuator/health/readiness > /dev/null']
+      interval: 3s
+      timeout: 3s
+      start_period: 30s
+      retries: 40
+
+volumes:
+  leave-service-files:
+  leave-service-aot:
