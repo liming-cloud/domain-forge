@@ -87,8 +87,7 @@ class AdditionalDataSourceIT {
         assertEquals("domainforge", application.getBean(JdbcTemplate.class)
                 .queryForObject("SELECT current_database()", String.class));
         assertEquals(database, application.getBean(ExtraRowMapper.class).database());
-        assertEquals(1, admin().queryForObject("SELECT count(*) FROM pg_database WHERE datname = ?", Integer.class,
-                database));
+        assertEquals(1, application.getBean(PrimaryRowMapper.class).databases(database));
     }
 
     // 两个库在各自的事务中提交与回滚，互不影响。

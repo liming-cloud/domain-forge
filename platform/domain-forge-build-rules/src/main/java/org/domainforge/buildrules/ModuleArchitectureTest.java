@@ -13,7 +13,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 由 platform parent 通过 surefire dependenciesToScan 在每个 Java 模块执行，只检查本模块 target/classes 的生产类。
+ * 由 platform parent 通过 surefire dependenciesToScan 在每个 Java 模块执行：检查本模块 target/classes 的生产类，
+ * 以及 target/test-classes 中测试类的 SQL 位置。
  */
 class ModuleArchitectureTest {
     /**
@@ -32,6 +33,22 @@ class ModuleArchitectureTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "架构规则违规 " + violations.size() + " 项：\n" + String.join("\n", violations));
+    }
+
+    /**
+     * 测试用的 SQL 同样写在资源文件中（P-03）；没有测试类时视为通过。
+     */
+    @Test
+    void testClassesKeepSqlInResources() {
+        Path base = Path.of(System.getProperty("basedir", System.getProperty("user.dir")));
+        Path classes = base.resolve("target/test-classes");
+        if (!Files.isDirectory(classes)) {
+            return;
+        }
+        List<String> violations = ArchitectureRules.checkSql(new ClassFileImporter().importPath(classes));
+        assertTrue(
+                violations.isEmpty(),
+                () -> "测试代码 SQL 位置违规 " + violations.size() + " 项：\n" + String.join("\n", violations));
     }
 
     /**

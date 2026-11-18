@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 平台可判定的架构规则；只检查依赖方向与已知技术边界，不判断业务语义。
@@ -53,19 +54,28 @@ public final class ArchitectureRules {
     /** JSpecify 空值注解：只是类型元数据，领域层与应用层都可使用。 */
     private static final String NULLNESS = "org.jspecify.annotations";
 
+    private static final String MAPPER = "org.apache.ibatis.annotations.Mapper";
+
     private static final List<String> FORBIDDEN_JDK = List.of("java.sql", "java.net.http");
 
-    private static final List<String> INTERFACES_FORBIDDEN =
+    private static final List<String> PERSISTENCE =
             List.of(
                     "java.sql",
                     "javax.sql",
                     "org.springframework.jdbc",
                     "org.apache.ibatis",
                     "org.mybatis",
-                    "com.baomidou",
-                    "org.redisson",
-                    "io.lettuce",
-                    "org.springframework.data.redis");
+                    "com.baomidou");
+
+    private static final List<String> INTERFACES_FORBIDDEN =
+            Stream.concat(
+                    PERSISTENCE.stream(),
+                    Stream.of("org.redisson", "io.lettuce", "org.springframework.data.redis"))
+                    .toList();
+
+    /** 启动层只用 @MapperScan、@Mapper 装配 Mapper，不直接使用持久化类型（P-01）；MapperFactoryBean 是 @MapperScan 的默认属性值。 */
+    private static final Set<String> BOOTSTRAP_PERSISTENCE_TYPES =
+            Set.of(MAPPER, "org.mybatis.spring.annotation.MapperScan", "org.mybatis.spring.mapper.MapperFactoryBean");
 
     private static final Set<String> SQL_ANNOTATIONS =
             Set.of(
@@ -129,6 +139,21 @@ public final class ArchitectureRules {
     }
 
     /**
+     * 检查一组已导入的测试类：只检查 SQL 位置（P-03），其余规则约束生产代码的职责划分。
+     *
+     * @param imported 同一模块的测试类
+     * @return 违规说明
+     */
+    public static List<String> checkSql(JavaClasses imported) {
+        List<String> violations = new ArrayList<>();
+        for (JavaClass type : types(imported)) {
+            checkSqlAnnotations(type, violations);
+            checkSqlCalls(type, violations);
+        }
+        return violations.stream().distinct().sorted().toList();
+    }
+
+    /**
      * 去掉 package-info：它只承载包注解，不是类型，不参与依赖、职责与度量规则。
      */
     static JavaClasses types(JavaClasses imported) {
@@ -172,6 +197,9 @@ public final class ArchitectureRules {
         checkInternal(origin, target, violations);
         if (from == null) {
             return;
+        }
+        if ("bootstrap".equals(from.layer())) {
+            checkBootstrap(origin, target, violations);
         }
         Location to = locate(targetPackage);
         if (to != null) {
@@ -228,6 +256,25 @@ public final class ArchitectureRules {
                     : null;
             default -> null;
         };
+    }
+
+    private static void checkBootstrap(JavaClass origin, JavaClass target, List<String> violations) {
+        boolean persistence =
+                startsWithAny(target.getPackageName(), PERSISTENCE)
+                        && !BOOTSTRAP_PERSISTENCE_TYPES.contains(target.getName());
+        if (persistence || mapper(target)) {
+            violations.add(
+                    "[技术边界] "
+                            + origin.getName()
+                            + " → "
+                            + target.getName()
+                            + "：启动层只能用 @MapperScan、@Mapper 装配持久化，不得直接使用 SQL／Mapper／条件构造器");
+        }
+    }
+
+    private static boolean mapper(JavaClass target) {
+        return target.isAnnotatedWith(MAPPER)
+                || target.isAssignableTo("com.baomidou.mybatisplus.core.mapper.BaseMapper");
     }
 
     private static boolean domainAllowed(String name, String targetPackage) {

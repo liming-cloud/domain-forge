@@ -145,8 +145,11 @@ class MessagingIT {
     }
 
     private static int effects(String eventId) {
-        return application.getBean(JdbcTemplate.class)
-                .queryForObject("SELECT count(*) FROM it_effect WHERE event_id = ?", Integer.class, eventId);
+        return fixture().effects(eventId);
+    }
+
+    private static MessagingFixtureMapper fixture() {
+        return application.getBean(MessagingFixtureMapper.class);
     }
 
     private static void await(String what, BooleanSupplier condition) throws InterruptedException {
@@ -173,8 +176,7 @@ class MessagingIT {
     void committedEventIsDelivered() throws Exception {
         String id = publish(application, normal("NoteCreated", "note-1"));
         await("事件被消费", () -> effects(id) == 1);
-        var row = application.getBean(JdbcTemplate.class).queryForMap(
-                "SELECT sent_at, attempts FROM domainforge_outbox WHERE event_id = ?", id);
+        var row = fixture().outboxByEvent(id);
         assertNotNull(row.get("sent_at"));
         assertEquals(0, row.get("attempts"));
         assertEquals("NoteCreated:1:note-1", NormalHandler.LAST.get(id));
@@ -208,8 +210,7 @@ class MessagingIT {
             id[0] = publisher.publish(normal("NoteCreated", "rolled-back"));
             throw new IllegalStateException("业务失败");
         }));
-        assertEquals(0, application.getBean(JdbcTemplate.class)
-                .queryForObject("SELECT count(*) FROM domainforge_outbox WHERE event_id = ?", Integer.class, id[0]));
+        assertNull(fixture().outboxByEvent(id[0]));
         assertThrows(IllegalStateException.class, () -> publisher.publish(normal("NoteCreated", "no-tx")));
     }
 
@@ -232,8 +233,7 @@ class MessagingIT {
         String id;
         try {
             id = publish(application, normal("NoteCreated", "during-outage"));
-            await("发送失败被记录", () -> application.getBean(JdbcTemplate.class).queryForObject(
-                    "SELECT attempts FROM domainforge_outbox WHERE event_id = ?", Integer.class, id) > 0);
+            await("发送失败被记录", () -> (Integer) fixture().outboxByEvent(id).get("attempts") > 0);
         } finally {
             docker("unpause");
         }
@@ -247,8 +247,7 @@ class MessagingIT {
         String id = publish(application, normal("NoteCreated", "resent"));
         await("首次消费", () -> effects(id) == 1);
         double duplicates = counter("domainforge.messaging.duplicate", NORMAL_GROUP);
-        application.getBean(JdbcTemplate.class)
-                .update("UPDATE domainforge_outbox SET sent_at = NULL WHERE event_id = ?", id);
+        fixture().markUnsent(id);
         await("重发被识别为重复", () -> counter("domainforge.messaging.duplicate", NORMAL_GROUP) > duplicates);
         assertEquals(1, effects(id));
     }
@@ -292,8 +291,8 @@ class MessagingIT {
     @EnableAutoConfiguration
     static class Application {
         @Bean
-        NormalHandler normalHandler(JdbcTemplate jdbc) {
-            return new NormalHandler(jdbc);
+        NormalHandler normalHandler(MessagingFixtureMapper fixture) {
+            return new NormalHandler(fixture);
         }
 
         @Bean
@@ -313,10 +312,10 @@ class MessagingIT {
     static final class NormalHandler implements EventHandler {
         static final Map<String, String> LAST = new ConcurrentHashMap<>();
         static final Map<String, String> TRACES = new ConcurrentHashMap<>();
-        private final JdbcTemplate jdbc;
+        private final MessagingFixtureMapper fixture;
 
-        NormalHandler(JdbcTemplate jdbc) {
-            this.jdbc = jdbc;
+        NormalHandler(MessagingFixtureMapper fixture) {
+            this.fixture = fixture;
         }
 
         @Override
@@ -332,7 +331,7 @@ class MessagingIT {
         @Override
         public void handle(ReceivedEvent event) {
             if (event.type().equals("Poison")) throw new IllegalStateException("毒消息");
-            jdbc.update("INSERT INTO it_effect (event_id, handled_by) VALUES (?, ?)", event.id(), NORMAL_GROUP);
+            fixture.recordEffect(event.id(), NORMAL_GROUP);
             HANDLED.computeIfAbsent(event.id(), ignored -> new AtomicInteger()).incrementAndGet();
             LAST.put(event.id(), event.type() + ":" + event.version() + ":" + event.key());
             String traceId = org.slf4j.MDC.get("traceId");

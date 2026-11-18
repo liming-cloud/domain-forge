@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -210,6 +210,16 @@
     {
       "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/OrderServiceIT.java.tpl",
       "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/OrderServiceIT.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/infrastructure/fixture/OrderFixtureMapper.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/infrastructure/fixture/OrderFixtureMapper.java",
+      "example": true
+    },
+    {
+      "source": "assets/src/test/resources/mapper/fixture/OrderFixtureMapper.xml.tpl",
+      "target": "src/test/resources/mapper/fixture/OrderFixtureMapper.xml",
       "example": true
     },
     {

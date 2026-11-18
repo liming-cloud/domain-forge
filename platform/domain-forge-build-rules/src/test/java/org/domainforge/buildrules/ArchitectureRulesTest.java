@@ -66,6 +66,16 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    void bootstrapCannotUseMapper() {
+        assertViolation("fixture.bad.bootmapper", "[技术边界]");
+    }
+
+    @Test
+    void bootstrapCannotUseDataSource() {
+        assertViolation("fixture.bad.bootjdbc", "[技术边界]");
+    }
+
+    @Test
     void contextClassesMustHaveLayer() {
         assertViolation("fixture.bad.orphan", "[职责归属]");
     }

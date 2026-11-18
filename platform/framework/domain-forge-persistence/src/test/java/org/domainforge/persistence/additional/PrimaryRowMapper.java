@@ -10,4 +10,6 @@ public interface PrimaryRowMapper {
     void insert(String value);
 
     int count(String value);
+
+    int databases(String name);
 }

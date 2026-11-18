@@ -3,4 +3,5 @@
 <mapper namespace="org.domainforge.persistence.additional.PrimaryRowMapper">
     <insert id="insert">INSERT INTO primary_row (value) VALUES (#{value})</insert>
     <select id="count" resultType="int">SELECT count(*) FROM primary_row WHERE value = #{value}</select>
+    <select id="databases" resultType="int">SELECT count(*) FROM pg_database WHERE datname = #{name}</select>
 </mapper>

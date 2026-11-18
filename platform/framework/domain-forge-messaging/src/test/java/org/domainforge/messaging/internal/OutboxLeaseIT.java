@@ -15,7 +15,9 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
@@ -39,7 +41,7 @@ class OutboxLeaseIT {
     private static final String TOPIC = "df-it-lease";
     private static String schema;
     private static ConfigurableApplicationContext application;
-    private static JdbcTemplate jdbc;
+    private static MessagingFixtureMapper fixture;
 
     @BeforeAll
     static void start() throws Exception {
@@ -61,7 +63,7 @@ class OutboxLeaseIT {
                 "--spring.flyway.baseline-version=0",
                 "--domainforge.messaging.outbox.enabled=true",
                 "--domainforge.messaging.relay.enabled=false");
-        jdbc = application.getBean(JdbcTemplate.class);
+        fixture = application.getBean(MessagingFixtureMapper.class);
     }
 
     @AfterAll
@@ -71,7 +73,7 @@ class OutboxLeaseIT {
 
     @BeforeEach
     void clean() {
-        jdbc.update("DELETE FROM domainforge_outbox");
+        fixture.clearOutbox();
     }
 
     private static String env(String name) {
@@ -102,7 +104,7 @@ class OutboxLeaseIT {
             gate.pass();
         }
         assertEquals(1, running.get(10, TimeUnit.SECONDS));
-        assertNotNull(jdbc.queryForObject("SELECT sent_at FROM domainforge_outbox WHERE id = ?", Object.class, id));
+        assertNotNull(fixture.outbox(id).get("sent_at"));
     }
 
     // 租约过期后另一实例重新认领并发送；原实例随后的失败结果只作用于自己的租约，不覆盖新结果。
@@ -112,14 +114,12 @@ class OutboxLeaseIT {
         var stale = new Gate();
         var running = CompletableFuture.supplyAsync(relay(stale.producer())::relayOnce);
         assertTrue(stale.entered.await(10, TimeUnit.SECONDS), "原实例开始发送");
-        jdbc.update("UPDATE domainforge_outbox SET claimed_until = now() - interval '1 second' WHERE id = ?", id);
+        fixture.expireLease(id);
         assertEquals(1, relay(producer(message -> null)).relayOnce(), "另一实例接手发送");
-        var taken = jdbc.queryForMap("SELECT sent_at, claim_token FROM domainforge_outbox WHERE id = ?", id);
+        var taken = fixture.outbox(id);
         stale.fail();
         assertEquals(0, running.get(10, TimeUnit.SECONDS));
-        var row = jdbc.queryForMap(
-                "SELECT sent_at, claim_token, attempts, last_error FROM domainforge_outbox WHERE id = ?",
-                id);
+        var row = fixture.outbox(id);
         assertEquals(taken.get("sent_at"), row.get("sent_at"));
         assertEquals(taken.get("claim_token"), row.get("claim_token"));
         assertEquals(0, row.get("attempts"));
@@ -141,8 +141,7 @@ class OutboxLeaseIT {
         }
         assertEquals(1, running.get(10, TimeUnit.SECONDS));
         assertEquals(1, relay(producer(message -> null)).relayOnce());
-        assertNotNull(jdbc.queryForObject("SELECT sent_at FROM domainforge_outbox WHERE id = ?", Object.class,
-                second));
+        assertNotNull(fixture.outbox(second).get("sent_at"));
     }
 
     // 一批中途失败：失败的记录按退避重试，同批未发送的记录释放租约，下一轮即可发送。
@@ -153,10 +152,10 @@ class OutboxLeaseIT {
         assertEquals(0, relay(producer(message -> {
             throw new IllegalStateException("发送失败");
         })).relayOnce());
-        var failed = jdbc.queryForMap("SELECT attempts, claim_token FROM domainforge_outbox WHERE id = ?", failing);
+        var failed = fixture.outbox(failing);
         assertEquals(1, failed.get("attempts"));
         assertNull(failed.get("claim_token"));
-        assertNull(jdbc.queryForObject("SELECT claim_token FROM domainforge_outbox WHERE id = ?", String.class, rest));
+        assertNull(fixture.outbox(rest).get("claim_token"));
         assertEquals(1, relay(producer(message -> null)).relayOnce(), "未发送的记录下一轮即可发送");
     }
 
@@ -164,23 +163,19 @@ class OutboxLeaseIT {
         String eventId = UUID.randomUUID().toString();
         application.getBean(TransactionOperations.class)
                 .executeWithoutResult(status -> application.getBean(OutboxMapper.class).insert(event, eventId, null));
-        return jdbc.queryForObject("SELECT id FROM domainforge_outbox WHERE event_id = ?", Long.class, eventId);
+        return fixture.idOf(eventId);
     }
 
-    private static boolean lockable(long id) throws SQLException {
-        try (var connection = scoped().getConnection()) {
-            connection.setAutoCommit(false);
-            try (var statement = connection.prepareStatement(
-                    "SELECT id FROM domainforge_outbox WHERE id = ? FOR UPDATE NOWAIT")) {
-                statement.setLong(1, id);
-                statement.executeQuery().close();
-                return true;
-            } catch (SQLException locked) {
-                if ("55P03".equals(locked.getSQLState())) return false;
-                throw locked;
-            } finally {
-                connection.rollback();
-            }
+    // 在测试线程的连接上加锁（中继在另一个线程发送）；不在事务中，语句结束即释放。
+    private static boolean lockable(long id) {
+        try {
+            fixture.lock(id);
+            return true;
+        } catch (DataAccessException failure) {
+            if (NestedExceptionUtils.getMostSpecificCause(failure) instanceof SQLException locked
+                    && "55P03".equals(locked.getSQLState()))
+                return false;
+            throw failure;
         }
     }
 
