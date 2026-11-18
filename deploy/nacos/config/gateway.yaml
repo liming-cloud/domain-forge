@@ -20,3 +20,6 @@ gateway:
         service: iam
         paths: [/api/**]
         anonymous: [POST /api/auth/login, POST /api/auth/invitations/accept]
+      - id: leave-service
+        service: leave-service
+        paths: [/api/leave-requests/**, /api/me/leave-requests, /api/me/leave-balance, /api/leave-balances/**]

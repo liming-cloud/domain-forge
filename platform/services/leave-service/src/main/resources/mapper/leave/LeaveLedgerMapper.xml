@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.leave.infrastructure.persistence.leave.LeaveLedgerMapper">
+    <select id="find" resultType="com.company.leave.infrastructure.persistence.leave.LedgerRow">
+        SELECT account_id, remaining_days, version FROM leave_ledger WHERE account_id = #{accountId}
+    </select>
+    <select id="findByRequest" resultType="com.company.leave.infrastructure.persistence.leave.LedgerRow">
+        SELECT l.account_id, l.remaining_days, l.version
+        FROM leave_ledger l JOIN leave_request r ON r.account_id = l.account_id
+        WHERE r.id = #{requestId}
+    </select>
+    <select id="requests" resultType="com.company.leave.infrastructure.persistence.leave.RequestRow">
+        SELECT id, unit_id, start_date, end_date, status, version FROM leave_request WHERE account_id = #{accountId} ORDER BY id
+    </select>
+    <!-- 同一员工的账户被并发开立时不写入（零行），由应用层判定为冲突。 -->
+    <insert id="insert">
+        INSERT INTO leave_ledger (account_id, remaining_days, version)
+        VALUES (#{accountId}, #{remainingDays}, #{version})
+        ON CONFLICT (account_id) DO NOTHING
+    </insert>
+    <update id="update">
+        UPDATE leave_ledger
+        SET remaining_days = #{row.remainingDays}, version = #{row.version}
+        WHERE account_id = #{row.accountId} AND version = #{expected}
+    </update>
+    <!-- 只在账户行已按版本写入后调用：新申请插入，已有申请只更新状态与版本（时段与部门创建后不变）。 -->
+    <insert id="saveRequest">
+        INSERT INTO leave_request (id, account_id, unit_id, start_date, end_date, status, version)
+        VALUES (#{request.id}, #{accountId}, #{request.unitId}, #{request.startDate}, #{request.endDate},
+                #{request.status}, #{request.version})
+        ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version
+        WHERE leave_request.version &lt;&gt; EXCLUDED.version
+    </insert>
+</mapper>

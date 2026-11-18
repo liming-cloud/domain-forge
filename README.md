@@ -1,13 +1,14 @@
-# Domain Forge
+# 请假审批
 
-公司级 DDD 微服务脚手架：可复用的基础组件、身份权限（IAM）后端、API 网关、业务服务模板和部署参考方案，以及让 AI 编码工具与人工评审都能遵守的研发规范和自动检查。业务服务在本仓库内以源码方式复用平台能力。
+业务项目：员工提交年假申请，部门审批人审批，年假余额随之扣减。基于 Domain Forge 平台的副本建立，平台代码与文档随上游同步（[平台升级同步](docs/reference/平台升级同步.md)），业务只新增自己的服务与文档。
 
+- 负责人：sunliming（GitHub `liming-cloud`）；问题与需求提在本仓库的 GitHub Issues
+- 业务服务：[leave-service](platform/services/leave-service/README.md)；业务决定见 `docs/decisions/` 中以 `业务-` 开头的记录
 - 架构与模块：[总体架构](docs/explanation/总体架构.md)
 - 怎么开发、怎么提 PR：[开发流程](docs/workflow/01-开发流程.md)
 - AI 编码工具入口：[AGENTS.md](AGENTS.md)
 - 全部文档：[文档索引](docs/README.md)
-- 用本仓库开始一个业务项目：[业务仓库起步清单](docs/reference/业务仓库起步清单.md)；跟进平台升级：[平台升级同步](docs/reference/平台升级同步.md)
-- 平台维护者：产品定义、路线图与平台研发流程在 `docs/platform/`（业务项目已删除）
+- 本仓库如何由平台副本整理而来：[业务仓库起步清单](docs/reference/业务仓库起步清单.md)
 
 ## 目录
 
@@ -18,10 +19,10 @@ platform/                      Maven 工程（parent 与聚合入口：platform/
   shared/                      纯共享类型
   framework/                   13 个通用组件：web-support、persistence、cache、access-control、config、
                                service-call、messaging、scheduling、tracing、file-storage、notification、idempotency、defaults
-  services/                    平台服务：iam（身份权限）、gateway（API 网关）；业务服务也放在这里
+  services/                    平台服务：iam（身份权限）、gateway（API 网关）；业务服务 leave-service（请假审批）
   templates/ddd-service/       业务服务生成模板
 deploy/                        Docker Compose 部署参考
-docs/                          规则、参考、解释、决定与流程文档（platform/ 为平台维护者专用）
+docs/                          规则、参考、解释、决定与流程文档（业务决定以 业务- 开头）
 scripts/                       文档链接检查、单服务冒烟，以及模板、部署与闭环的验证脚本
 ```
 

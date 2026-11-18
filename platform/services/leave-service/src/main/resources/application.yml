@@ -1,0 +1,152 @@
+# leave-service 服务配置。凭据与连接目标只来自环境变量，没有默认值；缺失时启动失败。
+# 会话策略、Redis 连接资源和持久化默认值来自平台组件，这里只写差异。
+spring:
+  application:
+    name: leave-service
+  config:
+    # 带订单示例时启用 Outbox 与文件存储；这些文件随示例生成，没有示例时不存在。
+    import:
+      - optional:classpath:messaging-outbox.yml
+      - optional:classpath:file-storage.yml
+  main:
+    banner-mode: off
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+  cloud:
+    nacos:
+      discovery:
+        # 本地可独立运行；部署时启用注册与发现，IAM 地址也从发现获得。
+        enabled: ${LEAVE_SERVICE_DISCOVERY_ENABLED:false}
+        server-addr: ${LEAVE_SERVICE_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${LEAVE_SERVICE_NACOS_NAMESPACE:public}
+        group: ${LEAVE_SERVICE_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${LEAVE_SERVICE_NACOS_USERNAME:}
+        password: ${LEAVE_SERVICE_NACOS_PASSWORD:}
+    # Feign 超时（连接 1 秒、读取 2 秒）、不重试、不跟随重定向由 domain-forge-service-call 统一提供，
+    # 个别客户端需要不同值时在 spring.cloud.openfeign.client.config.<contextId> 下覆盖。
+  datasource:
+    url: ${LEAVE_SERVICE_DB_URL}
+    username: ${LEAVE_SERVICE_DB_USER}
+    password: ${LEAVE_SERVICE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 0
+      connection-timeout: 3000
+      validation-timeout: 1000
+      data-source-properties:
+        connectTimeout: 3
+        socketTimeout: 5
+  flyway:
+    enabled: true
+    clean-disabled: true
+    baseline-on-migrate: false
+  transaction:
+    default-timeout: 10s
+  data:
+    redis:
+      # 与 IAM 共用会话 Redis：纯登录态由 Sa-Token 原生校验，权限与范围向 IAM 读取。
+      host: ${LEAVE_SERVICE_REDIS_HOST}
+      port: ${LEAVE_SERVICE_REDIS_PORT}
+      password: ${LEAVE_SERVICE_REDIS_PASSWORD}
+  servlet:
+    multipart:
+      # 上传内容由 Servlet 容器完整接收（超过 1MB 暂存到临时目录）后再进入用例；超过上限返回 413。
+      # 与 domainforge.files.max-size 及入口 Nginx 对 /files 路径的上限保持一致。
+      max-file-size: 20MB
+      max-request-size: 21MB
+      file-size-threshold: 1MB
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+# 本地直连 IAM 时设置 LEAVE_SERVICE_IAM_URL（如 http://127.0.0.1:8080）；为空时经 Nacos 发现 iam。
+# 消息组件连接 RocketMQ Proxy 的地址；只有发布或消费事件时才连接，部署时为 rocketmq-broker:8081。
+# 定时任务（PowerJob）：实现 ScheduledTask 的 Bean 由调度组件登记；部署时启用，本地与测试默认不启用。
+# 文件存储（启用后）：默认本地目录，部署时为容器内挂载的命名卷；改用 S3 兼容存储时设置 LEAVE_SERVICE_FILES_STORAGE=s3
+# 与 LEAVE_SERVICE_FILES_S3_* （桶由运维事先创建，密钥只来自环境变量），见 docs/reference/components/file-storage.md。
+domainforge:
+  files:
+    storage: ${LEAVE_SERVICE_FILES_STORAGE:local}
+    max-size: 20MB
+    local:
+      root: ${LEAVE_SERVICE_FILES_ROOT:}
+    s3:
+      endpoint: ${LEAVE_SERVICE_FILES_S3_ENDPOINT:}
+      region: ${LEAVE_SERVICE_FILES_S3_REGION:us-east-1}
+      bucket: ${LEAVE_SERVICE_FILES_S3_BUCKET:}
+      access-key: ${LEAVE_SERVICE_FILES_S3_ACCESS_KEY:}
+      secret-key: ${LEAVE_SERVICE_FILES_S3_SECRET_KEY:}
+  messaging:
+    endpoints: ${LEAVE_SERVICE_MESSAGING_ENDPOINTS:}
+  scheduling:
+    enabled: ${LEAVE_SERVICE_SCHEDULING_ENABLED:false}
+    server-address: ${LEAVE_SERVICE_SCHEDULING_SERVER_ADDRESS:}
+    app-password: ${LEAVE_SERVICE_SCHEDULING_APP_PASSWORD:}
+
+leave-service:
+  iam:
+    url: ${LEAVE_SERVICE_IAM_URL:}
+
+mybatis-plus:
+  configuration:
+    default-statement-timeout: 5
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    local-cache-scope: STATEMENT
+  global-config:
+    banner: false
+
+server:
+  port: ${LEAVE_SERVICE_PORT:8090}
+  shutdown: graceful
+  forward-headers-strategy: none
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  server:
+    # 默认只在回环地址；部署时设为 0.0.0.0，使内部网络中的 Prometheus 可以抓取（端口不发布到主机、不经 Nginx）。
+    address: ${LEAVE_SERVICE_MANAGEMENT_ADDRESS:127.0.0.1}
+    port: ${LEAVE_SERVICE_MANAGEMENT_PORT:9092}
+  endpoints:
+    web:
+      exposure:
+        # 只开放健康检查与 Prometheus 指标（/actuator/prometheus）。
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,redis
+      status:
+        order: down,out-of-service,degraded,unknown,up
+  metrics:
+    tags:
+      application: leave-service
+
+---
+# 配置中心：部署时以 SPRING_PROFILES_ACTIVE=config-center 启用。Nacos 不可达或 dataId 未发布时启动失败。
+# 需要不重启生效的配置组用 domain-forge-config 的 DynamicSettingsBinder 声明，见 docs/reference/components/config.md。
+spring:
+  config:
+    activate:
+      on-profile: config-center
+    import: "nacos:leave-service.yaml?refreshEnabled=true"
+  cloud:
+    nacos:
+      config:
+        server-addr: ${LEAVE_SERVICE_NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${LEAVE_SERVICE_NACOS_NAMESPACE:public}
+        group: ${LEAVE_SERVICE_NACOS_GROUP:DEFAULT_GROUP}
+        username: ${LEAVE_SERVICE_NACOS_USERNAME:}
+        password: ${LEAVE_SERVICE_NACOS_PASSWORD:}
+domainforge:
+  config:
+    expected-source: nacos

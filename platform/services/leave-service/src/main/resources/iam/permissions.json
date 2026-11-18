@@ -1,0 +1,8 @@
+{
+  "namespace": "leave",
+  "permissions": [
+    {"code": "leave:request:apply", "name": "提交请假申请", "scoped": true, "systemOnly": false},
+    {"code": "leave:request:approve", "name": "审批请假申请", "scoped": true, "systemOnly": false},
+    {"code": "leave:balance:grant", "name": "发放年假", "scoped": true, "systemOnly": false}
+  ]
+}
