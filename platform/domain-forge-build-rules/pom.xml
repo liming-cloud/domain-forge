@@ -89,7 +89,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.1</version>
+                <version>3.16.0</version>
                 <!-- 与 platform parent 相同的零告警编译。 -->
                 <configuration>
                     <showWarnings>true</showWarnings>
