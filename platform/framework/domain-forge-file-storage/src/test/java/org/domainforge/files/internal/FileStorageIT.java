@@ -39,6 +39,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -163,16 +164,17 @@ class FileStorageIT {
         return context.getBean(ObjectStorage.class);
     }
 
-    private static JdbcTemplate jdbc() {
-        return new JdbcTemplate(new DriverManagerDataSource(url(schema), "domainforge", env("POSTGRES_PASSWORD")));
+    // 两个上下文共用同一 schema，查询记录用始终在运行的本地目录上下文。
+    private static FileFixtureMapper fixture() {
+        return local.getBean(FileFixtureMapper.class);
     }
 
     private static String key(String id) {
-        return jdbc().queryForObject("SELECT storage_key FROM domainforge_file WHERE id = ?", String.class, id);
+        return Objects.requireNonNull(fixture().storageKey(id), id);
     }
 
     private static int rows(String id) {
-        return jdbc().queryForObject("SELECT count(*) FROM domainforge_file WHERE id = ?", Integer.class, id);
+        return fixture().rows(id);
     }
 
     private static String today() {
@@ -301,14 +303,14 @@ class FileStorageIT {
     @Test
     @Order(Integer.MAX_VALUE)
     void s3OutageFailsAndRecovers() throws Exception {
-        long before = jdbc().queryForObject("SELECT count(*) FROM domainforge_file", Long.class);
+        long before = fixture().total();
         docker("pause");
         try {
             assertThrows(FileStorageUnavailableException.class, () -> store(s3, "down.txt", "停机"));
         } finally {
             docker("unpause");
         }
-        assertEquals(before, jdbc().queryForObject("SELECT count(*) FROM domainforge_file", Long.class));
+        assertEquals(before, fixture().total());
         long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
         StoredFile stored = null;
         while (stored == null && System.nanoTime() < deadline) {

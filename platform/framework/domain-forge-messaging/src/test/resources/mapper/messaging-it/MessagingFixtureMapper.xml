@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.domainforge.messaging.internal.MessagingFixtureMapper">
+    <select id="outboxByEvent" resultType="map">
+        SELECT sent_at, attempts FROM domainforge_outbox WHERE event_id = #{eventId}
+    </select>
+    <select id="outbox" resultType="map">
+        SELECT sent_at, claim_token, attempts, last_error FROM domainforge_outbox WHERE id = #{id}
+    </select>
+    <select id="idOf" resultType="long">SELECT id FROM domainforge_outbox WHERE event_id = #{eventId}</select>
+    <delete id="clearOutbox">DELETE FROM domainforge_outbox</delete>
+    <update id="markUnsent">UPDATE domainforge_outbox SET sent_at = NULL WHERE event_id = #{eventId}</update>
+    <update id="expireLease">
+        UPDATE domainforge_outbox SET claimed_until = now() - interval '1 second' WHERE id = #{id}
+    </update>
+    <select id="lock" resultType="long">SELECT id FROM domainforge_outbox WHERE id = #{id} FOR UPDATE NOWAIT</select>
+    <insert id="recordEffect">INSERT INTO it_effect (event_id, handled_by) VALUES (#{eventId}, #{handledBy})</insert>
+    <select id="effects" resultType="int">SELECT count(*) FROM it_effect WHERE event_id = #{eventId}</select>
+</mapper>

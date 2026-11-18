@@ -6,6 +6,7 @@ import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.stp.StpLogic;
 import @@PACKAGE@@.application.order.OrderPermissions;
 import @@PACKAGE@@.bootstrap.@@APP_CLASS@@;
+import @@PACKAGE@@.infrastructure.fixture.OrderFixtureMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.domainforge.access.api.SameTokens;
@@ -17,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -86,10 +86,13 @@ class OrderServiceIT {
         if (iam != null) iam.stop(0);
     }
 
+    private static OrderFixtureMapper fixture() {
+        return application.getBean(OrderFixtureMapper.class);
+    }
+
     @BeforeEach
     void reset() {
-        application.getBean(JdbcTemplate.class)
-                .update("TRUNCATE orders, order_line, order_file, domainforge_file, domainforge_outbox");
+        fixture().reset();
         SUBJECTS.clear();
         SCOPES.clear();
         IAM_DOWN.set(false);
@@ -271,9 +274,8 @@ class OrderServiceIT {
         assertProblem(409, "ORDER_STATE_CONFLICT",
                 call("POST", "/api/orders/" + id + "/lines", writer, "{\"expectedVersion\":2,\"sku\":\"B\",\"quantity\":1,"
                         + "\"unitPriceCents\":100}"));
-        var jdbc = application.getBean(JdbcTemplate.class);
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
-        var event = jdbc.queryForMap("SELECT topic, event_type, event_key, payload FROM domainforge_outbox");
+        assertEquals(1, fixture().outboxCount());
+        var event = fixture().onlyOutboxEvent();
         assertEquals("@@ARTIFACT@@-orders", event.get("topic"));
         assertEquals("OrderSubmitted", event.get("event_type"));
         assertEquals(id, event.get("event_key"));
@@ -285,7 +287,7 @@ class OrderServiceIT {
         assertEquals("CANCELLED", json(call("POST", "/api/orders/" + other + "/cancel", writer, version(1)))
                 .get("status").asString());
         assertProblem(409, "ORDER_STATE_CONFLICT", call("POST", "/api/orders/" + other + "/submit", writer, version(2)));
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
+        assertEquals(1, fixture().outboxCount());
     }
 
     // 聚合维护跨行不变式：同一商品只能一行、总额有上限；违反时整个命令回滚，订单行不变。
@@ -302,9 +304,7 @@ class OrderServiceIT {
         var added = call("POST", "/api/orders/" + id + "/lines", writer,
                 "{\"expectedVersion\":1,\"sku\":\"C-1\",\"quantity\":1,\"unitPriceCents\":500}");
         assertEquals(2, json(added).get("version").asInt());
-        var jdbc = application.getBean(JdbcTemplate.class);
-        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM order_line WHERE order_id = ?", Integer.class,
-                Long.parseLong(id)));
+        assertEquals(2, fixture().lines(Long.parseLong(id)));
     }
 
     // 权限码缺失 403；过期版本为 409 + 稳定代码；范围外对象按不存在处理。
@@ -335,13 +335,12 @@ class OrderServiceIT {
         assertEquals(200, first.statusCode(), first.body());
         assertEquals(first.body(), again.body());
         assertEquals("true", again.headers().firstValue("Idempotent-Replayed").orElse(null));
-        var jdbc = application.getBean(JdbcTemplate.class);
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
+        assertEquals(1, fixture().outboxCount());
         var reused = keyed(writer, "/api/orders/" + id + "/submit", key, version(7));
         assertProblem(422, "IDEMPOTENCY_KEY_REUSED", reused);
         assertProblem(409, "ORDER_STATE_CONFLICT",
                 keyed(writer, "/api/orders/" + id + "/submit", UUID.randomUUID().toString(), version(2)));
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM domainforge_outbox", Integer.class));
+        assertEquals(1, fixture().outboxCount());
     }
 
     private static HttpResponse<String> keyed(String token, String path, String key, String body) throws Exception {
@@ -390,8 +389,7 @@ class OrderServiceIT {
         assertEquals(204, call("DELETE", "/api/orders/" + order + "/files/" + file, writer, null).statusCode());
         assertProblem(404, "ORDER_FILE_NOT_FOUND", download("/api/orders/" + order + "/files/" + file, writer));
         assertEquals(0, json(call("GET", "/api/orders/" + order + "/files", writer, null)).size());
-        assertNotNull(application.getBean(JdbcTemplate.class).queryForObject(
-                "SELECT deleted_at FROM domainforge_file WHERE id = ?", java.sql.Timestamp.class, file));
+        assertEquals(1, fixture().deletedFiles(file));
     }
 
     // logback-spring.xml 注册了状态监听器：Logback 的 WARN 状态不以文本打到标准输出，部署环境只有 JSON 日志行。
