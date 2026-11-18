@@ -107,7 +107,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.6</version>
+                <version>3.6.1</version>
                 <configuration>
                     <!-- 与 platform parent 一致：默认要求有测试，命令行可用 -Dsurefire.failIfNoTests=false 覆盖（不用 failIfNoTests：failsafe 也读取该属性）。 -->
                     <failIfNoTests>${surefire.failIfNoTests}</failIfNoTests>
