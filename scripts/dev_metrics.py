@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """按里程碑统计研发度量与北极星指标，输出 Markdown 报告。
 
-用法：scripts/dev_metrics.py [--milestone 首版] [--runs 10] [-o 报告路径]
-数据全部来自 GitHub（gh）和仓库本身：里程碑内的任务 issue 及关闭它们的已合并 PR、CI 运行、规则卡、
-domain-forge-build-rules 的反例测试（检出结果取自本机 surefire 报告，没有则标“未运行”）。
-指标口径见 docs/platform/质量模型与北极星.md。
+用法：scripts/dev_metrics.py [--milestone 首版] [--runs 10] [--fast-gate] [-o 报告路径]
+数据来自 GitHub（gh）和仓库本身：里程碑内的任务 issue 及关闭它们的已合并 PR、CI 运行、规则卡、
+编译参数、domain-forge-build-rules 的反例测试（检出结果取自本机 surefire 报告，没有则标“未运行”）。
+--fast-gate 在本机执行一次快速门禁并计时（约 1.5 分钟）。
+指标口径见 docs/platform/工程北极星.md 与 docs/platform/质量模型与北极星.md。
 """
 
 import argparse
@@ -13,6 +14,7 @@ import re
 import statistics
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import date, datetime
@@ -22,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 RULES_DIR = ROOT / "platform/domain-forge-build-rules"
 RULES_TEST = RULES_DIR / "src/test/java/org/domainforge/buildrules/ArchitectureRulesTest.java"
 SUREFIRE = RULES_DIR / "target/surefire-reports/TEST-org.domainforge.buildrules.ArchitectureRulesTest.xml"
+PLATFORM_POM = ROOT / "platform/pom.xml"
+FAST_GATE = ("platform/mvnw", "-f", "platform/pom.xml", "-q", "verify", "-DskipITs", "-Ddocker.skip=true")
 CARD_DIRS = ("docs/rules", "docs/workflow")
 CARD_HEADING = re.compile(r"^### ([A-Z]-\d{2}) \S")
 CHECK_LINE = re.compile(r"^\*\*检查\*\*：(.+)$")
@@ -91,30 +95,52 @@ def modules_of(pr, modules):
     return touched
 
 
+def is_rework(pr):
+    return any(label["name"] == "rework" for label in pr["labels"])
+
+
 def pr_table(prs, modules):
     rows = ["| PR | 标题 | 创建→合并 | 评审轮次 | 评审意见 | 返工 | 模块数 |", "|---|---|---|---|---|---|---|"]
     for pr in prs:
         cycle = parse_time(pr["mergedAt"]) - parse_time(pr["createdAt"])
         title = pr["title"].replace("|", "\\|")
-        rework = "是" if any(label["name"] == "rework" for label in pr["labels"]) else "否"
+        rework = "是" if is_rework(pr) else "否"
         rows.append(f"| #{pr['number']} | {title} | {fmt_hours(hours(cycle))} | {review_rounds(pr)} "
                     f"| {review_comments(pr)} | {rework} | {len(modules_of(pr, modules))} |")
     return rows
 
 
-def north_star(prs, modules):
-    total = len(prs)
-    first_pass = sum(1 for pr in prs
-                     if not any(label["name"] == "rework" for label in pr["labels"]) and review_rounds(pr) == 1)
+def percent(part, whole):
+    return f"{part}/{whole}（{part * 100 // whole if whole else 0}%）"
+
+
+def delivery_lines(prs, modules):
     cycles = [hours(parse_time(pr["mergedAt"]) - parse_time(pr["createdAt"])) for pr in prs]
     distribution = Counter(len(modules_of(pr, modules)) for pr in prs)
-    lines = [
-        f"- AI 一次通过率：{first_pass}/{total}（{first_pass * 100 // total if total else 0}%）",
+    return [
         f"- 中位交付周期（PR 创建到合并）：{fmt_hours(median(cycles)) if cycles else '无数据'}",
         "- 变更局部性（每个 PR 涉及的 Maven 模块数 → PR 数）：" + (
             "、".join(f"{k} 个模块 {v} 个" for k, v in sorted(distribution.items())) or "无数据"),
     ]
-    return lines
+
+
+def fast_gate_line(measure):
+    if not measure:
+        return "- 本地快速门禁：未测量（加 `--fast-gate` 在本机执行一次并计时）"
+    started = time.monotonic()
+    result = subprocess.run(FAST_GATE, cwd=ROOT, capture_output=True, text=True)
+    minutes = (time.monotonic() - started) / 60
+    outcome = "通过" if result.returncode == 0 else f"失败（退出码 {result.returncode}），时长不作基线"
+    return f"- 本地快速门禁：{minutes:.1f} 分钟，{outcome}（`{' '.join(FAST_GATE)}`）"
+
+
+def compiler_warning_line():
+    text = PLATFORM_POM.read_text(encoding="utf-8")
+    plugin = re.search(r"<artifactId>maven-compiler-plugin</artifactId>(.*?)</plugin>", text, re.S)
+    guarded = plugin and "<failOnWarning>true</failOnWarning>" in plugin.group(1) and "-Xlint:all" in plugin.group(1)
+    if guarded:
+        return "- 编译告警：0（`platform/pom.xml` 启用 `-Xlint:all` 与 `failOnWarning`，有告警即构建失败）"
+    return "- 编译告警：未设门禁（`platform/pom.xml` 的编译插件缺少 `-Xlint:all` 或 `failOnWarning`）"
 
 
 def rule_card_stats():
@@ -188,12 +214,12 @@ def escaped_section(milestone, issues):
     escaped = gh_json("issue", "list", "--label", "escaped-defect", "--state", "all", "--limit", "200",
                       "--json", "number,title,state")
     in_milestone = sum(1 for issue in issues if any(label["name"] == "escaped-defect" for label in issue["labels"]))
-    lines = [f"- 全部带 `escaped-defect` 的 issue：{len(escaped)} 个；其中属于里程碑「{milestone}」：{in_milestone} 个"]
+    lines = [f"- 逃逸缺陷：全部带 `escaped-defect` 的 issue {len(escaped)} 个；其中属于里程碑「{milestone}」：{in_milestone} 个"]
     lines += [f"  - #{item['number']} {item['title']}（{item['state']}）" for item in escaped]
     return "\n".join(lines)
 
 
-def build_report(milestone, runs):
+def build_report(milestone, runs, fast_gate):
     issues = milestone_issues(milestone)
     numbers = {issue["number"] for issue in issues}
     closed = sum(1 for issue in issues if issue["state"] == "CLOSED")
@@ -201,7 +227,7 @@ def build_report(milestone, runs):
     modules = maven_modules()
     auto, total = rule_card_stats()
     head = run("git", "rev-parse", "--short", "HEAD").strip()
-    rework = sum(1 for pr in prs if any(label["name"] == "rework" for label in pr["labels"]))
+    first_pass = sum(1 for pr in prs if not is_rework(pr))
     sections = [
         f"# 研发度量报告：里程碑「{milestone}」",
         f"生成日期 {date.today()}，仓库提交 `{head}`，由 `scripts/dev_metrics.py` 从 GitHub 生成。"
@@ -210,15 +236,20 @@ def build_report(milestone, runs):
         "- PR 与任务的关系：PR 的 `closingIssuesReferences`，或标题末尾的 `(#任务号)`。\n"
         "- 评审轮次 = 1 + “要求修改”评审次数；评审意见数 = PR 对话评论数 + 带正文的评审数。"
         "本仓库由同一账号开 PR、自动合并，评审多发生在 PR 外，因此这两项偏低。\n"
-        "- AI 一次通过率 = 没有 `rework` 标签且评审轮次为 1 的 PR 占比。"
-        "历史 PR 没有统一打 `rework`、`escaped-defect` 标签，这两项在首份报告中偏低，随着标签纪律建立才有参考价值。\n"
+        "- 一次通过率 = 没有 `rework` 标签的 PR 占比（ADR-0029，不再看评审轮次）。"
+        "历史 PR 没有统一打 `rework`、`escaped-defect` 标签，这两项早期偏乐观，随着标签纪律建立才有参考价值。\n"
+        "- 规则可执行率 = 检查行含“自动”标签的规则卡 ÷ 全部规则卡，统计全仓库，不分里程碑。\n"
         "- 交付周期取 PR 创建到合并；任务开工时间 GitHub 上没有记录，不另算。\n"
         "- 模块数 = PR 改动文件所属的 Maven 模块去重个数；只改文档、脚本、CI 的 PR 为 0。",
-        "## 北极星指标\n\n### 价值\n\n" + "\n".join(north_star(prs, modules)[:2]) +
-        f"\n\n### 质量\n\n- 原则可执行率：{auto}/{total}（{auto * 100 // total}%，规则卡检查行含“自动”标签的比例）\n"
-        + north_star(prs, modules)[2] +
-        f"\n\n### 护栏\n\n{escaped_section(milestone, issues)}\n"
-        f"- 返工 PR（`rework`）：{rework}/{len(prs)}\n\n### 领先指标：CI 作业耗时\n\n{ci_section(runs)}",
+        "## 工程北极星\n\n"
+        f"- 规则可执行率：{percent(auto, total)}；目标「工程优化」结束时 ≥ 40%，首版收尾时 ≥ 50%\n"
+        f"{fast_gate_line(fast_gate)}\n"
+        "- CI 完整门禁：见下方“CI 作业耗时”的 `mvn verify` 作业与整次运行\n"
+        f"- 一次通过率：{percent(first_pass, len(prs))}\n"
+        f"{escaped_section(milestone, issues)}\n"
+        f"{compiler_warning_line()}\n\n"
+        f"### CI 作业耗时\n\n{ci_section(runs)}",
+        "## 价值与变更局部性\n\n" + "\n".join(delivery_lines(prs, modules)),
         "## 架构规则的反例与检出\n\n" + counterexample_section(),
         "## 里程碑 PR 明细\n\n" + "\n".join(pr_table(prs, modules)),
     ]
@@ -229,9 +260,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--milestone", default="首版")
     parser.add_argument("--runs", type=int, default=10, help="统计 CI 耗时的运行次数")
+    parser.add_argument("--fast-gate", action="store_true", help="在本机执行一次快速门禁并计时")
     parser.add_argument("-o", "--output", help="输出文件；省略则打印到标准输出")
     args = parser.parse_args()
-    report = build_report(args.milestone, args.runs)
+    report = build_report(args.milestone, args.runs, args.fast_gate)
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
     else:
