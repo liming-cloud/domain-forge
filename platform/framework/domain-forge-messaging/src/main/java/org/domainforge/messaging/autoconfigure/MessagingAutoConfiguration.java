@@ -7,6 +7,7 @@ import io.micrometer.tracing.propagation.Propagator;
 import org.apache.rocketmq.client.apis.ClientConfiguration;
 import org.apache.rocketmq.client.apis.ClientException;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
+import org.apache.rocketmq.client.apis.StaticSessionCredentialsProvider;
 import org.apache.rocketmq.client.apis.producer.Producer;
 import org.domainforge.messaging.api.EventHandler;
 import org.domainforge.messaging.api.EventPublisher;
@@ -41,18 +42,21 @@ import java.util.List;
 @MapperScan(basePackageClasses = OutboxMapper.class, annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class MessagingAutoConfiguration {
     /**
-     * 连接 RocketMQ Proxy 的客户端配置；未配置地址时为空。
+     * 连接 RocketMQ Proxy 的客户端配置；未配置地址时为空，配置了 {@code access-key} 时带 ACL 凭据。
      */
     @Bean
     @ConditionalOnMissingBean
     MessagingClient messagingClient(MessagingProperties properties) {
         String endpoints = properties.endpoints();
         if (endpoints.isBlank()) return new MessagingClient(null);
-        return new MessagingClient(ClientConfiguration.newBuilder()
+        var builder = ClientConfiguration.newBuilder()
                 .setEndpoints(endpoints)
                 .enableSsl(false)
-                .setRequestTimeout(properties.requestTimeout())
-                .build());
+                .setRequestTimeout(properties.requestTimeout());
+        if (!properties.accessKey().isBlank())
+            builder.setCredentialProvider(
+                    new StaticSessionCredentialsProvider(properties.accessKey(), properties.secretKey()));
+        return new MessagingClient(builder.build());
     }
 
     /**

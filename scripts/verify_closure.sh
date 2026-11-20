@@ -13,6 +13,8 @@
 # 数据库账号读不到 IAM 的表、/internal/ 不对外。不修改当前工作区。
 #
 # 用法：scripts/verify_closure.sh
+#       MQ_ACL=1 scripts/verify_closure.sh  # 列入 compose.mq-acl.yml：服务以应用账号收发事件，并核对无凭据直连 broker、
+#                                           # 密钥不符经 Proxy 连接的客户端都被拒
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +22,8 @@ work="$(mktemp -d)"
 copy="$work/repo"
 export COMPOSE_PROJECT_NAME="dfclosure$$"
 export COMPOSE_FILE="$copy/deploy/compose.yml:$copy/deploy/services/order-service.compose.yml:$copy/deploy/services/board-service.compose.yml:$copy/scripts/compose.tracing-verify.yml:$copy/scripts/compose.metrics-verify.yml"
+mq_acl="${MQ_ACL:-}"
+[ "$mq_acl" = 1 ] && COMPOSE_FILE="$COMPOSE_FILE:$copy/deploy/compose.mq-acl.yml"
 # shellcheck source=scripts/deploy_lib.sh
 . "$repo/scripts/deploy_lib.sh"
 port=$(free_port)
@@ -56,6 +60,8 @@ step "启动整套服务"
 service_db_pw=$(secret)
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "ORDER_SERVICE_IMAGE_TAG=$tag" \
     "ORDER_SERVICE_DB_PASSWORD=$service_db_pw" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
+[ "$mq_acl" = 1 ] && printf 'ROCKETMQ_ADMIN_ACCESS_KEY=dfadmin\nROCKETMQ_ADMIN_SECRET_KEY=%s\nROCKETMQ_APP_ACCESS_KEY=dfapp\nROCKETMQ_APP_SECRET_KEY=%s\n' \
+    "$(secret)" "$(secret)" >> "$env_file"
 up_wait --build --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
@@ -64,6 +70,15 @@ grep -q 'nacos config seeded: order-service.yaml' <<< "$(compose logs nacos-init
 grep -q -- '- id: order-service' "$copy/deploy/nacos/config/gateway.yaml" || fail "生成服务的网关路由未写入种子"
 grep -q -- '- id: board-service-calls' "$copy/deploy/nacos/config/gateway.yaml" || fail "调用方示例的网关路由未写入种子"
 grep -q 'rocketmq group ready: board-service-order-tally' <<< "$(compose logs rocketmq-init)" || fail "消费组未创建"
+
+if [ "$mq_acl" = 1 ]; then
+    step "RocketMQ ACL：应用账号已建，无凭据的客户端被拒"
+    grep -q 'rocketmq app user ready: dfapp' <<< "$(compose logs rocketmq-init)" || fail "应用账号未创建"
+    # 镜像自带的 tools.yml 凭据不是有效账号，相当于网段内任意未授权的客户端直连 broker。
+    denied=$(compose run --rm --no-deps -T --entrypoint ./mqadmin rocketmq-init \
+        sendMessage -n rocketmq-namesrv:9876 -t order-service-orders -p probe 2>&1 || true)
+    grep -q 'CODE: 16' <<< "$denied" || fail "无凭据的客户端发送应被拒：$(tail -3 <<< "$denied")"
+fi
 
 step "初始化管理员并注册账号"
 admin_pw="Admin-$(secret)"
@@ -346,5 +361,17 @@ put "/api/accounts/$alice_id/roles" "{\"expectedVersion\":$(field version <<< "$
 expect 200 "撤销角色"
 post /api/orders '{}' "$alice_token" > /dev/null
 expect 403 "撤权后同一会话的业务命令"
+
+if [ "$mq_acl" = 1 ]; then
+    step "RocketMQ ACL：密钥不符的服务经 Proxy 连接被拒，启动失败"
+    probe=$(compose run -d --no-deps -e BOARD_SERVICE_MESSAGING_SECRET_KEY=wrong board-service)
+    for attempt in $(seq 1 60); do
+        [ "$(docker inspect -f '{{.State.Running}}' "$probe")" = "false" ] && break
+        sleep 2
+    done
+    probe_logs=$(docker logs "$probe" 2>&1)
+    docker rm -f "$probe" > /dev/null
+    grep -q 'response-code=40100' <<< "$probe_logs" || fail "密钥不符的消费者应被 Proxy 拒绝"
+fi
 
 echo "closure_check=passed"

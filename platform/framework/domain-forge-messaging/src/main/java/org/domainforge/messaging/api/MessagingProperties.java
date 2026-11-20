@@ -10,6 +10,8 @@ import java.time.Duration;
  * 缺失即启动失败。
  *
  * @param endpoints      RocketMQ Proxy 地址
+ * @param accessKey      RocketMQ 开启 ACL 时的账号；为空时不带凭据
+ * @param secretKey      与 {@code accessKey} 对应的密钥
  * @param requestTimeout 客户端请求超时
  * @param retentionHours 已发送与去重记录的保留小时数
  * @param outbox         发布端
@@ -19,6 +21,8 @@ import java.time.Duration;
 @ConfigurationProperties("domainforge.messaging")
 public record MessagingProperties(
         @DefaultValue("") String endpoints,
+        @DefaultValue("") String accessKey,
+        @DefaultValue("") String secretKey,
         @DefaultValue("3s") Duration requestTimeout,
         @DefaultValue("168") long retentionHours,
         @DefaultValue Outbox outbox,

@@ -79,6 +79,8 @@ domainforge:
       secret-key: ${@@ENV@@_FILES_S3_SECRET_KEY:}
   messaging:
     endpoints: ${@@ENV@@_MESSAGING_ENDPOINTS:}
+    access-key: ${@@ENV@@_MESSAGING_ACCESS_KEY:}
+    secret-key: ${@@ENV@@_MESSAGING_SECRET_KEY:}
   scheduling:
     enabled: ${@@ENV@@_SCHEDULING_ENABLED:false}
     server-address: ${@@ENV@@_SCHEDULING_SERVER_ADDRESS:}

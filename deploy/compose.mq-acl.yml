@@ -1,0 +1,19 @@
+# RocketMQ ACL 覆盖文件：开启认证与授权，未带凭据或凭据不符的客户端被拒绝。生产环境必须列入。
+# 用法：COMPOSE_FILE=deploy/compose.yml:deploy/compose.mq-acl.yml（有业务服务时一并列入），环境文件填写
+# ROCKETMQ_ADMIN_ACCESS_KEY／SECRET_KEY（管理员，供 broker 内部与 rocketmq-init 使用）与
+# ROCKETMQ_APP_ACCESS_KEY／SECRET_KEY（所有业务服务共用的应用账号，由 rocketmq-init 创建）。
+services:
+  rocketmq-broker:
+    entrypoint: [sh, /etc/rocketmq/acl-broker.sh]
+    command: []
+    environment:
+      ROCKETMQ_ADMIN_ACCESS_KEY: ${ROCKETMQ_ADMIN_ACCESS_KEY:?provide ROCKETMQ_ADMIN_ACCESS_KEY}
+      ROCKETMQ_ADMIN_SECRET_KEY: ${ROCKETMQ_ADMIN_SECRET_KEY:?provide ROCKETMQ_ADMIN_SECRET_KEY}
+    volumes:
+      - ./rocketmq/acl-broker.sh:/etc/rocketmq/acl-broker.sh:ro
+  rocketmq-init:
+    environment:
+      ROCKETMQ_ADMIN_ACCESS_KEY: ${ROCKETMQ_ADMIN_ACCESS_KEY:?provide ROCKETMQ_ADMIN_ACCESS_KEY}
+      ROCKETMQ_ADMIN_SECRET_KEY: ${ROCKETMQ_ADMIN_SECRET_KEY:?provide ROCKETMQ_ADMIN_SECRET_KEY}
+      ROCKETMQ_APP_ACCESS_KEY: ${ROCKETMQ_APP_ACCESS_KEY:?provide ROCKETMQ_APP_ACCESS_KEY}
+      ROCKETMQ_APP_SECRET_KEY: ${ROCKETMQ_APP_SECRET_KEY:?provide ROCKETMQ_APP_SECRET_KEY}

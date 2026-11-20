@@ -25,7 +25,7 @@
 | Outbox 表 `domainforge_outbox` | 服务在自己的迁移中创建（结构见组件 `domain-forge/messaging/schema.sql`）；`domainforge.messaging.outbox.enabled=true` 启用发布。列 `trace_parent` 记录发布时的链路，用于中继与消费方延续同一链路（见[链路追踪](tracing.md)）；列 `claimed_until`、`claim_token` 是中继的租约 |
 | 中继 | 每秒扫描，事务提交后立即唤醒（中继未启动或正在停止时忽略唤醒，由下次扫描发送）；短事务内 `FOR UPDATE SKIP LOCKED` 认领一批并写入 60 秒租约，在事务外发送，再以短事务按租约令牌记录结果，发送期间不持有连接与行锁（[0025](../../decisions/0025-Outbox中继改为租约认领.md)）；多实例分担，租约过期后可由其他实例重新认领；有顺序键的只取该键最早一条。一批中出现发送失败即停止本批，释放未发送记录的租约。已发送记录保留 7 天后清理 |
 | 消费 | 每个 `EventHandler` Bean 对应一个推送消费者（消费组、主题由处理者声明）；去重表 `domainforge_inbox` 由服务在迁移中创建 |
-| 连接 | `domainforge.messaging.endpoints`（Proxy 地址）；需要连接（启用中继或有处理者）却未配置时启动失败 |
+| 连接 | `domainforge.messaging.endpoints`（Proxy 地址）；需要连接（启用中继或有处理者）却未配置时启动失败。RocketMQ 开启 ACL 时配置 `access-key`、`secret-key`（为空时不带凭据） |
 | 指标 | `domainforge.messaging.outbox.pending`（积压）、`.outbox.sent`、`.outbox.failed`、`domainforge.messaging.duplicate`、`domainforge.messaging.dead-letter`（按消费组） |
 | 测试开关 | `domainforge.messaging.relay.enabled=false` 只写 Outbox 不发送；`domainforge.messaging.consumer.enabled=false` 只装配处理者不连接。只用于没有 RocketMQ 的测试 |
 

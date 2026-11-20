@@ -141,6 +141,33 @@ jobs:
           path: diagnostics/
           retention-days: 7
 
+  closure-mq-acl:
+    name: MVP 闭环（RocketMQ ACL 开启）
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: 列入 compose.mq-acl.yml 走完闭环，并核对无凭据的客户端被拒
+        env:
+          DIAGNOSTICS_DIR: ${{ github.workspace }}/diagnostics
+          MQ_ACL: '1'
+        run: scripts/verify_closure.sh
+      - name: 保存容器日志
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: closure-mq-acl-diagnostics
+          path: diagnostics/
+          retention-days: 7
+
   docs:
     name: 文档链接
     runs-on: ubuntu-latest

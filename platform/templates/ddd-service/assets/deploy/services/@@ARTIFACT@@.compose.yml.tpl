@@ -56,6 +56,9 @@ services:
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
       # 消息：只在发布或消费事件时连接；主题与消费组由 rocketmq-init 按 deploy/rocketmq/topics.conf 创建。
       @@ENV@@_MESSAGING_ENDPOINTS: rocketmq-broker:8081
+      # RocketMQ ACL（compose.mq-acl.yml）开启时用的应用账号；未开启时为空，不带凭据。
+      @@ENV@@_MESSAGING_ACCESS_KEY: ${ROCKETMQ_APP_ACCESS_KEY:-}
+      @@ENV@@_MESSAGING_SECRET_KEY: ${ROCKETMQ_APP_SECRET_KEY:-}
       # 定时任务：应用 @@ARTIFACT@@ 由 powerjob-init 按 deploy/powerjob/apps.conf 注册。
       @@ENV@@_SCHEDULING_ENABLED: "true"
       @@ENV@@_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
