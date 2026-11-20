@@ -256,6 +256,10 @@ class AccessModelIT {
                 () -> bean(AccessScopes.class).scopes(digest("scope.member"), List.of(EXPORT)));
         assertFailure(Kind.UNAUTHENTICATED,
                 () -> bean(AccessScopes.class).scopes("0".repeat(64), List.of(READ)));
+        assertEquals(Set.of(READ),
+                bean(AccessScopes.class).available(digest("scope.member"), List.of(READ, EXPORT)).keySet());
+        assertFailure(Kind.UNAUTHENTICATED,
+                () -> bean(AccessScopes.class).available("0".repeat(64), List.of(READ)));
     }
 
     // 目录升级：被引用的权限不能移除或改变范围声明，未引用的可以移除。

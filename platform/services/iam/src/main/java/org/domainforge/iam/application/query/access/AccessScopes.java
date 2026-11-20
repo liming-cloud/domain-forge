@@ -16,4 +16,9 @@ public interface AccessScopes {
      * 返回每个权限的范围；会话无效报告未认证，不返回空范围冒充放行或拒绝。
      */
     Map<String, AccessScope> scopes(String tokenDigest, List<String> permissions);
+
+    /**
+     * 同 scopes，但跳过不在目录中或不需要数据范围的权限，结果只含其余权限；用于随当前主体预取，目录未安装时不影响主体读取。
+     */
+    Map<String, AccessScope> available(String tokenDigest, List<String> permissions);
 }
