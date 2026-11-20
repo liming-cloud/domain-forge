@@ -54,6 +54,20 @@ public final class InternalAccessController {
     @GetMapping("/internal/access/scopes")
     @Operation(summary = "读取当前用户数据范围", description = "无授予返回空范围；业务查询把范围映射为参数绑定的过滤条件")
     public Map<String, CurrentScope> scopes(@RequestParam("permission") List<String> permissions) {
+        return scopesOf(permissions);
+    }
+
+    /**
+     * 一次返回当前主体与指定权限的数据范围，供每个请求既要判定权限又要读范围的服务只调用一次；权限要求同 scopes。
+     */
+    @SaCheckLogin
+    @GetMapping("/internal/access/snapshot")
+    @Operation(summary = "读取当前用户身份、权限与数据范围", description = "current 与 scopes 的合并，一次请求完成")
+    public AccessSnapshot snapshot(@RequestParam("permission") List<String> permissions) {
+        return new AccessSnapshot(access.current(), scopesOf(permissions));
+    }
+
+    private Map<String, CurrentScope> scopesOf(List<String> permissions) {
         Map<String, CurrentScope> result = new TreeMap<>();
         scopes.scopes(identity.current().tokenDigest(), permissions)
                 .forEach((code, scope) -> result.put(code,

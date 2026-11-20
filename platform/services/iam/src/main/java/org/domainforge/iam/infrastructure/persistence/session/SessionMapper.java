@@ -10,12 +10,7 @@ import java.time.Instant;
 @org.apache.ibatis.annotations.Mapper
 public interface SessionMapper {
     /**
-     * 本事务身份查询的数据库执行预算500ms。
-     */
-    String budget();
-
-    /**
-     * 主库新语句读当前状态；单纯Redis仍有效不足以返回身份。
+     * 主库新语句读当前状态，语句超时 1 秒；单纯Redis仍有效不足以返回身份。
      */
     IdentityRow current(String digest);
 

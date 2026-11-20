@@ -21,7 +21,8 @@ public interface OrderRepository {
     void insert(Order order);
 
     /**
-     * 以原版本为条件保存；订单已被他人修改（零行）返回 false，由应用层判定为冲突。
+     * 以修改前的版本为条件保存 changed；订单已被他人修改（零行）返回 false，由应用层判定为冲突。
+     * original 是本次读取的订单，仓储据此只写有变化的部分。
      */
-    boolean update(Order order, long expectedVersion);
+    boolean update(Order changed, Order original);
 }
