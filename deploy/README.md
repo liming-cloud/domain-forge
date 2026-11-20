@@ -42,7 +42,7 @@ docker compose -f deploy/compose.yml --env-file /etc/domain-forge/df.env run --r
 
 | 变量 | 生成 |
 |---|---|
-| `POSTGRES_PASSWORD`、`REDIS_PASSWORD`、`NACOS_ADMIN_PASSWORD`、`NACOS_SERVICE_PASSWORD`、`NACOS_AUTH_IDENTITY_KEY`、`NACOS_AUTH_IDENTITY_VALUE` | `openssl rand -hex 24` |
+| `POSTGRES_PASSWORD`、`REDIS_PASSWORD`、`NACOS_ADMIN_PASSWORD`、`NACOS_SERVICE_PASSWORD`、`NACOS_AUTH_IDENTITY_KEY`、`NACOS_AUTH_IDENTITY_VALUE`、`ROCKETMQ_ADMIN_SECRET_KEY`、`ROCKETMQ_APP_SECRET_KEY` | `openssl rand -hex 24` |
 | `NACOS_AUTH_TOKEN`、`IAM_FINGERPRINT_KEY` | `openssl rand -base64 32` |
 
 生产环境把 `NGINX_HTTP_BIND` 改为 `0.0.0.0` 或指定网卡地址；默认只绑定回环地址。
@@ -134,7 +134,7 @@ deploy/restore.sh /etc/domain-forge/df.env /var/backups/domain-forge/domainforge
 - 消费一直失败的消息共投递 5 次后进入死信队列 `%DLQ%<消费组>`，指标 `domainforge.messaging.dead-letter` 增加；排查后用 RocketMQ 自带工具处理，本参考不提供重放脚本。
 - 消息存储卷不进入备份；丢失它只会丢失“已发送、尚未消费”的消息。从备份恢复后，Outbox 与消费方的去重表都回到备份时刻。
 - **恢复前先停止业务写入**，确认 `domainforge.messaging.outbox.pending` 为 0、消费组没有积压，再执行 `restore.sh`。RocketMQ 中的消费进度不随恢复回退：恢复时仍在途的事件会在恢复后被消费方处理，而发布方的数据已回到备份时刻，结果不一致（如统计多计一次，见 [#61](https://github.com/liming-cloud/domain-forge/issues/61)）。
-- RocketMQ 不开启鉴权，只在内部网络可达，网段内的容器可以发布或消费任意主题（见路线图已知风险（平台仓库 `docs/platform/路线图.md`））。
+- **鉴权（生产环境必须开启）**：默认不开启，RocketMQ 只在内部网络可达，网段内的容器可以发布或消费任意主题。`compose.mq-acl.yml` 覆盖文件开启认证与授权（ACL 2.0）：环境文件填写 `ROCKETMQ_ADMIN_*`（管理员，broker 内部与 `rocketmq-init` 使用）与 `ROCKETMQ_APP_*`（所有业务服务共用的应用账号，对全部主题与消费组可发布、订阅，由 `rocketmq-init` 每次部署创建或同步密钥），之后所有 `docker compose` 命令与运维脚本都通过 `COMPOSE_FILE` 列入它（`COMPOSE_FILE=deploy/compose.yml:deploy/compose.mq-acl.yml:<业务服务覆盖文件>`）。业务服务经 `<ENV>_MESSAGING_ACCESS_KEY／SECRET_KEY` 拿到应用账号，未开启时为空、不带凭据。没有凭据或凭据不符的客户端被拒（直连 broker 为 `CODE: 16`，经 Proxy 为 `40100`，服务启动失败）；名称服务（9876）的路由查询不在 ACL 范围内。改密：改环境文件后重新 `up`，`rocketmq-init` 同步应用账号；管理员账号只在消息存储卷中不存在时由 broker 创建，修改时先在 broker 容器内用 `mqadmin updateUser` 改密，再同步环境文件并重新 `up`。
 
 ## 文件存储
 
