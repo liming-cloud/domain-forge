@@ -67,7 +67,7 @@ public class WriteOrder {
             throw OrderRejected.notFound("ORDER_NOT_FOUND", "订单不存在");
         if (current.version() != version) throw OrderRejected.versionConflict();
         Order changed = current.addLine(line(input));
-        if (!orders.update(changed, version)) throw OrderRejected.versionConflict();
+        if (!orders.update(changed, current)) throw OrderRejected.versionConflict();
         return new OrderChange(changed.id(), changed.version(), changed.status().name());
     }
 

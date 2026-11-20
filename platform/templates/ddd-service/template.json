@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.19.0",
+  "version": "0.20.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -43,6 +43,11 @@
       "example": false
     },
     {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamAccessSnapshot.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamAccessSnapshot.java",
+      "example": false
+    },
+    {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamCurrentSubjectSource.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamCurrentSubjectSource.java",
       "example": false
@@ -55,6 +60,11 @@
     {
       "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamFailures.java.tpl",
       "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/IamFailures.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/ScopePrefetch.java.tpl",
+      "target": "src/main/java/@@PACKAGE_PATH@@/infrastructure/acl/iam/ScopePrefetch.java",
       "example": false
     },
     {

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,6 +50,7 @@ class OrderServiceIT {
     private static final Map<String, String> SUBJECTS = new ConcurrentHashMap<>();
     private static final Map<String, String> SCOPES = new ConcurrentHashMap<>();
     private static final AtomicBoolean IAM_DOWN = new AtomicBoolean();
+    private static final AtomicInteger IAM_CALLS = new AtomicInteger();
     private static HttpServer iam;
     private static ConfigurableApplicationContext application;
     private static String base;
@@ -96,6 +98,7 @@ class OrderServiceIT {
         SUBJECTS.clear();
         SCOPES.clear();
         IAM_DOWN.set(false);
+        IAM_CALLS.set(0);
     }
 
     private static String env(String name) {
@@ -105,13 +108,17 @@ class OrderServiceIT {
     }
 
     /**
-     * IAM 替身：按 Bearer 令牌返回预置主体与范围；未知令牌或缺少有效 Same-Token 时 401，故障开关 503。
+     * IAM 替身：按 Bearer 令牌返回预置主体与范围（snapshot 为二者合并）；未知令牌或缺少有效 Same-Token 时 401，故障开关 503。
      */
     private static void answer(HttpExchange exchange) throws IOException {
+        IAM_CALLS.incrementAndGet();
         String token = String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")).replace("Bearer ", "");
         boolean internal = SameTokens.current().equals(exchange.getRequestHeaders().getFirst(SameTokens.HEADER));
         String path = exchange.getRequestURI().getPath();
-        String body = path.endsWith("/current") ? SUBJECTS.get(token) : SCOPES.get(token);
+        String subject = SUBJECTS.get(token);
+        String body = path.endsWith("/current") ? subject
+                : path.endsWith("/scopes") ? SCOPES.get(token)
+                : subject == null ? null : "{\"subject\":" + subject + ",\"scopes\":" + SCOPES.get(token) + "}";
         int status = IAM_DOWN.get() ? 503 : body == null || !internal ? 401 : 200;
         byte[] bytes = (status == 200 ? body
                 : "{\"type\":\"about:blank\",\"status\":" + status + ",\"detail\":\"x\",\"code\":\"X\"}")
@@ -288,6 +295,17 @@ class OrderServiceIT {
                 .get("status").asString());
         assertProblem(409, "ORDER_STATE_CONFLICT", call("POST", "/api/orders/" + other + "/submit", writer, version(2)));
         assertEquals(1, fixture().outboxCount());
+    }
+
+    // 每个受保护请求只调用 IAM 一次：读当前主体时一并取回本服务目录中需要范围的权限；状态迁移不改订单行。
+    @Test
+    void protectedRequestCallsIamOnce() throws Exception {
+        String writer = user(621, BOTH, scope(false, true, ""), scope(false, true, ""));
+        String id = draft(writer, null);
+        assertEquals(1, IAM_CALLS.getAndSet(0));
+        assertEquals(200, call("POST", "/api/orders/" + id + "/submit", writer, version(1)).statusCode());
+        assertEquals(1, IAM_CALLS.get());
+        assertEquals(1, fixture().lines(Long.parseLong(id)));
     }
 
     // 聚合维护跨行不变式：同一商品只能一行、总额有上限；违反时整个命令回滚，订单行不变。

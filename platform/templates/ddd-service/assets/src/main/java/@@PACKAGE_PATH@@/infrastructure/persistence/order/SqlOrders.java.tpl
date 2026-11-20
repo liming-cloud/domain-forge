@@ -10,7 +10,7 @@ import @@PACKAGE@@.domain.repository.OrderRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * MyBatis 订单仓储：订单与订单行一起读写，保存时订单行整体替换。
+ * MyBatis 订单仓储：订单与订单行一起读写；保存时订单行有变化才整体替换，状态迁移只更新订单。
  */
 @Repository
 public class SqlOrders implements OrderRepository {
@@ -40,10 +40,11 @@ public class SqlOrders implements OrderRepository {
     }
 
     @Override
-    public boolean update(Order order, long expected) {
-        if (mapper.update(row(order), expected) != 1) return false;
-        mapper.deleteLines(order.id());
-        insertLines(order);
+    public boolean update(Order changed, Order original) {
+        if (mapper.update(row(changed), original.version()) != 1) return false;
+        if (changed.lines().equals(original.lines())) return true;
+        mapper.deleteLines(changed.id());
+        insertLines(changed);
         return true;
     }
 

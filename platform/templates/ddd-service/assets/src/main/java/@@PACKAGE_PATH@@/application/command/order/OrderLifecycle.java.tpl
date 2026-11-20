@@ -73,7 +73,7 @@ public class OrderLifecycle {
             throw OrderRejected.notFound("ORDER_NOT_FOUND", "订单不存在");
         if (current.version() != version) throw OrderRejected.versionConflict();
         Order changed = transition.apply(current);
-        if (!orders.update(changed, version)) throw OrderRejected.versionConflict();
+        if (!orders.update(changed, current)) throw OrderRejected.versionConflict();
         changed.events().forEach(this::publish);
         return changed.withoutEvents();
     }

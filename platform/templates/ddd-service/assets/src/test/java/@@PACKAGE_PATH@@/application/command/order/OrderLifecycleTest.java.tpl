@@ -139,10 +139,10 @@ class OrderLifecycleTest {
         }
 
         @Override
-        public boolean update(Order order, long expectedVersion) {
-            Order current = saved.get(order.id());
-            if (current == null || current.version() != expectedVersion) return false;
-            saved.put(order.id(), order);
+        public boolean update(Order changed, Order original) {
+            Order current = saved.get(changed.id());
+            if (current == null || current.version() != original.version()) return false;
+            saved.put(changed.id(), changed);
             writes++;
             return true;
         }

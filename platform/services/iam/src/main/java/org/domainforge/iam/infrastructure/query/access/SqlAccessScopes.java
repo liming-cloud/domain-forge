@@ -18,7 +18,7 @@ import java.util.Set;
 /**
  * 按精确权限合并启用角色的范围：任一 ALL 即 ALL；否则合并本人与有效组织集合。
  *
- * <p>无匹配授予时结果为空范围；超限明确失败，不截断后继续。
+ * <p>无匹配授予时结果为空范围；超限明确失败，不截断后继续。不在目录中或不需要范围的权限，scopes 拒绝，available 跳过。
  */
 @Repository
 public class SqlAccessScopes implements AccessScopes {
@@ -33,6 +33,14 @@ public class SqlAccessScopes implements AccessScopes {
 
     @Override
     public Map<String, AccessScope> scopes(String digest, List<String> permissions) {
+        Map<String, AccessScope> result = available(digest, permissions);
+        if (!result.keySet().containsAll(permissions))
+            throw IamException.invalid("权限不在目录中或不需要数据范围");
+        return result;
+    }
+
+    @Override
+    public Map<String, AccessScope> available(String digest, List<String> permissions) {
         Set<String> requested = new LinkedHashSet<>(validated(permissions));
         boolean subject = false;
         Set<String> scoped = new HashSet<>();
@@ -49,8 +57,7 @@ public class SqlAccessScopes implements AccessScopes {
             }
         }
         if (!subject) throw IamException.unauthenticated("UNAUTHENTICATED", "需要有效登录");
-        if (!scoped.containsAll(requested))
-            throw IamException.invalid("权限不在目录中或不需要数据范围");
+        requested.retainAll(scoped);
         Map<String, AccessScope> result = new HashMap<>();
         for (String code : requested)
             result.put(code, scope(all.contains(code), self.contains(code), units.getOrDefault(code, Set.of())));

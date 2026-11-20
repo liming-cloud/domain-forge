@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import io.swagger.v3.oas.annotations.Operation;
 import org.domainforge.access.api.CurrentAccess;
 import org.domainforge.iam.application.port.authentication.CurrentIdentityAccess;
+import org.domainforge.iam.application.query.access.AccessScope;
 import org.domainforge.iam.application.query.access.AccessScopes;
 import org.domainforge.shared.CurrentScope;
 import org.domainforge.shared.CurrentSubject;
@@ -54,10 +55,25 @@ public final class InternalAccessController {
     @GetMapping("/internal/access/scopes")
     @Operation(summary = "读取当前用户数据范围", description = "无授予返回空范围；业务查询把范围映射为参数绑定的过滤条件")
     public Map<String, CurrentScope> scopes(@RequestParam("permission") List<String> permissions) {
+        return published(scopes.scopes(identity.current().tokenDigest(), permissions));
+    }
+
+    /**
+     * 一次返回当前主体与指定权限的数据范围，供每个请求既要判定权限又要读范围的服务只调用一次；不在目录中或不需要范围的
+     * 权限不出现在结果中（不报错），调用方需要它时再经 scopes 读取并得到明确的拒绝。
+     */
+    @SaCheckLogin
+    @GetMapping("/internal/access/snapshot")
+    @Operation(summary = "读取当前用户身份、权限与数据范围", description = "current 与 scopes 的合并，一次请求完成")
+    public AccessSnapshot snapshot(@RequestParam("permission") List<String> permissions) {
+        CurrentSubject subject = access.current();
+        return new AccessSnapshot(subject, published(scopes.available(identity.current().tokenDigest(), permissions)));
+    }
+
+    private static Map<String, CurrentScope> published(Map<String, AccessScope> found) {
         Map<String, CurrentScope> result = new TreeMap<>();
-        scopes.scopes(identity.current().tokenDigest(), permissions)
-                .forEach((code, scope) -> result.put(code,
-                        new CurrentScope(scope.all(), scope.self(), scope.unitIds())));
+        found.forEach((code, scope) -> result.put(code,
+                new CurrentScope(scope.all(), scope.self(), scope.unitIds())));
         return result;
     }
 }

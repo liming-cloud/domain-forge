@@ -30,4 +30,11 @@ public interface IamAccessClient {
     @GetMapping("/internal/access/scopes")
     Map<String, CurrentScope> scopes(
             @RequestHeader("Authorization") String authorization, @RequestParam("permission") List<String> permissions);
+
+    /**
+     * 当前主体与指定权限的数据范围，一次调用完成。
+     */
+    @GetMapping("/internal/access/snapshot")
+    IamAccessSnapshot snapshot(
+            @RequestHeader("Authorization") String authorization, @RequestParam("permission") List<String> permissions);
 }

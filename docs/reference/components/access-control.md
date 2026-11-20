@@ -16,5 +16,5 @@ Same-Token 的生成、转发与刷新见[API 网关](gateway.md#same-token)，�
 ## 装配边界
 
 - 组件依赖 cache、shared、web-support，不依赖 IAM、Feign、Nacos，也不分本地／远程 `StpLogic` 子类。
-- 权限数据由各服务实现 `StpInterface` 提供：IAM 本地实现；其他服务在自己的 `infrastructure/acl/iam` 以 Feign 读取当前用户的权限（`GET /internal/access/current`），失败拒绝、不跨请求缓存允许结果，同一请求内可复用一次。
+- 权限数据由各服务实现 `StpInterface` 提供：IAM 本地实现；其他服务在自己的 `infrastructure/acl/iam` 以 Feign 读取当前用户的权限（`GET /internal/access/current`；同时需要数据范围的服务用 `GET /internal/access/snapshot` 一次取回权限与范围），失败拒绝、不跨请求缓存允许结果，同一请求内可复用一次。
 - 允许本次实际使用的原生权限与角色注解，不额外承诺组合注解或多上下文框架。
