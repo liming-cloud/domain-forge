@@ -9,7 +9,7 @@ services:
   postgres:
     mem_limit: 1408m
   redis:
-    mem_limit: 384m
+    mem_limit: 256m
   nacos:
     mem_limit: 768m
     environment: *jvm
@@ -32,7 +32,7 @@ services:
     mem_limit: 768m
     environment: *jvm
   board-service:
-    mem_limit: 640m
+    mem_limit: 768m
     environment: *jvm
   nginx:
     mem_limit: 128m
