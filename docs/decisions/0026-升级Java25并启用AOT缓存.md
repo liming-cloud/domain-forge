@@ -11,8 +11,8 @@
 
 - **JDK 25**：编译目标 `release 25`，CI 与运行镜像（Temurin 25 JRE，按摘要固定）同步。依赖与插件不升级：在 25 上完整 `mvn verify` 与部署验证通过。
 - **解包运行**：镜像构建时用 `jarmode=tools extract` 解包（AOT 缓存不能缓存嵌套 jar 中的类）；三个服务 pom 去掉 `includeTools=false`。
-- **镜像内自训练**：构建时按 jar、依赖与 JDK 算出指纹写入镜像；容器启动时在服务的命名卷 `<服务名>-aot` 中找该指纹的缓存，没有就先做一次训练运行（`-XX:AOTCacheOutput`、`-Dspring.context.exit=onRefresh`）再以 `-XX:AOTCache` 启动。训练刷新完整上下文（含 Flyway），在启动生命周期组件之前退出，只跑到上下文启动、不带流量。训练失败时不带缓存照常启动。卷中保留最近两份缓存。
-- **日志仍逐行为 JSON**：训练输出写入卷中 `training.log`，只把其中的 JSON 行转到容器日志；JDK 生成缓存时的提示与组装子进程的输出不进入容器日志。
+- **镜像内自训练**：构建时按 jar、依赖与 JDK 算出指纹写入镜像；容器启动时在服务的命名卷 `<服务名>-aot` 中找该指纹的缓存，没有就先做一次训练运行（`-XX:AOTMode=record`、`-Dspring.context.exit=onRefresh`），退出后再单独组装（`-XX:AOTMode=create`），然后以 `-XX:AOTCache` 启动。训练刷新完整上下文（含 Flyway），在启动生命周期组件之前退出，只跑到上下文启动、不带流量。训练失败时不带缓存照常启动。卷中保留最近两份缓存。
+- **日志仍逐行为 JSON**：训练输出写入卷中 `training.log`，只把其中的 JSON 行转到容器日志；JDK 生成缓存时的提示与组装步骤的输出不进入容器日志。
 - **显式放行受限接口**：启动参数加 `--enable-native-access=ALL-UNNAMED`（netty 加载本地库）与 `--sun-misc-unsafe-memory-access=allow`（nacos-client 3.1.1、rocketmq-client-java 5.2.2 内置的 guava 与 netty，PowerJob 带入的 fastjson 2.0.58），否则 JDK 25 每次启动在标准错误打出非 JSON 警告，使日志检查失败。这些库不再使用 `sun.misc.Unsafe` 与受限方法后去掉对应参数。
 - **镜像安装 curl**：Temurin 25 镜像不再自带 curl、wget，健康检查与验证脚本要在容器内用 curl。
 
@@ -29,3 +29,4 @@
 - 训练运行中定时任务 worker 会短暂连上 PowerJob（它在 Bean 初始化时启动），不在 Nacos 注册、不执行 `ApplicationRunner`。
 - 缓存文件被替换或损坏时 JVM 忽略它照常启动（较慢），容器日志出现 `[error][aot]` 开头的非 JSON 行，作为异常信号保留；删除该文件后重启即重新训练。
 - 用法见[部署参考](../../deploy/README.md#启动与-aot-缓存)。
+- 由 [#153](https://github.com/liming-cloud/domain-forge/issues/153) 修订：训练原用一步式 `-XX:AOTCacheOutput`，会在训练进程内再起一个组装 JVM，两者叠加超出 768m 等内存配额而被内核 OOM 结束，服务不带缓存运行；改为两步。堆比例由 75% 改为 50%（压满时非堆约 300MB）。

@@ -31,8 +31,8 @@ compose() { docker compose --env-file "$env_file" "$@"; }
 # 常驻容器的 CPU 配额（服务=核数），合计 4 核；内存配额（合计 8064m）在 compose.perf.yml 中，二者模拟 4 核 8G 的单机。
 # CPU 配额在启动与灌数之后、压测之前施加：逐容器的静态配额下 PowerJob 等 JVM 启动超过健康检查时限（真实单机启动时
 # 各容器共享 CPU），灌数也会因 IAM 的密码计算太慢而拖到一小时以上；二者都不是计量对象。一次性初始化任务此前已退出。
-cpu_quotas=(postgres=0.8 redis=0.2 nacos=0.2 rocketmq-namesrv=0.1 rocketmq-broker=0.2 powerjob-server=0.1
-    iam=0.8 gateway=0.6 order-service=0.6 board-service=0.2 nginx=0.2)
+cpu_quotas=(postgres=0.8 redis=0.2 nacos=0.1 rocketmq-namesrv=0.1 rocketmq-broker=0.2 powerjob-server=0.1
+    iam=0.8 gateway=0.6 order-service=0.6 board-service=0.3 nginx=0.2)
 cleanup() {
     [ $? -eq 0 ] || dump_diagnostics
     if [ "${KEEP:-}" = 1 ]; then
