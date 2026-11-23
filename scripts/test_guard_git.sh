@@ -19,7 +19,7 @@ expect() {
   python3 -c 'import json, sys; print(json.dumps({"cwd": sys.argv[1], "tool_name": "Bash", "tool_input": {"command": sys.argv[2]}}))' \
     "$work/$dir" "$command" | "$hook" 2>/dev/null || got=$?
   if [ "$got" != "$want" ]; then
-    echo "失败：$dir 上 \`$command\` 期望退出码 $want，实际 $got" >&2
+    echo "失败：${dir} 上 \`${command}\` 期望退出码 ${want}，实际 ${got}" >&2
     failures=$((failures + 1))
   fi
 }
@@ -35,6 +35,18 @@ expect 2 on-branch 'git push -f'
 expect 2 on-branch 'git push --force-with-lease'
 expect 0 on-branch 'git push -u origin feat/1-demo'
 expect 0 on-branch 'gh pr create --fill'
+
+# 分支按命令里 cd／git -C 的目标目录判断，解析不了时退回会话 cwd（#180）
+expect 0 on-main "cd $work/on-branch && git add a && git commit -m x"
+expect 0 on-main "git -C $work/on-branch commit -m x"
+expect 2 on-branch "cd $work/on-main && git commit -m x"
+expect 2 on-branch "git -C $work/on-main commit -m x"
+expect 2 on-main 'cd "$DIR" && git commit -m x'
+# 只匹配真正的 git 调用，heredoc 与提交说明中的文字不拦
+expect 0 on-main $'cat > notes.md <<\'EOF\'\ngit commit -m x\ngit push --force\nEOF'
+expect 0 on-main 'echo "git commit -m x" && gh pr create --body "先 git commit 再 git push -f"'
+expect 0 on-branch $'git commit -m "$(cat <<\'EOF\'\n在 main 上 git commit 会被拦\nEOF\n)"'
+expect 2 on-main $'git commit -F - <<\'EOF\'\n说明\nEOF'
 
 if [ "$failures" -gt 0 ]; then
   echo "guard-git.sh 自测失败 $failures 项" >&2
