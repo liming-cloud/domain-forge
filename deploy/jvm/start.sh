@@ -10,7 +10,10 @@ set -eu
 # 后两项放行第三方库对 JDK 受限接口的使用（netty 加载本地库；nacos、rocketmq、fastjson 内置的 guava 等调用 sun.misc.Unsafe），
 # 否则 JDK 每次启动在标准错误打出非 JSON 警告。上游不再使用时去掉，见决定记录 0026。
 # 堆取容器内存的一半：元空间、代码缓存、线程栈与直接内存在压满时约 300MB，堆占 75% 时 768m 的容器会被内核 OOM 结束。
+# Feign 默认的 JDK HttpURLConnection 每个目标只缓存 5 条长连接，并发高时其余连接用完即关、反复建连；放宽到 100。
+# Nacos 客户端的服务列表缓存与配置快照默认写服务用户不存在的家目录，失败时打带堆栈的 ERROR；指到容器内可写目录。
 set -- -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError -Drocketmq.log.root=/tmp/rocketmq \
+    -Dhttp.maxConnections=100 -DJM.SNAPSHOT.PATH=/tmp \
     --enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow -jar /app/app.jar
 dir=/var/lib/domain-forge/aot
 cache="$dir/$(cat /app/aot.key).aot"
