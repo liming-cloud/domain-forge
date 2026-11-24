@@ -1,0 +1,2 @@
+      # 文件存储：本地目录在命名卷 @@ARTIFACT@@-files 中，backup.sh／restore.sh 按挂载点识别并一同备份恢复。
+      @@ENV@@_FILES_ROOT: /var/lib/domain-forge/files

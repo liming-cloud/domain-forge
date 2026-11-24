@@ -238,8 +238,8 @@ docker compose -f deploy/compose.yml -f deploy/compose.local.yml --env-file <环
 
 | 文件 | 内容 |
 |---|---|
-| `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM；文件存储卷 `<服务名>-files` |
-| `deploy/nacos/config/gateway.yaml`（追加） | 仅 `--with-example` 时：向网关路由种子追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
+| `deploy/services/<服务名>.compose.yml` | `<服务名>-db-init`：创建同名数据库账号与 schema（账号只拥有自己的 schema，读不到 IAM 和其他服务的表，每次启动把密码同步为环境文件中的值）；`<服务名>`：镜像构建方式同 IAM，经 Nacos 注册并发现 IAM，健康检查同 IAM；用到消息时才带消息端点与 `rocketmq-init` 依赖，带订单示例时才带文件存储卷 `<服务名>-files` |
+| `deploy/nacos/config/gateway.yaml`（追加） | 向网关路由种子追加服务路由（`/api/<命名空间>/**`），`--with-example` 时再追加示例接口的路由。新增公开接口时在这里补充路径，不要写 `/internal/`；已部署的环境改在 Nacos 控制台的 `gateway.yaml` 中补充（种子只在首次部署时发布） |
 
 部署步骤：
 

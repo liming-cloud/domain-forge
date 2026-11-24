@@ -55,6 +55,9 @@ gateway:
         anonymous: [POST /api/auth/login, POST /api/auth/invitations/accept]
       - id: order-service
         service: order-service
+        paths: [/api/order/**]
+      - id: order-service-orders
+        service: order-service
         paths: [/api/orders/**, /api/me/orders]
         limits:                    # 可选：接口限流，按顺序取第一条命中的
           - endpoint: POST /api/orders/*/files   # “方法 路径模式”，须落在本路由的路径内
@@ -68,7 +71,7 @@ gateway:
 - 匹配：每个路径单独生成一条路由，按第一个通配或变量之前的字面前缀长度排序，越具体越先匹配（业务服务的前缀优先于 IAM 的 `/api/**`）。按“路由”整体排序会让包含多个路径的路由抢先匹配，因此按路径拆开。
 - 不在路由中的路径一律 404；路径必须以 `/api/` 开头，因此 `/internal/**`、`/actuator/**` 不可能被路由。
 - 生效：配置组重新绑定后，Spring Cloud 的刷新事件触发网关重新读取路由；`GatewayIT` 以“发布后请求实际转到新服务”判定，不以收到通知为准（[O-10](../../rules/08-配置与运行.md#o-10-收到通知不等于已生效)）。
-- 种子 `deploy/nacos/config/gateway.yaml`：模板以 `--with-example` 生成服务时追加示例接口的路由。种子只在 dataId 不存在时发布（[ADR 0011](../../decisions/0011-配置中心的取舍.md)），已部署环境新增服务时需要在 Nacos 控制台补上路由。
+- 种子 `deploy/nacos/config/gateway.yaml`：模板生成服务时追加服务路由（`/api/<命名空间>/**`），以 `--with-example` 生成时再追加示例接口的路由。种子只在 dataId 不存在时发布（[ADR 0011](../../decisions/0011-配置中心的取舍.md)），已部署环境新增服务时需要在 Nacos 控制台补上路由。
 
 ### 路径检查
 
