@@ -44,13 +44,16 @@ class GenerateTest(unittest.TestCase):
         compose = (self.root / 'deploy/services/order-service.compose.yml').read_text(encoding='utf-8')
         self.assertIn('image: postgres:18@sha256:abc', compose)
         self.assertIn('ORDER_SERVICE_DB_USER: order_service', compose)
-        self.assertNotIn('order-service', (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8'))
+        routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
+        self.assertIn('      - id: order-service\n        service: order-service\n        paths: [/api/order/**]\n', routes)
+        self.assertEqual(1, routes.count('service: order-service'))
         seed = (self.root / 'deploy/nacos/config/order-service.yaml').read_text(encoding='utf-8')
         self.assertIn('source: nacos', seed)
         self.assertIn('SPRING_PROFILES_ACTIVE: config-center', compose)
         self.assertIn('ORDER_SERVICE_SCHEDULING_ENABLED: "true"', compose)
-        self.assertIn('      - order-service-files:/var/lib/domain-forge/files\n', compose)
-        self.assertIn('volumes:\n  order-service-files:\n', compose)
+        for unused in ('MESSAGING_ENDPOINTS', 'order-service-files', 'FILES_ROOT', 'rocketmq-init'):
+            self.assertNotIn(unused, compose)
+        self.assertIn('volumes:\n  order-service-aot:\n', compose)
         self.assertFalse((output / 'src/main/resources/file-storage.yml').exists())
         pom = (output / 'pom.xml').read_text(encoding='utf-8')
         for optional in ('domain-forge-messaging', 'domain-forge-idempotency', 'domain-forge-file-storage'):
@@ -88,7 +91,14 @@ class GenerateTest(unittest.TestCase):
         self.assertFalse(any(output.rglob('*rchive*')))
         self.assertFalse((self.root / 'deploy/services/retail-order.archive.compose.yml').exists())
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
-        self.assertIn('      - id: retail-order\n        service: retail-order\n', routes)
+        self.assertIn('      - id: retail-order\n        service: retail-order\n        paths: [/api/retail/**]\n', routes)
+        self.assertIn('      - id: retail-order-orders\n        service: retail-order\n        paths: [/api/orders/**', routes)
+        compose = (self.root / 'deploy/services/retail-order.compose.yml').read_text(encoding='utf-8')
+        self.assertIn('RETAIL_ORDER_MESSAGING_ENDPOINTS: rocketmq-broker:8081', compose)
+        self.assertIn('      rocketmq-init:\n        condition: service_completed_successfully\n', compose)
+        self.assertIn('RETAIL_ORDER_FILES_ROOT: /var/lib/domain-forge/files', compose)
+        self.assertIn('      - retail-order-files:/var/lib/domain-forge/files\n', compose)
+        self.assertIn('volumes:\n  retail-order-files:\n  retail-order-aot:\n', compose)
         self.assertIn('      - id: iam\n', routes)
         self.assertNotIn('/internal/', routes)
 
@@ -123,6 +133,15 @@ class GenerateTest(unittest.TestCase):
         self.assertIn('group board-service-order-tally CONCURRENT\n', topics)
         routes = (self.root / 'deploy/nacos/config/gateway.yaml').read_text(encoding='utf-8')
         self.assertIn('paths: [/api/board/order-tally]', routes)
+        compose = (self.root / 'deploy/services/board-service.compose.yml').read_text(encoding='utf-8')
+        self.assertIn('BOARD_SERVICE_MESSAGING_ENDPOINTS: rocketmq-broker:8081', compose)
+        self.assertIn('rocketmq-init:', compose)
+        self.assertNotIn('board-service-files', compose)
+
+    def test_example_rejects_namespace_that_duplicates_example_route(self):
+        with self.assertRaises(ValueError):
+            generate.generate(self.root, 'order-service', 'com.company.order', 'orders', with_example=True)
+        self.assertFalse((self.root / 'platform/services/order-service').exists())
 
     def test_call_example_requires_valid_peer(self):
         for peer in ['Order', 'iam', 'gateway', 'board']:

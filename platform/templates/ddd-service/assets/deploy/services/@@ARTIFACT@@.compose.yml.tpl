@@ -54,22 +54,14 @@ services:
       @@ENV@@_NACOS_SERVER_ADDR: nacos:8848
       @@ENV@@_NACOS_USERNAME: ${NACOS_SERVICE_USERNAME:-domainforge}
       @@ENV@@_NACOS_PASSWORD: ${NACOS_SERVICE_PASSWORD:?provide NACOS_SERVICE_PASSWORD}
-      # 消息：只在发布或消费事件时连接；主题与消费组由 rocketmq-init 按 deploy/rocketmq/topics.conf 创建。
-      @@ENV@@_MESSAGING_ENDPOINTS: rocketmq-broker:8081
-      # RocketMQ ACL（compose.mq-acl.yml）开启时用的应用账号；未开启时为空，不带凭据。
-      @@ENV@@_MESSAGING_ACCESS_KEY: ${ROCKETMQ_APP_ACCESS_KEY:-}
-      @@ENV@@_MESSAGING_SECRET_KEY: ${ROCKETMQ_APP_SECRET_KEY:-}
-      # 定时任务：应用 @@ARTIFACT@@ 由 powerjob-init 按 deploy/powerjob/apps.conf 注册。
+@@COMPOSE_MESSAGING_ENVIRONMENT@@      # 定时任务：应用 @@ARTIFACT@@ 由 powerjob-init 按 deploy/powerjob/apps.conf 注册。
       @@ENV@@_SCHEDULING_ENABLED: "true"
       @@ENV@@_SCHEDULING_SERVER_ADDRESS: powerjob-server:7700
       @@ENV@@_SCHEDULING_APP_PASSWORD: ${POWERJOB_APP_PASSWORD:?provide POWERJOB_APP_PASSWORD}
-      # 文件存储（启用时）：本地目录在命名卷 @@ARTIFACT@@-files 中，backup.sh／restore.sh 按挂载点识别并一同备份恢复。
-      @@ENV@@_FILES_ROOT: /var/lib/domain-forge/files
-      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
+@@COMPOSE_FILES_ENVIRONMENT@@      # 管理端口（健康检查与 /actuator/prometheus）在内部网络可达，供业务项目的 Prometheus 抓取；不发布到主机、不经 Nginx。
       @@ENV@@_MANAGEMENT_ADDRESS: 0.0.0.0
     volumes:
-      - @@ARTIFACT@@-files:/var/lib/domain-forge/files
-      # AOT 缓存（见 deploy/jvm/start.sh）：不进入备份，丢失后下次启动重新训练。
+@@COMPOSE_FILES_MOUNT@@      # AOT 缓存（见 deploy/jvm/start.sh）：不进入备份，丢失后下次启动重新训练。
       - @@ARTIFACT@@-aot:/var/lib/domain-forge/aot
     networks: [backend]
     depends_on:
@@ -79,9 +71,7 @@ services:
         condition: service_healthy
       nacos-init:
         condition: service_completed_successfully
-      rocketmq-init:
-        condition: service_completed_successfully
-      powerjob-init:
+@@COMPOSE_MESSAGING_DEPENDS_ON@@      powerjob-init:
         condition: service_completed_successfully
     healthcheck:
       # 健康检查在容器内执行。
@@ -92,5 +82,4 @@ services:
       retries: 40
 
 volumes:
-  @@ARTIFACT@@-files:
-  @@ARTIFACT@@-aot:
+@@COMPOSE_FILES_VOLUME@@  @@ARTIFACT@@-aot:

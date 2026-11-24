@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.20.0",
+  "version": "0.21.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -243,6 +243,13 @@
       "target": "deploy/nacos/config/@@ARTIFACT@@.yaml",
       "example": false,
       "root": "repository"
+    },
+    {
+      "source": "assets/deploy/nacos/config/gateway-service-route.yaml.tpl",
+      "target": "deploy/nacos/config/gateway.yaml",
+      "example": false,
+      "root": "repository",
+      "mode": "append"
     },
     {
       "source": "assets/deploy/nacos/config/gateway-route.yaml.tpl",

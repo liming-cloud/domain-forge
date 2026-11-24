@@ -1,4 +1,4 @@
-      - id: @@ARTIFACT@@
+      - id: @@ARTIFACT@@-orders
         service: @@ARTIFACT@@
         paths: [/api/orders/**, /api/me/orders]
         # 订单凭证上传按账号限流：每分钟补充 30 次、突发 10 次（超出 429 RATE_LIMITED）。

@@ -113,6 +113,17 @@ def optional_dependencies(with_example, source):
     return ''.join((TEMPLATE / 'fragments' / (n + '.xml')).read_text(encoding='utf-8') for n in names)
 
 
+def compose_sections(with_example, source, values):
+    """部署覆盖文件中消息与文件存储的段（环境变量、依赖、卷）随组件依赖一起生成，未用到的组件不出现。"""
+    enabled = {'messaging': with_example or source is not None, 'files': with_example}
+    sections = {}
+    for path in sorted((TEMPLATE / 'fragments').glob('compose-*.yml')):
+        component = path.stem.split('-')[1]
+        text = render(path.read_text(encoding='utf-8'), values) if enabled[component] else ''
+        sections[path.stem.upper().replace('-', '_')] = text
+    return sections
+
+
 def add_module(services_pom, name):
     """把新服务加入 services 聚合；已登记则拒绝。"""
     text = services_pom.read_text(encoding='utf-8')
@@ -136,6 +147,7 @@ def generate(root, name, package, namespace=None, with_example=False, call_peer=
     values = values_for(name, package, namespace)
     values['PEER'] = other_service(call_peer, name, '被调')
     values['SOURCE'] = other_service(source, name, '事件来源')
+    require(not (with_example and values['NAMESPACE'] == 'orders'), '带示例时命名空间不能是 orders：服务路由与示例路由的路径重复')
 
     services = root / 'platform' / 'services'
     require((services / 'pom.xml').is_file(), '找不到 platform/services/pom.xml，请在仓库根目录运行或传入 --root')
@@ -143,6 +155,7 @@ def generate(root, name, package, namespace=None, with_example=False, call_peer=
     require(not output.exists(), '服务目录已存在，禁止覆盖')
     values['POSTGRES_IMAGE'] = postgres_image(root)
     values['OPTIONAL_DEPENDENCIES'] = optional_dependencies(with_example, source)
+    values.update(compose_sections(with_example, source, values))
     version, assets = load_assets(with_example, values, call_peer, source)
     bases = {'service': output, 'repository': root}
     for kind, relative, text, mode in assets:
