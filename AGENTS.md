@@ -44,8 +44,8 @@ python3 scripts/check_doc_links.py                                        # 文�
 提交前 `mvn verify` 必须通过；检查不通过时修正对象，不放宽检查（[W-11](docs/workflow/01-开发流程.md#w-11-发现问题时修正对象不放宽检查)）。开发中先缩小范围（`<模块>` 写相对 `platform/` 的路径，如 `services/iam`），提交前再跑完整门禁；单测试类、单服务冒烟等命令与注意事项见[工程与构建](docs/reference/工程与构建.md#快速反馈)：
 
 ```bash
-M="platform/mvnw -f platform/pom.xml"
-$M -pl <模块> -am verify -DskipITs -Ddocker.skip=true   # 单模块门禁：单元测试与静态检查，不起容器
+M() { platform/mvnw -f platform/pom.xml "$@"; }   # 函数写法，bash 与 zsh 通用
+M -pl <模块> -am verify -DskipITs -Ddocker.skip=true   # 单模块门禁：单元测试与静态检查，不起容器
 scripts/smoke_service.sh <服务>                          # 单服务冒烟，约 1 分钟
 ```
 
