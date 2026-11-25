@@ -9,7 +9,10 @@ import cn.dev33.satoken.stp.StpLogic;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.awaitility.Awaitility;
+import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.gateway.bootstrap.GatewayApplication;
+import org.domainforge.gateway.infrastructure.routing.GatewaySettings;
 import org.domainforge.gateway.infrastructure.security.SameTokenRotation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -22,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.logging.logback.StructuredLogEncoder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.ResolvableType;
 import org.springframework.core.env.Environment;
 
 import java.io.IOException;
@@ -36,6 +40,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -53,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class GatewayIT {
     private static final HttpClient HTTP = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     private static final Map<String, Map<String, String>> RECEIVED = new ConcurrentHashMap<>();
+    private static final CountDownLatch SLOW = new CountDownLatch(1);
     private static final String BASE_ROUTES = String.join("\n",
             "    routes:",
             "      - id: iam",
@@ -126,7 +133,7 @@ class GatewayIT {
     }
 
     /**
-     * 后端替身：记录最近一次请求的路径与关键请求头；/slow 结尾的路径超过网关的响应超时才应答。
+     * 后端替身：记录最近一次请求的路径与关键请求头；/slow 结尾的路径在测试放行（网关已响应超时）后才应答。
      */
     private static HttpServer stub(String name) throws IOException {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -145,7 +152,7 @@ class GatewayIT {
             if (value != null) seen.put(header, value);
         }
         RECEIVED.put(name, seen);
-        if (exchange.getRequestURI().getPath().endsWith("/slow")) sleep(3000);
+        if (exchange.getRequestURI().getPath().endsWith("/slow")) hold();
         byte[] body = ("{\"name\":\"" + name + "\"}").getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         // 与后端的追踪组件一样回传 traceId，验证网关响应中不会出现两个值。
@@ -156,9 +163,9 @@ class GatewayIT {
         exchange.close();
     }
 
-    private static void sleep(long millis) {
+    private static void hold() {
         try {
-            Thread.sleep(millis);
+            assertTrue(SLOW.await(10, TimeUnit.SECONDS), "测试未放行 /slow");
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -219,17 +226,12 @@ class GatewayIT {
         return call("GET", path, client, Map.of("Authorization", "Bearer " + session));
     }
 
-    private static void await(String what, BooleanSupplier condition) throws InterruptedException {
+    private static void await(String what, BooleanSupplier condition) {
         await(what, Duration.ofSeconds(30), condition);
     }
 
-    private static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            if (condition.getAsBoolean()) return;
-            Thread.sleep(200);
-        }
-        fail(timeout.toSeconds() + " 秒内未观察到：" + what);
+    private static void await(String what, Duration timeout, BooleanSupplier condition) {
+        Awaitility.await(what).atMost(timeout).pollInterval(Duration.ofMillis(200)).until(condition::getAsBoolean);
     }
 
     private static int status(String path, String client) {
@@ -306,6 +308,8 @@ class GatewayIT {
                 "            burst: 3"));
         publish(limited, 5, 50, "replenish-per-minute: 60");
         String other = gateway.getBean(StpLogic.class).createLoginSession(1002L);
+        // 等规则生效时 session 的令牌已用完；两个实例交替的计数用未用过的账号，不等待补满。
+        String fresh = gateway.getBean(StpLogic.class).createLoginSession(1003L);
         await("规则生效", () -> {
             try {
                 return upload(base, session, "198.51.100.201") == 429;
@@ -316,26 +320,36 @@ class GatewayIT {
         try (var second = launch(Integer.parseInt(System.getenv("NACOS_PORT")))) {
             String secondBase = "http://127.0.0.1:"
                     + second.getBean(Environment.class).getProperty("local.server.port");
-            Thread.sleep(3100);
             for (int index = 0; index < 3; index++)
-                assertEquals(200, upload(index == 1 ? secondBase : base, session, "198.51.100." + (210 + index)),
+                assertEquals(200, upload(index == 1 ? secondBase : base, fresh, "198.51.100." + (210 + index)),
                         "第 " + index + " 次（两个实例交替）");
-            assertEquals(429, upload(secondBase, session, "198.51.100.219"), "另一个网关实例共享计数");
+            assertEquals(429, upload(secondBase, fresh, "198.51.100.219"), "另一个网关实例共享计数");
             // 余下断言在第二个实例关闭前完成：同一进程中的实例共用 Reactor Netty 全局资源，关闭任一实例会将其释放。
-            remainingLimitAssertions(other);
+            remainingLimitAssertions(fresh, other);
         }
     }
 
-    private static void remainingLimitAssertions(String other) throws Exception {
+    private static void remainingLimitAssertions(String exhausted, String other) throws Exception {
         var rejected = call("POST", "/api/notes/7/files", "198.51.100.220",
-                Map.of("Authorization", "Bearer " + session));
+                Map.of("Authorization", "Bearer " + exhausted));
         assertEquals(429, rejected.statusCode());
         assertTrue(rejected.body().contains("\"code\":\"RATE_LIMITED\""));
         assertEquals("1", rejected.headers().firstValue("Retry-After").orElseThrow());
         assertEquals(200, upload(base, other, "198.51.100.221"), "其他账号不受影响");
         assertEquals(200, get("/api/notes/7", "198.51.100.222").statusCode(), "未声明限流的接口不受影响");
-        Thread.sleep(1100);
-        assertEquals(200, upload(base, session, "198.51.100.224"), "补充令牌后恢复");
+        // 令牌桶按 Redis 的时间补充，不能注入时钟：等到补充出令牌（T-09 登记）。
+        await("补充令牌后恢复", Duration.ofSeconds(5), () -> {
+            try {
+                return upload(base, exhausted, "198.51.100.224") == 200;
+            } catch (Exception unavailable) {
+                return false;
+            }
+        });
+    }
+
+    private static GatewaySettings settings() {
+        var type = ResolvableType.forClassWithGenerics(DynamicSettings.class, GatewaySettings.class);
+        return (GatewaySettings) ((DynamicSettings<?>) gateway.getBeanProvider(type).getObject()).current();
     }
 
     private static int upload(String target, String token, String client) throws Exception {
@@ -364,8 +378,11 @@ class GatewayIT {
         worker.start();
         try {
             for (int round = 0; round < 4; round++) {
-                publish(BASE_ROUTES, 1, 6 + round, "burst: " + (6 + round));
-                Thread.sleep(1500);
+                int burst = 6 + round;
+                publish(BASE_ROUTES, 1, burst, "burst: " + burst);
+                await("网关应用刷新", () -> settings().rateLimit().burst() == burst);
+                int before = succeeded.get();
+                await("刷新后仍有成功的请求", () -> succeeded.get() > before);
             }
         } finally {
             stop.set(true);
@@ -424,9 +441,13 @@ class GatewayIT {
         var missing = get("/api/ghost/1", "203.0.113.40");
         assertEquals(503, missing.statusCode());
         assertTrue(missing.body().contains("\"code\":\"SERVICE_UNAVAILABLE\""));
-        var slow = get("/api/notes/slow", "203.0.113.40");
-        assertEquals(504, slow.statusCode());
-        assertTrue(slow.body().contains("\"code\":\"GATEWAY_TIMEOUT\""));
+        try {
+            var slow = get("/api/notes/slow", "203.0.113.40");
+            assertEquals(504, slow.statusCode());
+            assertTrue(slow.body().contains("\"code\":\"GATEWAY_TIMEOUT\""));
+        } finally {
+            SLOW.countDown();
+        }
     }
 
     // 同一客户端地址超过桶容量后 429；其他地址不受影响。

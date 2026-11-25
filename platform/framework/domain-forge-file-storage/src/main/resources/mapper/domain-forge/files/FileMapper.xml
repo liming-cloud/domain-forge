@@ -33,7 +33,7 @@
     <select id="expired" resultMap="row">
         SELECT id, storage_key, name, content_type, size, sha256, uploaded_by, uploaded_at
         FROM domainforge_file
-        WHERE deleted_at IS NOT NULL AND deleted_at &lt; now() - make_interval(secs => #{graceSeconds})
+        WHERE deleted_at IS NOT NULL AND deleted_at &lt; #{cutoff}
         ORDER BY deleted_at
         LIMIT #{limit}
     </select>

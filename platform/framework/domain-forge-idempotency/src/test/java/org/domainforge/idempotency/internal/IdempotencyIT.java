@@ -3,6 +3,7 @@ package org.domainforge.idempotency.internal;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.dev33.satoken.stp.StpLogic;
+import org.awaitility.Awaitility;
 import org.domainforge.access.api.SameTokens;
 import org.domainforge.idempotency.api.Idempotent;
 import org.domainforge.web.api.PlatformJsonApi;
@@ -23,6 +24,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +44,7 @@ class IdempotencyIT {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final Map<String, AtomicInteger> EXECUTED = new ConcurrentHashMap<>();
     private static final CountDownLatch HOLD = new CountDownLatch(1);
+    private static final CountDownLatch SLOW = new CountDownLatch(1);
     private static ConfigurableApplicationContext first;
     private static ConfigurableApplicationContext second;
     private static String alice;
@@ -102,6 +105,11 @@ class IdempotencyIT {
         return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    private static void awaitExecuting(String body) {
+        Awaitility.await("首次请求开始处理").atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(20))
+                .until(() -> executed(body) > 0);
+    }
+
     private static int executed(String body) {
         return EXECUTED.getOrDefault(body, new AtomicInteger()).get();
     }
@@ -154,9 +162,9 @@ class IdempotencyIT {
                 throw new IllegalStateException(failure);
             }
         });
-        long deadline = System.nanoTime() + 5_000_000_000L;
-        while (executed(body) == 0 && System.nanoTime() < deadline) Thread.sleep(20);
+        awaitExecuting(body);
         var during = post(second, "/api/orders", alice, key, body);
+        SLOW.countDown();
         assertEquals(409, during.statusCode());
         assertTrue(during.body().contains("\"code\":\"IDEMPOTENCY_IN_PROGRESS\""));
         var done = slow.get();
@@ -177,12 +185,15 @@ class IdempotencyIT {
                 throw new IllegalStateException(failure);
             }
         });
-        long deadline = System.nanoTime() + 5_000_000_000L;
-        while (executed(body) == 0 && System.nanoTime() < deadline) Thread.sleep(20);
-        Thread.sleep(2500);
-        var during = post(second, "/api/orders", alice, key, body);
-        HOLD.countDown();
-        assertEquals(409, during.statusCode(), during.body());
+        awaitExecuting(body);
+        // 租期（1 秒）由 Redis 计时、按真实时间续租，不能注入时钟：在 2.5 个租期内持续断言重复请求为 409（T-09 登记）。
+        try {
+            Awaitility.await("超过租期仍在处理").during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4))
+                    .pollInterval(Duration.ofMillis(250))
+                    .until(() -> post(second, "/api/orders", alice, key, body).statusCode() == 409);
+        } finally {
+            HOLD.countDown();
+        }
         assertEquals(201, held.get(5, TimeUnit.SECONDS).statusCode());
         assertEquals(1, executed(body));
     }
@@ -252,7 +263,7 @@ class IdempotencyIT {
         @PostMapping(value = "/api/orders", produces = "application/json")
         org.springframework.http.ResponseEntity<String> create(@RequestBody String body) throws Exception {
             EXECUTED.computeIfAbsent(body, ignored -> new AtomicInteger()).incrementAndGet();
-            if (body.contains("slow-")) Thread.sleep(1500);
+            if (body.contains("slow-")) assertTrue(SLOW.await(10, TimeUnit.SECONDS));
             if (body.contains("hold-")) assertTrue(HOLD.await(10, TimeUnit.SECONDS));
             int id = ids.incrementAndGet();
             return org.springframework.http.ResponseEntity.status(201).location(URI.create("/api/orders/" + id))

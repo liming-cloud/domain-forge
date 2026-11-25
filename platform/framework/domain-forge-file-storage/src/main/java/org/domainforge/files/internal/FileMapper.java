@@ -3,6 +3,7 @@ package org.domainforge.files.internal;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -27,9 +28,9 @@ public interface FileMapper {
     int markDeleted(@Param("id") String id);
 
     /**
-     * 删除标记早于保留期的文件（最多 limit 条），返回其 ID 与存储键。
+     * 删除标记早于 {@code cutoff}（当前时间减保留期）的文件（最多 limit 条），返回其 ID 与存储键。
      */
-    List<FileRow> expired(@Param("graceSeconds") long graceSeconds, @Param("limit") int limit);
+    List<FileRow> expired(@Param("cutoff") OffsetDateTime cutoff, @Param("limit") int limit);
 
     /**
      * 删除一条已标记删除的记录。

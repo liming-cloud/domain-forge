@@ -1,6 +1,8 @@
 package org.domainforge.files.internal;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.awaitility.Awaitility;
 import org.domainforge.files.api.FileContent;
 import org.domainforge.files.api.FileRejected;
 import org.domainforge.files.api.FileStorageUnavailableException;
@@ -33,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -160,6 +163,12 @@ class FileStorageIT {
                 new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)), 7L);
     }
 
+    // 保留期（1 秒）按注入的时钟判断：用拨快 2 秒的时钟清理，不等待真实时间。
+    private static FileCleanup afterGrace(ConfigurableApplicationContext context) {
+        return new FileCleanup(context.getBean(FileMapper.class), storage(context), Duration.ofSeconds(1),
+                context.getBean(MeterRegistry.class), Clock.offset(Clock.systemUTC(), Duration.ofSeconds(2)));
+    }
+
     private static ObjectStorage storage(ConfigurableApplicationContext context) {
         return context.getBean(ObjectStorage.class);
     }
@@ -216,9 +225,9 @@ class FileStorageIT {
             assertFalse(inTransaction(context, () -> files.delete(stored.id())));
             assertTrue(files.find(stored.id()).isEmpty());
             assertTrue(files.open(stored.id()).isEmpty());
-            assertTrue(exists(context, key), "保留期内对象仍在");
-            Thread.sleep(1100);
             context.getBean(FileCleanup.class).purgeDeleted();
+            assertTrue(exists(context, key), "保留期内对象仍在");
+            afterGrace(context).purgeDeleted();
             assertFalse(exists(context, key));
             assertEquals(0, rows(stored.id()));
         }
@@ -279,8 +288,9 @@ class FileStorageIT {
             Path source = Files.createTempFile("orphan-", ".txt");
             Files.writeString(source, "孤儿");
             storage(context).write(orphan, source, Files.size(source));
-            Thread.sleep(1100);
-            assertTrue(context.getBean(FileCleanup.class).sweepOrphans(1) >= 1);
+            context.getBean(FileCleanup.class).sweepOrphans(1);
+            assertTrue(exists(context, orphan), "保留期内不清扫");
+            assertTrue(afterGrace(context).sweepOrphans(1) >= 1);
             assertFalse(exists(context, orphan));
             assertTrue(exists(context, key(kept.id())));
             assertThrows(IllegalArgumentException.class, () -> FileCleanup.days("weeks=2"));
@@ -311,16 +321,9 @@ class FileStorageIT {
             docker("unpause");
         }
         assertEquals(before, fixture().total());
-        long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
-        StoredFile stored = null;
-        while (stored == null && System.nanoTime() < deadline) {
-            try {
-                stored = store(s3, "up.txt", "恢复");
-            } catch (FileStorageUnavailableException notYet) {
-                Thread.sleep(500);
-            }
-        }
-        assertNotNull(stored, "S3 恢复后 90 秒内仍无法写入");
+        StoredFile stored = Awaitility.await("S3 恢复后可以写入").atMost(Duration.ofSeconds(90))
+                .pollInterval(Duration.ofMillis(500)).ignoreException(FileStorageUnavailableException.class)
+                .until(() -> store(s3, "up.txt", "恢复"), Objects::nonNull);
         assertEquals("恢复", read(s3.getBean(FileStore.class).open(stored.id()).orElseThrow()));
     }
 

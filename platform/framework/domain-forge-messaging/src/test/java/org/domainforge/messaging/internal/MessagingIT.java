@@ -2,6 +2,7 @@ package org.domainforge.messaging.internal;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.awaitility.Awaitility;
 import org.domainforge.messaging.api.EventHandler;
 import org.domainforge.messaging.api.EventPublisher;
 import org.domainforge.messaging.api.OutgoingEvent;
@@ -152,13 +153,9 @@ class MessagingIT {
         return application.getBean(MessagingFixtureMapper.class);
     }
 
-    private static void await(String what, BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
-        while (System.nanoTime() < deadline) {
-            if (condition.getAsBoolean()) return;
-            Thread.sleep(200);
-        }
-        fail("90 秒内未观察到：" + what);
+    private static void await(String what, BooleanSupplier condition) {
+        Awaitility.await(what).atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofMillis(200))
+                .until(condition::getAsBoolean);
     }
 
     private static double counter(String name, String group) {

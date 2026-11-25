@@ -30,7 +30,9 @@ import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ServiceCallIntegrationTest {
     private static final Map<String, Map<String, String>> SEEN = new ConcurrentHashMap<>();
     private static final Map<String, AtomicInteger> CALLS = new ConcurrentHashMap<>();
+    private static final CountDownLatch SLOW = new CountDownLatch(1);
     private static HttpServer server;
     private static ConfigurableApplicationContext context;
     private static StubClient stub;
@@ -80,7 +83,7 @@ class ServiceCallIntegrationTest {
     }
 
     /**
-     * /status/{code} 按指定状态返回 Problem Details；/slow 超过读取超时才应答；记录每个路径收到的关键请求头与次数。
+     * /status/{code} 按指定状态返回 Problem Details；/slow 在测试放行（调用方已读取超时）后才应答；记录每个路径收到的关键请求头与次数。
      */
     private static void answer(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
@@ -91,7 +94,7 @@ class ServiceCallIntegrationTest {
             if (values != null) headers.put(name, String.join("|", values));
         }
         SEEN.put(path, headers);
-        if (path.equals("/slow")) sleep(1500);
+        if (path.equals("/slow")) hold();
         int status = path.startsWith("/status/") ? Integer.parseInt(path.substring("/status/".length())) : 200;
         String code = status == 409 ? "NOTE_CONFLICT" : "X";
         String json = status == 200
@@ -106,9 +109,9 @@ class ServiceCallIntegrationTest {
         exchange.close();
     }
 
-    private static void sleep(long millis) {
+    private static void hold() {
         try {
-            Thread.sleep(millis);
+            assertTrue(SLOW.await(10, TimeUnit.SECONDS), "测试未放行 /slow");
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -165,7 +168,11 @@ class ServiceCallIntegrationTest {
     void transportFailuresAreNotRetried() {
         assertEquals(ServiceCallFailure.UNAVAILABLE,
                 failure(() -> context.getBean(RefusedClient.class).ok()).failure());
-        assertEquals(ServiceCallFailure.UNKNOWN, failure(() -> stub.slow()).failure());
+        try {
+            assertEquals(ServiceCallFailure.UNKNOWN, failure(() -> stub.slow()).failure());
+        } finally {
+            SLOW.countDown();
+        }
         assertEquals(1, CALLS.get("/slow").get());
         failure(() -> stub.status(500));
         assertEquals(1, CALLS.get("/status/500").get());

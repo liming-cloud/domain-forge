@@ -22,7 +22,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +39,7 @@ class OrderDigestIT {
     private static final Map<String, String> BEHAVIOUR = new ConcurrentHashMap<>();
     private static final Map<String, Long> ACCOUNTS = new ConcurrentHashMap<>();
     private static final Map<String, String> SEEN = new ConcurrentHashMap<>();
+    private static final CountDownLatch SLOW = new CountDownLatch(1);
     private static HttpServer peer;
     private static ConfigurableApplicationContext application;
     private static String base;
@@ -83,7 +86,7 @@ class OrderDigestIT {
     }
 
     /**
-     * @@PEER@@ 替身：按 Bearer 令牌预置的行为应答；记录收到的用户令牌、Same-Token 与链路上下文。
+     * @@PEER@@ 替身：按 Bearer 令牌预置的行为应答（slow 在测试放行后才应答）；记录收到的用户令牌、Same-Token 与链路上下文。
      */
     private static void answer(HttpExchange exchange) throws IOException {
         var headers = exchange.getRequestHeaders();
@@ -92,7 +95,7 @@ class OrderDigestIT {
         SEEN.put("same-token", String.valueOf(headers.getFirst("SA-SAME-TOKEN")));
         SEEN.put("traceparent", String.valueOf(headers.getFirst("traceparent")));
         String behaviour = BEHAVIOUR.getOrDefault(token, "401");
-        if (behaviour.equals("slow")) sleep(1500);
+        if (behaviour.equals("slow")) hold();
         int status = behaviour.equals("ok") || behaviour.equals("slow") ? 200 : Integer.parseInt(behaviour);
         String body = status == 200
                 ? "[{\"id\":\"1\",\"status\":\"DRAFT\",\"totalCents\":1500,\"version\":1},"
@@ -120,9 +123,9 @@ class OrderDigestIT {
         exchange.close();
     }
 
-    private static void sleep(long millis) {
+    private static void hold() {
         try {
-            Thread.sleep(millis);
+            assertTrue(SLOW.await(10, TimeUnit.SECONDS), "测试未放行 slow 应答");
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -170,7 +173,11 @@ class OrderDigestIT {
         assertEquals(401, digest(user(502, "401")).statusCode());
         assertEquals(403, digest(user(503, "403")).statusCode());
         assertEquals(503, digest(user(504, "503")).statusCode());
-        assertEquals(503, digest(user(505, "slow")).statusCode());
+        try {
+            assertEquals(503, digest(user(505, "slow")).statusCode());
+        } finally {
+            SLOW.countDown();
+        }
         SEEN.clear();
         assertEquals(401, digest(null).statusCode());
         assertTrue(SEEN.isEmpty(), "未登录时不应调用对方");

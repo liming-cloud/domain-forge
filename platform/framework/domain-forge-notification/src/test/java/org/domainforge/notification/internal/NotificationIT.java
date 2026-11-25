@@ -27,12 +27,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +51,7 @@ class NotificationIT {
     private static final String SECRET = "it-access-key-secret";
     private static final List<Map<String, String>> SENT = new CopyOnWriteArrayList<>();
     private static final AtomicReference<Reply> REPLY = new AtomicReference<>();
+    private static final CountDownLatch NO_HOLD = new CountDownLatch(0);
     private static HttpServer aliyun;
     private static ConfigurableApplicationContext application;
 
@@ -91,7 +95,8 @@ class NotificationIT {
     @BeforeEach
     void reset() {
         SENT.clear();
-        REPLY.set(new Reply(200, "{\"Code\":\"OK\",\"Message\":\"OK\",\"BizId\":\"biz-1\",\"RequestId\":\"r\"}", 0));
+        REPLY.set(new Reply(200, "{\"Code\":\"OK\",\"Message\":\"OK\",\"BizId\":\"biz-1\",\"RequestId\":\"r\"}",
+                NO_HOLD));
         application.getBean(RedissonClient.class).getKeys().deleteByPattern("domainforge:verification:*");
     }
 
@@ -114,10 +119,10 @@ class NotificationIT {
         boolean signed = authorization.matches() && authorization.group(1).equals(AcsSignature.signedHeaders(headers))
                 && authorization.group(2).equals(AcsSignature.sign("POST", query, headers, "", SECRET))
                 && "SendSms".equals(headers.get("x-acs-action")) && "2017-05-25".equals(headers.get("x-acs-version"));
-        Reply reply = signed ? REPLY.get() : new Reply(400, "{\"Code\":\"SignatureDoesNotMatch\"}", 0);
+        Reply reply = signed ? REPLY.get() : new Reply(400, "{\"Code\":\"SignatureDoesNotMatch\"}", NO_HOLD);
         if (signed) SENT.add(query);
         try {
-            Thread.sleep(reply.delayMillis());
+            assertTrue(reply.hold().await(10, TimeUnit.SECONDS), "测试未放行替身应答");
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -133,7 +138,7 @@ class NotificationIT {
     }
 
     private static void reply(int status, String code) {
-        REPLY.set(new Reply(status, "{\"Code\":\"" + code + "\",\"Message\":\"x\",\"RequestId\":\"r\"}", 0));
+        REPLY.set(new Reply(status, "{\"Code\":\"" + code + "\",\"Message\":\"x\",\"RequestId\":\"r\"}", NO_HOLD));
     }
 
     private static SmsSender sms() {
@@ -175,8 +180,13 @@ class NotificationIT {
         assertThrows(NotificationUnavailableException.class, () -> sms().send(message));
         reply(500, "InternalError");
         assertThrows(NotificationUnavailableException.class, () -> sms().send(message));
-        REPLY.set(new Reply(200, "{\"Code\":\"OK\"}", 1500));
-        assertThrows(NotificationUnavailableException.class, () -> sms().send(message));
+        var hold = new CountDownLatch(1);
+        REPLY.set(new Reply(200, "{\"Code\":\"OK\"}", hold));
+        try {
+            assertThrows(NotificationUnavailableException.class, () -> sms().send(message));
+        } finally {
+            hold.countDown();
+        }
         int calls = SENT.size();
         assertThrows(SmsRejected.class, () -> sms().send(new SmsMessage("12345", "login-code", Map.of())));
         assertThrows(IllegalArgumentException.class, () -> sms().send(new SmsMessage("13800138000", "x", Map.of())));
@@ -213,26 +223,26 @@ class NotificationIT {
 
     // 过期后不能再校验。
     @Test
-    void codesExpire() throws InterruptedException {
+    void codesExpire() {
         codes().issue("short", "13800138003");
         String code = lastCode();
-        Thread.sleep(1200);
+        expireNow(":code", Duration.ofSeconds(1));
         assertEquals(VerifyOutcome.EXPIRED, codes().verify("short", "13800138003", code));
     }
 
     // 重发间隔内拒绝；当天达到上限后拒绝；重发后旧验证码失效。
     @Test
-    void resendIntervalAndDailyLimit() throws InterruptedException {
+    void resendIntervalAndDailyLimit() {
         codes().issue("limited", "13800138004");
         String first = lastCode();
         assertEquals(VerificationRejected.Reason.TOO_FREQUENT, assertThrows(VerificationRejected.class,
                 () -> codes().issue("limited", "13800138004")).reason());
-        Thread.sleep(1100);
+        expireNow(":resend", Duration.ofSeconds(1));
         codes().issue("limited", "13800138004");
         String second = lastCode();
         if (!first.equals(second))
             assertEquals(VerifyOutcome.MISMATCH, codes().verify("limited", "13800138004", first));
-        Thread.sleep(1100);
+        expireNow(":resend", Duration.ofSeconds(1));
         assertEquals(VerificationRejected.Reason.DAILY_LIMIT, assertThrows(VerificationRejected.class,
                 () -> codes().issue("limited", "13800138004")).reason());
         assertEquals(2, SENT.size());
@@ -245,9 +255,21 @@ class NotificationIT {
         assertThrows(NotificationUnavailableException.class, () -> codes().issue("limited", "13800138005"));
         reply(200, "isv.MOBILE_NUMBER_ILLEGAL");
         assertThrows(SmsRejected.class, () -> codes().issue("limited", "13800138005"));
-        REPLY.set(new Reply(200, "{\"Code\":\"OK\",\"BizId\":\"biz-2\"}", 0));
+        REPLY.set(new Reply(200, "{\"Code\":\"OK\",\"BizId\":\"biz-2\"}", NO_HOLD));
         codes().issue("limited", "13800138005");
         assertEquals(VerifyOutcome.VERIFIED, codes().verify("limited", "13800138005", lastCode()));
+    }
+
+    // 验证码与重发间隔由 Redis 按键的 TTL 到期，不能注入时钟：断言剩余 TTL 不超过策略值后删除该键，
+    // 等同于 Redis 让它到期（T-09）。
+    private static void expireNow(String suffix, Duration ttl) {
+        var keys = application.getBean(RedissonClient.class).getKeys();
+        var found = keys.getKeysStream(KeysScanOptions.defaults().pattern("domainforge:verification:*" + suffix))
+                .toList();
+        assertEquals(1, found.size(), found.toString());
+        long remaining = keys.remainTimeToLive(found.getFirst());
+        assertTrue(remaining > 0 && remaining <= ttl.toMillis(), "剩余 TTL " + remaining + "ms");
+        keys.delete(found.getFirst());
     }
 
     // Redis 中只有摘要：键与值都不含号码或验证码明文。
@@ -328,9 +350,9 @@ class NotificationIT {
     }
 
     /**
-     * 替身的一次应答。
+     * 替身的一次应答：{@code hold} 放行前不应答（模拟服务商超时）。
      */
-    record Reply(int status, String body, long delayMillis) {
+    record Reply(int status, String body, CountDownLatch hold) {
     }
 
     /**

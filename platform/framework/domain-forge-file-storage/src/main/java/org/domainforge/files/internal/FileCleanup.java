@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -77,13 +78,14 @@ public final class FileCleanup implements ScheduledTask {
     }
 
     /**
-     * 删除标记早于保留期的文件：先删对象再删记录，中途失败下次重做。
+     * 删除标记早于保留期的文件（按注入的时钟判断）：先删对象再删记录，中途失败下次重做。
      */
     int purgeDeleted() {
+        OffsetDateTime cutoff = OffsetDateTime.now(clock).minus(grace);
         int total = 0;
         List<FileRow> batch;
         do {
-            batch = files.expired(grace.toSeconds(), BATCH);
+            batch = files.expired(cutoff, BATCH);
             for (FileRow row : batch) {
                 storage.delete(row.storageKey());
                 files.purge(row.id());

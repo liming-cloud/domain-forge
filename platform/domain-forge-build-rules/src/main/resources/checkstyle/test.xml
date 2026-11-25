@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
         "https://checkstyle.org/dtds/configuration_1_3.dtd">
-<!-- 测试源码：不强制说明，只约束说明位置、复杂度上限与 SQL 文本（测试用的 SQL 同样写在资源文件，P-03）。 -->
+<!-- 测试源码：不强制说明，只约束说明位置、复杂度上限、SQL 文本（测试用的 SQL 同样写在资源文件，P-03）与固定时长等待（T-09）。 -->
 <module name="Checker">
     <property name="charset" value="UTF-8"/>
     <property name="severity" value="error"/>
@@ -19,6 +19,11 @@
             <property name="format"
                       value="(?is)^&quot;?\s*(select\b.+\bfrom\b|insert\s+into\b|update\s+\S+\s+set\b|delete\s+from\b|merge\s+into\b)"/>
             <property name="message" value="SQL 必须写在 Mapper XML，Java 中禁止出现 SQL 文本"/>
+        </module>
+        <!-- Thread.sleep、TimeUnit.X.sleep 与静态导入的 sleep：方法名（最后一段）为 sleep 的调用。 -->
+        <module name="MatchXpath">
+            <property name="query" value="//METHOD_CALL[./IDENT[@text='sleep'] or ./DOT/IDENT[last()][@text='sleep']]"/>
+            <message key="matchxpath.match" value="测试不用固定时长等待：按条件等待（Awaitility），要等时间流逝时用可注入的时钟（T-09）"/>
         </module>
     </module>
 </module>
