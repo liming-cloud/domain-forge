@@ -1,5 +1,7 @@
 package org.domainforge.tracing.internal;
 
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -96,17 +99,21 @@ class TracingIntegrationTest {
         assertTrue(!line.contains("secret"), "不应记录查询参数：" + line);
     }
 
-    private static String awaitLine(String marker) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-        while (System.nanoTime() < deadline) {
-            List<String> lines;
-            synchronized (LOGS) {
-                lines = Arrays.asList(LOGS.toString(StandardCharsets.UTF_8).split("\\R"));
-            }
-            for (String line : lines) if (line.contains(marker) && line.contains("http_access")) return line;
-            Thread.sleep(50);
+    private static String awaitLine(String marker) {
+        try {
+            return Awaitility.await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(50))
+                    .until(() -> accessLine(marker), Optional::isPresent).orElseThrow();
+        } catch (ConditionTimeoutException timeout) {
+            throw new AssertionError("未找到带 " + marker + " 的访问日志：" + LOGS.toString(StandardCharsets.UTF_8));
         }
-        throw new AssertionError("未找到带 " + marker + " 的访问日志：" + LOGS.toString(StandardCharsets.UTF_8));
+    }
+
+    private static Optional<String> accessLine(String marker) {
+        List<String> lines;
+        synchronized (LOGS) {
+            lines = Arrays.asList(LOGS.toString(StandardCharsets.UTF_8).split("\\R"));
+        }
+        return lines.stream().filter(line -> line.contains(marker) && line.contains("http_access")).findFirst();
     }
 
     /**

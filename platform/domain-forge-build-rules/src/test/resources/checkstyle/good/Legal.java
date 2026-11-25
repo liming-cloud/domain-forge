@@ -17,4 +17,11 @@ public class Legal {
         String first = names.get(0);
         return upper ? first.toUpperCase() : first;
     }
+
+    /**
+     * 名为 sleep 的变量上的调用不是固定时长等待。
+     */
+    public boolean blank(String sleep) {
+        return sleep.isBlank();
+    }
 }

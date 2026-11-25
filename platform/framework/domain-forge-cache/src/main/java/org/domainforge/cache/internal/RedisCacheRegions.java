@@ -1,5 +1,6 @@
 package org.domainforge.cache.internal;
 
+import com.github.benmanes.caffeine.cache.Ticker;
 import org.redisson.api.RPatternTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.listener.PatternStatusListener;
@@ -20,11 +21,18 @@ final class RedisCacheRegions implements AutoCloseable {
     private RPatternTopic notifications;
 
     RedisCacheRegions(RedissonClient client, List<RedisCacheRegion.Definition<?>> definitions) {
+        this(client, definitions, Ticker.systemTicker());
+    }
+
+    /**
+     * 本地副本按 {@code ticker} 计时；测试注入可拨动的计时器验证 L1 TTL，不等待真实时间。
+     */
+    RedisCacheRegions(RedissonClient client, List<RedisCacheRegion.Definition<?>> definitions, Ticker ticker) {
         if (definitions.size() > 64) {
             throw new IllegalArgumentException("缓存 region 最多 64 个");
         }
         for (var definition : definitions) {
-            if (regions.putIfAbsent(definition.name(), new RedisCacheRegion<>(client, definition))
+            if (regions.putIfAbsent(definition.name(), new RedisCacheRegion<>(client, definition, ticker))
                     != null) {
                 throw new IllegalArgumentException("同一 region 只能声明一种值类型与 codec");
             }

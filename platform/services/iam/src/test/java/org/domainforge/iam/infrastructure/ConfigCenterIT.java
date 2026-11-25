@@ -4,6 +4,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.status.StatusUtil;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.awaitility.Awaitility;
 import org.domainforge.config.api.DynamicSettings;
 import org.domainforge.iam.application.port.IamException;
 import org.domainforge.iam.application.port.authentication.LoginProtection;
@@ -40,7 +41,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * 在开启鉴权的真实 Nacos 上验证配置中心合同（设计见 docs/reference/components/config.md）：
@@ -177,17 +177,12 @@ class ConfigCenterIT {
         return counter == null ? 0 : counter.count();
     }
 
-    private static void await(String what, BooleanSupplier condition) throws InterruptedException {
+    private static void await(String what, BooleanSupplier condition) {
         await(what, Duration.ofSeconds(30), condition);
     }
 
-    private static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            if (condition.getAsBoolean()) return;
-            Thread.sleep(200);
-        }
-        fail(timeout.toSeconds() + " 秒内未观察到：" + what);
+    private static void await(String what, Duration timeout, BooleanSupplier condition) {
+        Awaitility.await(what).atMost(timeout).pollInterval(Duration.ofMillis(200)).until(condition::getAsBoolean);
     }
 
     /**

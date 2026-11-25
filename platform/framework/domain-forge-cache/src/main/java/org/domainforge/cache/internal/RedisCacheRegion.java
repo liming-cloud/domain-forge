@@ -2,6 +2,7 @@ package org.domainforge.cache.internal;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.Codec;
@@ -18,7 +19,7 @@ final class RedisCacheRegion<T> {
     private final String prefix;
     private final Cache<String, T> local;
     private volatile boolean closed;
-    RedisCacheRegion(RedissonClient client, Definition<T> definition) {
+    RedisCacheRegion(RedissonClient client, Definition<T> definition, Ticker ticker) {
         this.client = client;
         this.definition = definition;
         prefix = "domainforge:cache:" + definition.name() + ":";
@@ -28,6 +29,7 @@ final class RedisCacheRegion<T> {
                         : Caffeine.newBuilder()
                                 .maximumSize(definition.capacity())
                                 .expireAfterWrite(definition.localTtl())
+                                .ticker(ticker)
                                 .build();
     }
 

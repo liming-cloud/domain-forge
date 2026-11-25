@@ -83,8 +83,9 @@ class LocalCachingIT {
     void absentAndPresentRandomKeysRemainBounded() throws Exception {
         var client = client();
         String name = unique();
+        var ticker = new ManualTicker();
         try (var caches =
-                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))), ticker)) {
             var cache = caches.region(name, String.class);
             for (int index = 0; index < 512; index++) {
                 assertNull(cache.get("absent-" + index));
@@ -95,7 +96,7 @@ class LocalCachingIT {
                 assertEquals("value", cache.get("present-" + index));
             }
             assertTrue(cache.localSize() <= 8);
-            Thread.sleep(300);
+            ticker.advance(Duration.ofMillis(300));
             assertEquals(0, cache.localSize(), "原有容量和 TTL 断言同时保留");
         } finally {
             client.shutdown();
@@ -109,17 +110,18 @@ class LocalCachingIT {
         redis("ACL", "SETUSER", user, "on", ">" + password, "~*", "&*", "+@all");
         var client = client(user, password);
         String name = unique();
+        var ticker = new ManualTicker();
         try (var caches =
-                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))))) {
+                new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(100))), ticker)) {
             var cache = caches.region(name, String.class);
-            cache.put("key", "live-l2", Duration.ofSeconds(60));
-            Thread.sleep(100);
+            writeNotified(client, "domainforge:cache:" + name + ":key",
+                    () -> cache.put("key", "live-l2", Duration.ofSeconds(60)));
             assertEquals("live-l2", cache.get("key"));
             redis("ACL", "SETUSER", user, "-get");
             assertThrows(
                     RuntimeException.class,
                     () -> client.getBucket("domainforge:cache:" + name + ":key").get());
-            Thread.sleep(400);
+            ticker.advance(Duration.ofMillis(400));
             assertThrows(RuntimeException.class, () -> cache.get("key"), "L1 不能无限返回本地旧值");
         } finally {
             client.shutdown();
@@ -147,8 +149,8 @@ class LocalCachingIT {
                          new RedisCacheRegions(writer, List.of(definition(name, 0, Duration.ofSeconds(30))))) {
                 var cached = on.region(name, String.class);
                 var remote = off.region(name, String.class);
-                remote.put("key", "first", Duration.ofSeconds(60));
-                Thread.sleep(100);
+                writeNotified(client, "domainforge:cache:" + name + ":key",
+                        () -> remote.put("key", "first", Duration.ofSeconds(60)));
                 long before = gets(client);
                 for (int i = 0; i < 100; i++) {
                     assertEquals("first", cached.get("key"));
@@ -180,12 +182,12 @@ class LocalCachingIT {
         try (var caches =
                 new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofMillis(500))))) {
             var cache = caches.region(name, String.class);
-            cache.put("key", "near-expiry", Duration.ofMillis(700));
-            Thread.sleep(450);
+            // L2 只剩 250ms 时填充：本地副本（500ms）不能比 L2 活得更久。
+            cache.put("key", "near-expiry", Duration.ofMillis(250));
             assertEquals("near-expiry", cache.get("key"));
             await(() -> cache.get("key") == null);
-            cache.put("key", "parallel", Duration.ofSeconds(10));
-            Thread.sleep(100);
+            writeNotified(client, "domainforge:cache:" + name + ":key",
+                    () -> cache.put("key", "parallel", Duration.ofSeconds(10)));
             long before = gets(client);
             try (var threads = Executors.newVirtualThreadPerTaskExecutor()) {
                 var calls = new ArrayList<Callable<String>>();
@@ -214,8 +216,8 @@ class LocalCachingIT {
         try (var caches =
                 new RedisCacheRegions(client, List.of(definition(name, 8, Duration.ofSeconds(30))))) {
             var cache = caches.region(name, String.class);
-            cache.put("key", "old", Duration.ofSeconds(60));
-            Thread.sleep(100);
+            writeNotified(client, "domainforge:cache:" + name + ":key",
+                    () -> cache.put("key", "old", Duration.ofSeconds(60)));
             assertEquals("old", cache.get("key"));
             redis("ACL", "SETUSER", user, "off");
             assertTrue(Integer.parseInt(redis("CLIENT", "KILL", "USER", user)) >= 2);
@@ -292,11 +294,12 @@ class LocalCachingIT {
             first.region(name + "n", Long.class).put("same-key", 42L, Duration.ofSeconds(60));
             assertEquals("text", first.region(name, String.class).get("same-key"));
             assertEquals(42L, first.region(name + "n", Long.class).get("same-key"));
+            String patterns = redis("PUBSUB", "NUMPAT");
             var second = new RedisCacheRegions(client, List.of(string));
             second.close();
             var closed = second.region(name, String.class);
             assertThrows(IllegalStateException.class, () -> closed.get("same-key"));
-            Thread.sleep(100);
+            assertEquals(patterns, redis("PUBSUB", "NUMPAT"), "关闭只移除自身的监听器，共享的订阅仍在");
             assertEquals("text", first.region(name, String.class).get("same-key"));
             client.getBucket("domainforge:cache:" + name + ":same-key").delete();
             await(() -> first.region(name, String.class).localSize() == 0);
@@ -316,11 +319,12 @@ class LocalCachingIT {
         String name = unique();
         var definition =
                 new RedisCacheRegion.Definition<>(name, String.class, codec, 8, Duration.ofMillis(100));
-        try (var caches = new RedisCacheRegions(client, List.of(definition));
+        var ticker = new ManualTicker();
+        try (var caches = new RedisCacheRegions(client, List.of(definition), ticker);
              var thread = Executors.newVirtualThreadPerTaskExecutor()) {
             var cache = caches.region(name, String.class);
-            cache.put("key", "old", Duration.ofSeconds(60));
-            Thread.sleep(100);
+            writeNotified(client, "domainforge:cache:" + name + ":key",
+                    () -> cache.put("key", "old", Duration.ofSeconds(60)));
             var inflight = thread.submit(() -> cache.get("key"));
             try {
                 assertTrue(decoded.await(3, java.util.concurrent.TimeUnit.SECONDS));
@@ -331,7 +335,7 @@ class LocalCachingIT {
                 release.countDown();
             }
             assertEquals("old", inflight.get(), "已开始的旧读取可按合同返回，不宣称强一致");
-            Thread.sleep(400);
+            ticker.advance(Duration.ofMillis(400));
             assertEquals("new", cache.get("key"), "晚填充也必须受自身 TTL 约束");
         } finally {
             release.countDown();
@@ -351,8 +355,8 @@ class LocalCachingIT {
                      new RedisCacheRegions(writer, List.of(definition(name, 0, Duration.ofSeconds(30))))) {
             var cache = on.region(name, String.class);
             var remote = off.region(name, String.class);
-            remote.put("key", "initial", Duration.ofSeconds(60));
-            Thread.sleep(100);
+            writeNotified(client, "domainforge:cache:" + name + ":key",
+                    () -> remote.put("key", "initial", Duration.ofSeconds(60)));
             assertEquals("initial", cache.get("key"));
             long before = gets(client);
             long started = System.nanoTime();

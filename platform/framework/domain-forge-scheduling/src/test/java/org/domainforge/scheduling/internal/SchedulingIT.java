@@ -2,6 +2,7 @@ package org.domainforge.scheduling.internal;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.awaitility.Awaitility;
 import org.domainforge.scheduling.api.ScheduledTask;
 import org.domainforge.scheduling.api.TaskRun;
 import org.junit.jupiter.api.AfterAll;
@@ -31,7 +32,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,10 +50,12 @@ class SchedulingIT {
     private static final String APP_PASSWORD = "Scheduling-It-Pw1";
     private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final AtomicInteger TICKS = new AtomicInteger();
+    private static final AtomicLong LAST_TICK = new AtomicLong();
     private static final AtomicInteger FAILURES = new AtomicInteger();
     private static final AtomicInteger SLOW_ACTIVE = new AtomicInteger();
     private static final AtomicInteger SLOW_MAX = new AtomicInteger();
     private static final AtomicInteger SLOW_RUNS = new AtomicInteger();
+    private static final CountDownLatch SLOW_RELEASE = new CountDownLatch(1);
     private static final List<String> MANUAL = new CopyOnWriteArrayList<>();
     private static final List<String> TRACE_IDS = new CopyOnWriteArrayList<>();
     private static final Map<String, Long> IDS = new ConcurrentHashMap<>();
@@ -114,13 +120,8 @@ class SchedulingIT {
         return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString()).body();
     }
 
-    private static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            if (condition.getAsBoolean()) return;
-            Thread.sleep(500);
-        }
-        fail(timeout.toSeconds() + " 秒内未观察到：" + what);
+    private static void await(String what, Duration timeout, BooleanSupplier condition) {
+        Awaitility.await(what).atMost(timeout).pollInterval(Duration.ofMillis(500)).until(condition::getAsBoolean);
     }
 
     private static List<InstanceInfoDTO> instances(String task) {
@@ -193,16 +194,21 @@ class SchedulingIT {
         assertEquals(1, counter("it-fail", "failure"));
     }
 
-    // 上次未结束时不开始新的执行：每 2 秒触发、每次执行 5 秒，执行从不并发，执行次数明显少于触发次数。
+    // 上次未结束时不开始新的执行：每 2 秒触发，执行在测试放行前不结束；其间跨过多次触发也不开始新的执行，
+    // 放行后继续执行，执行从不并发。触发按 PowerJob 服务端的真实时间，不能注入时钟（T-09 登记）。
     @Test
     @Order(4)
-    void overlappingTriggersAreSkipped() throws Exception {
-        long started = System.nanoTime();
-        int before = SLOW_RUNS.get();
-        await("至少执行 3 次", Duration.ofSeconds(90), () -> SLOW_RUNS.get() - before >= 3);
-        int runs = SLOW_RUNS.get() - before;
-        long triggers = Duration.ofNanos(System.nanoTime() - started).toSeconds() / 2;
-        assertTrue(runs < triggers / 2, "未结束时的触发应被跳过：执行 " + runs + " 次，触发约 " + triggers + " 次");
+    void overlappingTriggersAreSkipped() {
+        try {
+            await("有一次执行未结束", Duration.ofSeconds(30), () -> SLOW_ACTIVE.get() == 1);
+            int runs = SLOW_RUNS.get();
+            Awaitility.await("未结束时的触发被跳过").during(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(6))
+                    .until(() -> SLOW_RUNS.get() == runs);
+        } finally {
+            SLOW_RELEASE.countDown();
+        }
+        int released = SLOW_RUNS.get();
+        await("放行后继续执行", Duration.ofSeconds(30), () -> SLOW_RUNS.get() > released);
         assertEquals(1, SLOW_MAX.get(), "同一任务不应并发执行");
     }
 
@@ -212,10 +218,10 @@ class SchedulingIT {
     void pauseResumeAndConsoleChangesAreKept() throws Exception {
         long tick = IDS.get("it-tick");
         client.disableJob(tick);
-        Thread.sleep(1500);
+        // 每 3 秒触发；暂停后没有执行的间隔超过 4.5 秒即说明不再执行（按 PowerJob 的真实时间，T-09 登记）。
+        await("暂停后不再执行", Duration.ofSeconds(30),
+                () -> System.nanoTime() - LAST_TICK.get() > Duration.ofMillis(4500).toNanos());
         int paused = TICKS.get();
-        Thread.sleep(4000);
-        assertEquals(paused, TICKS.get(), "暂停后不应再执行");
         // 模拟控制台编辑：以完整字段保存，改周期并恢复启用。
         var changed = TaskRegistrar.request(application.getBean("tick", ScheduledTask.class));
         changed.setId(tick);
@@ -242,6 +248,7 @@ class SchedulingIT {
         ScheduledTask tick() {
             return task("it-tick", "0/3 * * * * ?", run -> {
                 TICKS.incrementAndGet();
+                LAST_TICK.set(System.nanoTime());
                 TRACE_IDS.add(String.valueOf(org.slf4j.MDC.get("traceId")));
             });
         }
@@ -260,7 +267,7 @@ class SchedulingIT {
                 SLOW_RUNS.incrementAndGet();
                 SLOW_MAX.accumulateAndGet(SLOW_ACTIVE.incrementAndGet(), Math::max);
                 try {
-                    Thread.sleep(5000);
+                    assertTrue(SLOW_RELEASE.await(10, TimeUnit.MINUTES), "测试未放行慢任务");
                 } finally {
                     SLOW_ACTIVE.decrementAndGet();
                 }

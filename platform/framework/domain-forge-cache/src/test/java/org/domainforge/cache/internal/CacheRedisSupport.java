@@ -1,7 +1,10 @@
 package org.domainforge.cache.internal;
 
+import com.github.benmanes.caffeine.cache.Ticker;
+import org.awaitility.Awaitility;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
 import org.redisson.config.Protocol;
 
@@ -10,7 +13,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,17 +82,54 @@ final class CacheRedisSupport {
         }
     }
 
-    static void await(BooleanSupplier condition) throws Exception {
-        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
-            Thread.sleep(10);
+    static void await(BooleanSupplier condition) {
+        Awaitility.await("原生通知／重连生效")
+                .atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ZERO)
+                .pollInterval(Duration.ofMillis(10))
+                .until(condition::getAsBoolean);
+    }
+
+    /**
+     * 执行 SET 写入并等到 {@code client} 收到该键的 set 通知。L1 的失效监听先于本监听登记，同一通知按登记顺序分发，
+     * 因此返回后填充的本地副本不会再被这次写入的通知清掉。
+     */
+    static void writeNotified(RedissonClient client, String key, Runnable write) throws InterruptedException {
+        var topic = client.getPatternTopic(
+                "__keyevent@" + client.getConfig().useSingleServer().getDatabase() + "__:*", StringCodec.INSTANCE);
+        var notified = new CountDownLatch(1);
+        int listener = topic.addListener(String.class, (pattern, channel, name) -> {
+            if (key.equals(name) && channel.toString().endsWith(":set")) {
+                notified.countDown();
+            }
+        });
+        try {
+            write.run();
+            assertTrue(notified.await(10, TimeUnit.SECONDS), "未收到 " + key + " 的原生通知");
+        } finally {
+            topic.removeListener(listener);
         }
-        assertTrue(condition.getAsBoolean(), "原生通知／重连未在验证窗口内生效");
     }
 
     static String required(String name) {
         String value = System.getenv(name);
         assertNotNull(value, "先启动隔离 deploy 并提供 " + name);
         return value;
+    }
+
+    /**
+     * 可拨动的计时器：注入 L1 后由测试推进时间，验证本地 TTL 不等待真实时间。
+     */
+    static final class ManualTicker implements Ticker {
+        private final AtomicLong nanos = new AtomicLong();
+
+        @Override
+        public long read() {
+            return nanos.get();
+        }
+
+        void advance(Duration duration) {
+            nanos.addAndGet(duration.toNanos());
+        }
     }
 }

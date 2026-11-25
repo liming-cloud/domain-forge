@@ -1,5 +1,6 @@
 package org.domainforge.cache.autoconfigure;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
@@ -44,12 +45,21 @@ class NativeCachingIT {
         assertTrue(output.equals("OK") || output.equals("1"), "隔离 Redis 故障准备未完成");
     }
 
-    private static void await(BooleanSupplier condition) throws Exception {
-        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
-        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
-            Thread.sleep(10);
-        }
-        assertTrue(condition.getAsBoolean(), "原生失效／TTL 未在测试窗口内生效");
+    private static void await(BooleanSupplier condition) {
+        Awaitility.await("原生失效／TTL 生效")
+                .atMost(Duration.ofSeconds(3))
+                .pollDelay(Duration.ZERO)
+                .pollInterval(Duration.ofMillis(10))
+                .until(condition::getAsBoolean);
+    }
+
+    // 原生 L1 的 TTL 由 Redisson 内部计时，不能注入时钟：在超过 TTL 的整段窗口内持续断言（T-09 登记）。
+    private static void holds(String what, Duration window, BooleanSupplier condition) {
+        Awaitility.await(what)
+                .during(window)
+                .atMost(window.plusMillis(500))
+                .pollInterval(Duration.ofMillis(20))
+                .until(condition::getAsBoolean);
     }
 
     private static String required(String name) {
@@ -92,7 +102,6 @@ class NativeCachingIT {
                 remote.delete();
                 await(() -> cached.get() == null);
                 remote.set("expires", Duration.ofMillis(250));
-                Thread.sleep(180);
                 assertEquals("expires", cached.get());
                 await(() -> cached.get() == null);
                 remote.set("recovered", Duration.ofSeconds(5));
@@ -135,12 +144,11 @@ class NativeCachingIT {
             for (int index = 0; index < 128; index++) {
                 assertNull(local.getBucket(prefix + index, StringCodec.INSTANCE).get());
             }
-            Thread.sleep(300);
             // 固定版本原生资源核查；不将反射字段名作为产品结构门禁。
             var field = local.getClass().getDeclaredField("name2cacheKey");
             field.setAccessible(true);
-            int retained = ((java.util.Map<?, ?>) field.get(local)).size();
-            assertTrue(retained > 8, "原生 L1 附属键记录已受容量约束（保留 " + retained + "），重新评估 L1 选型");
+            var retained = (java.util.Map<?, ?>) field.get(local);
+            holds("原生 L1 附属键记录不受容量约束（已受约束时重新评估 L1 选型）", Duration.ofMillis(300), () -> retained.size() > 8);
         } finally {
             local.destroy();
             client.shutdown();
@@ -185,8 +193,8 @@ class NativeCachingIT {
             assertEquals("live-l2", cached.get());
             redis("ACL", "SETUSER", user, "-get");
             assertThrows(RuntimeException.class, remote::get, "故障必须确实阻止原生 GET");
-            Thread.sleep(400);
-            assertEquals("live-l2", cached.get(), "原生 L1 超过 TTL 后已重新读取 Redis，重新评估 L1 选型");
+            // 超过 TTL 后若重新读取 Redis，GET 被拒绝而抛出异常：说明原生实现已修复，重新评估 L1 选型。
+            holds("原生 L1 超过 TTL 后仍返回本地旧值", Duration.ofMillis(400), () -> "live-l2".equals(cached.get()));
         } finally {
             redis("ACL", "SETUSER", user, "+get");
             client.getBucket(key).delete();
