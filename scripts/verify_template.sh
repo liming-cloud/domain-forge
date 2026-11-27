@@ -24,5 +24,10 @@ python3 -I "$work/platform/templates/ddd-service/generate.py" --root "$work" \
 # 上游组件的测试已由主门禁执行：这里只安装其构建产物，完整门禁只对生成的两个服务执行。
 "$work/platform/mvnw" -f "$work/platform/pom.xml" -B -ntp -q install -DskipTests -Ddocker.skip=true \
   -pl services/template-check,services/template-caller -am
-"$work/platform/mvnw" -f "$work/platform/pom.xml" -B -ntp verify -pl services/template-check,services/template-caller "$@"
+# 新生成的服务还没有接口契约快照：以 api.contract.update 模拟本机首次构建写出 openapi.json（持续集成中缺快照会失败），
+# 再确认快照包含各自的示例接口。
+"$work/platform/mvnw" -f "$work/platform/pom.xml" -B -ntp verify -pl services/template-check,services/template-caller \
+  -Dapi.contract.update=true "$@"
+grep -q '"/api/orders/{id}/submit"' "$work/platform/services/template-check/openapi.json"
+grep -q '/order-digest"' "$work/platform/services/template-caller/openapi.json"
 echo "template_check=passed"

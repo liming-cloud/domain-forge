@@ -99,6 +99,10 @@ mybatis-plus:
   global-config:
     banner: false
 
+springdoc:
+  api-docs:
+    enabled: ${@@ENV@@_API_DOCS_ENABLED:false}
+
 server:
   port: ${@@ENV@@_PORT:8090}
   shutdown: graceful

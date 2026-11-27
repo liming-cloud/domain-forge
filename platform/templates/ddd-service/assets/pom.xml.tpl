@@ -101,6 +101,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- 由代码生成 OpenAPI（H-05）：默认关闭，接口契约快照测试与本地调试时打开。 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -203,6 +208,14 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <!-- 接口契约快照（ApiContract，H-05）：模块根目录的 openapi.json。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-build-rules</artifactId>
+            <version>${domain-forge-build-rules.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

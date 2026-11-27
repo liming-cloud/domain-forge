@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "0.21.1",
+  "version": "0.22.0",
   "assets": [
     {
       "source": "assets/README.md.tpl",
@@ -85,6 +85,11 @@
     {
       "source": "assets/src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java.tpl",
       "target": "src/test/java/@@PACKAGE_PATH@@/bootstrap/LoggingStateTest.java",
+      "example": false
+    },
+    {
+      "source": "assets/src/test/java/@@PACKAGE_PATH@@/interfaces/ApiContractIT.java.tpl",
+      "target": "src/test/java/@@PACKAGE_PATH@@/interfaces/ApiContractIT.java",
       "example": false
     },
     {

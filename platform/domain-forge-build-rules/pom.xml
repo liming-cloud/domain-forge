@@ -82,6 +82,12 @@
             <artifactId>spring-context</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 只供 test-jar 中的接口契约快照（ApiContract）解析与规范化 OpenAPI 文档；版本由 Spring Boot 管理。 -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

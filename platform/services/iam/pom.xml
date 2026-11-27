@@ -52,7 +52,6 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
-            <version>3.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.domainforge</groupId>
@@ -222,6 +221,14 @@
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 接口契约快照（ApiContract，H-05）。 -->
+        <dependency>
+            <groupId>org.domainforge</groupId>
+            <artifactId>domain-forge-build-rules</artifactId>
+            <version>${domain-forge-build-rules.version}</version>
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>

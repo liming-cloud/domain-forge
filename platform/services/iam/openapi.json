@@ -1,0 +1,1689 @@
+{
+  "components" : {
+    "schemas" : {
+      "AccessSnapshot" : {
+        "properties" : {
+          "scopes" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/CurrentScope"
+            },
+            "type" : "object"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/CurrentSubject"
+          }
+        },
+        "type" : "object"
+      },
+      "AccountDetailResponse" : {
+        "properties" : {
+          "account" : {
+            "$ref" : "#/components/schemas/AccountResponse"
+          },
+          "memberships" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MembershipBody"
+            },
+            "type" : "array"
+          },
+          "roleIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AccountPageResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AccountResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AccountResponse" : {
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "loginName" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AuditResponse" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "targetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ChangeResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateMenuRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "permission" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateRoleRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateUnitRequest" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CurrentScope" : {
+        "properties" : {
+          "all" : {
+            "type" : "boolean"
+          },
+          "self" : {
+            "type" : "boolean"
+          },
+          "unitIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
+      "CurrentSubject" : {
+        "properties" : {
+          "accountId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "permissions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "roles" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
+      "GrantBody" : {
+        "properties" : {
+          "permission" : {
+            "type" : "string"
+          },
+          "scope" : {
+            "type" : "string"
+          },
+          "unitIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "GrantsRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "grants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GrantBody"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "InstallRequest" : {
+        "properties" : {
+          "permissions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PermissionBody"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationRequest" : {
+        "description" : "邀请创建或显式重发；replacesInvitationId为空表示新建",
+        "properties" : {
+          "loginName" : {
+            "type" : "string"
+          },
+          "replacesInvitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationResponse" : {
+        "properties" : {
+          "invitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "secret" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "LoginRequest" : {
+        "description" : "登录输入；不接受客户端主体或权限",
+        "properties" : {
+          "loginName" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "LoginResult" : {
+        "properties" : {
+          "expiresInSeconds" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MembershipBody" : {
+        "properties" : {
+          "primary" : {
+            "type" : "boolean"
+          },
+          "unitId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MembershipsRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "memberships" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MembershipBody"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "MenuResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "permission" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "MoveRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "parentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OrganizationUnitResponse" : {
+        "properties" : {
+          "effective" : {
+            "type" : "boolean"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PasswordChangeRequest" : {
+        "description" : "自助改密输入；需当前会话和旧密码",
+        "properties" : {
+          "newPassword" : {
+            "type" : "string"
+          },
+          "oldPassword" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PermissionBody" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "scoped" : {
+            "type" : "boolean"
+          },
+          "systemOnly" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "RegistrationRequest" : {
+        "description" : "邀请注册输入；凭据与秘密不进入日志",
+        "properties" : {
+          "invitationSecret" : {
+            "type" : "string"
+          },
+          "loginName" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RenameRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RoleDetailResponse" : {
+        "properties" : {
+          "grants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GrantBody"
+            },
+            "type" : "array"
+          },
+          "role" : {
+            "$ref" : "#/components/schemas/RoleResponse"
+          }
+        },
+        "type" : "object"
+      },
+      "RoleResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "system" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RolesRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "roleIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "StateRequest" : {
+        "description" : "明确启用或停用；缺少enabled不能被解释为停用",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateMenuRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "permission" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "title" : "OpenAPI definition",
+    "version" : "v0"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/accounts" : {
+      "get" : {
+        "operationId" : "accounts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountPageResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "分页查询账号",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/accounts/{id}" : {
+      "get" : {
+        "operationId" : "account",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取账号详情",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/accounts/{id}/memberships" : {
+      "put" : {
+        "operationId" : "memberships",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MembershipsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "变更成员归属",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/accounts/{id}/roles" : {
+      "put" : {
+        "operationId" : "roles",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RolesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "分配账号角色",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/accounts/{id}/state" : {
+      "put" : {
+        "operationId" : "state_3",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "变更账号启用状态",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/audit" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuditResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "分页查询审计事实",
+        "tags" : [ "audit-controller" ]
+      }
+    },
+    "/api/auth/invitations/accept" : {
+      "post" : {
+        "description" : "邀请秘密放请求体；邀请已使用或过期时返回409",
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegistrationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "接受注册邀请",
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/auth/login" : {
+      "post" : {
+        "description" : "默认保护启用；返回的原生Bearer令牌只在SQL提交确认后交付",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "登录",
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/auth/logout" : {
+      "post" : {
+        "operationId" : "logout",
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "summary" : "退出当前会话",
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/auth/password" : {
+      "post" : {
+        "description" : "当前会话及旧密码必需；SQL提交后所有旧会话立即拒绝",
+        "operationId" : "password",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "修改本人密码",
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/invitations" : {
+      "post" : {
+        "description" : "秘密只返回一次；replacesInvitationId显式使旧邀请失效",
+        "operationId" : "issue",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InvitationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InvitationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建或重发注册邀请",
+        "tags" : [ "invitation-controller" ]
+      }
+    },
+    "/api/me" : {
+      "get" : {
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取本人最小资料",
+        "tags" : [ "account-controller" ]
+      }
+    },
+    "/api/me/menus" : {
+      "get" : {
+        "operationId" : "mine",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/MenuResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取本人可见菜单",
+        "tags" : [ "menu-controller" ]
+      }
+    },
+    "/api/menus" : {
+      "get" : {
+        "operationId" : "all",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/MenuResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询菜单目录",
+        "tags" : [ "menu-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_2",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateMenuRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建菜单项",
+        "tags" : [ "menu-controller" ]
+      }
+    },
+    "/api/menus/{id}" : {
+      "delete" : {
+        "operationId" : "delete",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "expectedVersion",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "summary" : "删除菜单项",
+        "tags" : [ "menu-controller" ]
+      },
+      "put" : {
+        "operationId" : "update",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateMenuRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "修改菜单项",
+        "tags" : [ "menu-controller" ]
+      }
+    },
+    "/api/menus/{id}/parent" : {
+      "put" : {
+        "operationId" : "move_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "移动菜单项",
+        "tags" : [ "menu-controller" ]
+      }
+    },
+    "/api/menus/{id}/state" : {
+      "put" : {
+        "operationId" : "state_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "启停菜单项",
+        "tags" : [ "menu-controller" ]
+      }
+    },
+    "/api/organization-units" : {
+      "get" : {
+        "operationId" : "tree",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/OrganizationUnitResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询组织树",
+        "tags" : [ "organization-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUnitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建组织",
+        "tags" : [ "organization-controller" ]
+      }
+    },
+    "/api/organization-units/{id}" : {
+      "delete" : {
+        "operationId" : "delete_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "expectedVersion",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "summary" : "删除组织",
+        "tags" : [ "organization-controller" ]
+      }
+    },
+    "/api/organization-units/{id}/name" : {
+      "put" : {
+        "operationId" : "rename_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RenameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "修改组织名称",
+        "tags" : [ "organization-controller" ]
+      }
+    },
+    "/api/organization-units/{id}/parent" : {
+      "put" : {
+        "operationId" : "move",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "移动组织",
+        "tags" : [ "organization-controller" ]
+      }
+    },
+    "/api/organization-units/{id}/state" : {
+      "put" : {
+        "operationId" : "state_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "启停组织",
+        "tags" : [ "organization-controller" ]
+      }
+    },
+    "/api/permission-namespaces/{namespace}" : {
+      "put" : {
+        "operationId" : "install",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InstallRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "format" : "int32",
+                  "type" : "integer"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "安装权限命名空间",
+        "tags" : [ "permission-catalog-controller" ]
+      }
+    },
+    "/api/permissions" : {
+      "get" : {
+        "operationId" : "permissions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PermissionBody"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询权限目录",
+        "tags" : [ "permission-catalog-controller" ]
+      }
+    },
+    "/api/roles" : {
+      "get" : {
+        "operationId" : "roles_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RoleResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询角色",
+        "tags" : [ "role-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建角色",
+        "tags" : [ "role-controller" ]
+      }
+    },
+    "/api/roles/{id}" : {
+      "delete" : {
+        "operationId" : "delete_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "expectedVersion",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "summary" : "删除角色",
+        "tags" : [ "role-controller" ]
+      },
+      "get" : {
+        "operationId" : "role",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RoleDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取角色详情",
+        "tags" : [ "role-controller" ]
+      }
+    },
+    "/api/roles/{id}/grants" : {
+      "put" : {
+        "operationId" : "grants",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrantsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "替换角色授予",
+        "tags" : [ "role-controller" ]
+      }
+    },
+    "/api/roles/{id}/name" : {
+      "put" : {
+        "operationId" : "rename",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RenameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "修改角色名称",
+        "tags" : [ "role-controller" ]
+      }
+    },
+    "/api/roles/{id}/state" : {
+      "put" : {
+        "operationId" : "state",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "启停角色",
+        "tags" : [ "role-controller" ]
+      }
+    },
+    "/internal/access/current" : {
+      "get" : {
+        "description" : "只检查登录与账号有效；业务服务据此做本地授权",
+        "operationId" : "current",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrentSubject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取当前用户身份与权限",
+        "tags" : [ "internal-access-controller" ]
+      }
+    },
+    "/internal/access/scopes" : {
+      "get" : {
+        "description" : "无授予返回空范围；业务查询把范围映射为参数绑定的过滤条件",
+        "operationId" : "scopes",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "permission",
+          "required" : true,
+          "schema" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "$ref" : "#/components/schemas/CurrentScope"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取当前用户数据范围",
+        "tags" : [ "internal-access-controller" ]
+      }
+    },
+    "/internal/access/snapshot" : {
+      "get" : {
+        "description" : "current 与 scopes 的合并，一次请求完成",
+        "operationId" : "snapshot",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "permission",
+          "required" : true,
+          "schema" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccessSnapshot"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取当前用户身份、权限与数据范围",
+        "tags" : [ "internal-access-controller" ]
+      }
+    }
+  }
+}
