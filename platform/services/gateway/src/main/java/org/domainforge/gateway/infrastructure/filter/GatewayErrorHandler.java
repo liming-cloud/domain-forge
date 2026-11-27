@@ -46,7 +46,7 @@ public class GatewayErrorHandler implements ErrorWebExceptionHandler {
         }
         if (connectionFailure(failure)) return GatewayResponses.unavailable(exchange);
         if (failure instanceof TimeoutException) return timeout(exchange);
-        LOG.error("gateway_internal_error type={}", failure.getClass().getName());
+        LOG.error("event=gateway_internal_error type={}", failure.getClass().getName());
         return GatewayResponses.failure(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务处理失败");
     }
 

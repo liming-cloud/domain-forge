@@ -161,7 +161,7 @@ public final class Problems {
      * 截断显式标记，避免循环原因或长栈放大日志。
      */
     private static String diagnostic(String kind, Throwable failure) {
-        StringBuilder text = new StringBuilder("platform_http_failure kind=").append(kind);
+        StringBuilder text = new StringBuilder("event=platform_http_failure kind=").append(kind);
         Throwable cause = failure;
         for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
             text.append(" cause=").append(cause.getClass().getName());

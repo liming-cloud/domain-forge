@@ -57,7 +57,7 @@ scripts/smoke_service.sh <服务>                          # 单服务冒烟，�
 - [S-06](docs/rules/02-系统设计.md#s-06-用包划分边界跨边界只经公开合同) 跨上下文只引用 `application.contract`，不访问其他组件的 `internal` 包；[S-24](docs/rules/02-系统设计.md#s-24-组件之间无环依赖指向更稳定的一方) 组件之间无环，依赖指向更稳定的一方。
 - [P-03](docs/rules/05-持久化.md#p-03-sql-写在-mapper-xml) SQL 只写在 Mapper XML 或合法的 MyBatis-Plus 链式条件里；[R-09](docs/rules/01-需求与领域建模.md#r-09-用-jmolecules-标识领域角色) 聚合根与实体用 jMolecules 注解并有 `@Identity`。
 - [C-09](docs/rules/04-源码质量.md#c-09-每个生产类型都有中文说明) 每个生产类型有中文说明；[C-13](docs/rules/04-源码质量.md#c-13-方法复杂度上限) 圈复杂度 ≤ 10，可执行语句 ≤ 30。
-- [C-17](docs/rules/04-源码质量.md#c-17-空值用-jspecify-声明) 每个包的 `package-info.java` 标 `@NullMarked`；[C-18](docs/rules/04-源码质量.md#c-18-编译零告警) 编译零告警；领域层与应用层不抛通用异常；日志只用 slf4j。
+- [C-17](docs/rules/04-源码质量.md#c-17-空值用-jspecify-声明) 每个包的 `package-info.java` 标 `@NullMarked`；[C-18](docs/rules/04-源码质量.md#c-18-编译零告警) 编译零告警；领域层与应用层不抛通用异常；日志只用 slf4j，消息以 `event=snake_case` 开头（[F-05](docs/rules/09-故障与可观测性.md#f-05-结构化日志能串联一次调用)）。
 - [B-05](docs/rules/03-技术与构建.md#b-05-直接使用的依赖必须显式声明) 直接用到的依赖显式声明；[C-03](docs/rules/04-源码质量.md#c-03-统一代码格式) 格式以 Spotless 的输出为准。
 
 ## 需要先停下来问人的事

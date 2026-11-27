@@ -24,4 +24,13 @@ public class Legal {
     public boolean blank(String sleep) {
         return sleep.isBlank();
     }
+
+    /**
+     * 日志消息以 event=snake_case 开头；首个参数不是字符串字面量的调用（如 Mono.error）不受检查。
+     */
+    public Object log(org.slf4j.Logger log, String region) {
+        log.warn("event=cache_fill_failed region={} type={}", region, "timeout");
+        log.info("event=gateway_same_token_refreshed");
+        return reactor.core.publisher.Mono.error(new IllegalStateException(region));
+    }
 }

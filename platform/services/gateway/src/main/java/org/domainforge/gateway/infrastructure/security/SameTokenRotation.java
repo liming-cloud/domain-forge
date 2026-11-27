@@ -62,10 +62,10 @@ public class SameTokenRotation {
                 long timeout = SaManager.getConfig().getSameTokenTimeout();
                 if (!due(remaining, timeout, interval.toSeconds())) return;
                 SaSameUtil.refreshToken();
-                LOG.info("gateway_same_token_refreshed");
+                LOG.info("event=gateway_same_token_refreshed");
             });
         } catch (RuntimeException failure) {
-            LOG.error("gateway_same_token_refresh_failed reason={}", failure.getClass().getName());
+            LOG.error("event=gateway_same_token_refresh_failed reason={}", failure.getClass().getName());
         }
     }
 }

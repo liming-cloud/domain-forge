@@ -77,7 +77,7 @@ public class RequestIdentityFilter implements WebFilter, Ordered {
     private static void access(ServerWebExchange exchange, long started) {
         Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
         var status = exchange.getResponse().getStatusCode();
-        LOG.info("gateway_access trace_id={} method={} path={} status={} route={} millis={}",
+        LOG.info("event=gateway_access trace_id={} method={} path={} status={} route={} millis={}",
                 ReactiveTraces.traceId(exchange).orElse("-"),
                 exchange.getRequest().getMethod(),
                 exchange.getRequest().getURI().getRawPath(),

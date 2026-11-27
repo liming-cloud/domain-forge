@@ -54,7 +54,7 @@ public final class TaskDispatcher implements BasicProcessor {
         String name = context.getJobParams();
         ScheduledTask task = tasks.get(name);
         if (task == null) {
-            LOG.error("scheduling_unknown_task task={} instance={}", name, context.getInstanceId());
+            LOG.error("event=scheduling_unknown_task task={} instance={}", name, context.getInstanceId());
             return new ProcessResult(false, "本服务没有任务 " + name);
         }
         Span span = tracer.nextSpan().name("task " + name).tag("task.instance", context.getInstanceId()).start();
@@ -66,7 +66,7 @@ public final class TaskDispatcher implements BasicProcessor {
         } catch (Exception failure) {
             record(name, "failure", sample);
             span.error(failure);
-            LOG.error("scheduling_task_failed task={} instance={} reason={}", name, context.getInstanceId(),
+            LOG.error("event=scheduling_task_failed task={} instance={} reason={}", name, context.getInstanceId(),
                     failure.getClass().getName(), failure);
             return new ProcessResult(false, failure.getClass().getName());
         } finally {

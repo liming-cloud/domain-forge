@@ -110,7 +110,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
         try {
             outcome = records.begin(record, fingerprint, settings.lease());
         } catch (RuntimeException unavailable) {
-            LOGGER.error("idempotency_unavailable reason={}", unavailable.getClass().getName());
+            LOGGER.error("event=idempotency_unavailable reason={}", unavailable.getClass().getName());
             reject(response, 503, "SERVICE_UNAVAILABLE", "服务暂不可用");
             return;
         }
@@ -162,7 +162,7 @@ public final class IdempotencyFilter extends OncePerRequestFilter {
         try {
             action.run();
         } catch (RuntimeException failure) {
-            LOGGER.error("idempotency_record_failed reason={}", failure.getClass().getName());
+            LOGGER.error("event=idempotency_record_failed reason={}", failure.getClass().getName());
         }
     }
 

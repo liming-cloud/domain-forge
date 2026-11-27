@@ -102,7 +102,8 @@ class NativeCachingIT {
                 remote.delete();
                 await(() -> cached.get() == null);
                 remote.set("expires", Duration.ofMillis(250));
-                assertEquals("expires", cached.get());
+                // 删键后本地缓存的空值要等失效通知到达才清掉，不能写入后立即断言。
+                await(() -> "expires".equals(cached.get()));
                 await(() -> cached.get() == null);
                 remote.set("recovered", Duration.ofSeconds(5));
                 await(() -> "recovered".equals(cached.get()));

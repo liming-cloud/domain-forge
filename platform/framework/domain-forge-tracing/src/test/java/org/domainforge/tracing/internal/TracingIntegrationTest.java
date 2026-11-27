@@ -91,7 +91,7 @@ class TracingIntegrationTest {
         String traceId = response.headers().firstValue("X-Trace-Id").orElseThrow();
         String line = awaitLine("\"traceId\":\"" + traceId + "\"");
         assertTrue(line.startsWith("{") && line.endsWith("}"), line);
-        assertTrue(line.contains("http_access method=GET path=/probe status=200"), line);
+        assertTrue(line.contains("event=http_access method=GET path=/probe status=200"), line);
         // Boot 的 ECS 格式为嵌套对象：服务名在 service.name，级别与日志器在 log 下，traceId 来自日志上下文。
         assertTrue(line.contains("\"service\":{\"name\":\"tracing-probe\""), "应带服务名：" + line);
         assertTrue(line.contains("\"log\":{\"level\":\"INFO\",\"logger\":"), "应带级别与日志器：" + line);

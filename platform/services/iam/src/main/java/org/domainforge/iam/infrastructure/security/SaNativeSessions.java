@@ -74,7 +74,7 @@ public final class SaNativeSessions implements NativeSessions {
             revoke(token);
         } catch (RuntimeException failure) {
             cleanupFailures.increment();
-            LoggerFactory.getLogger("iam.session.cleanup").warn("native_session_cleanup_failed");
+            LoggerFactory.getLogger("iam.session.cleanup").warn("event=native_session_cleanup_failed");
         }
     }
 }

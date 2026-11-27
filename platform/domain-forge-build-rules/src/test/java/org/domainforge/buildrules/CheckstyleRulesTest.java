@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
  * Checkstyle 规则的正反例：正例在三份配置下零违规；反例以检查名命名（可加 _变体），在配置了该检查的每份配置下只报出该检查；
- * 每个已配置的检查至少有一个反例。
+ * 每个已配置的检查至少有一个反例。同一模块配置多次时用 id 区分，检查名取 id。
  */
 class CheckstyleRulesTest {
     private static final Path RULES = Path.of("src/main/resources/checkstyle");
@@ -100,9 +100,9 @@ class CheckstyleRulesTest {
         return names;
     }
 
-    private static void collect(Configuration module, Set<String> names) {
+    private static void collect(Configuration module, Set<String> names) throws CheckstyleException {
         if (!CONTAINERS.contains(module.getName())) {
-            names.add(module.getName());
+            names.add(List.of(module.getPropertyNames()).contains("id") ? module.getProperty("id") : module.getName());
         }
         for (Configuration child : module.getChildren()) {
             collect(child, names);
@@ -110,7 +110,7 @@ class CheckstyleRulesTest {
     }
 
     /**
-     * 用指定配置检查一个文件，返回报出违规的检查名（去掉包名与 Check 后缀）。
+     * 用指定配置检查一个文件，返回报出违规的检查名（有 id 时取 id，否则去掉包名与 Check 后缀）。
      */
     private static List<String> audit(String config, Path file) throws CheckstyleException {
         List<String> found = new ArrayList<>();
@@ -137,7 +137,8 @@ class CheckstyleRulesTest {
             @Override
             public void addError(AuditEvent event) {
                 String source = event.getSourceName();
-                found.add(source.substring(source.lastIndexOf('.') + 1).replaceFirst("Check$", ""));
+                found.add(event.getModuleId() != null ? event.getModuleId()
+                        : source.substring(source.lastIndexOf('.') + 1).replaceFirst("Check$", ""));
             }
 
             @Override

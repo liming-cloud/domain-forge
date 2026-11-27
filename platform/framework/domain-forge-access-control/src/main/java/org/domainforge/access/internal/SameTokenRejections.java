@@ -28,11 +28,11 @@ public final class SameTokenRejections {
         var response = SaHolder.getResponse();
         response.setHeader("Content-Type", "application/problem+json;charset=UTF-8");
         if (failure instanceof SameTokenInvalidException) {
-            LOG.warn("拒绝缺少有效 Same-Token 的请求：{}", SaHolder.getRequest().getRequestPath());
+            LOG.warn("event=same_token_rejected path={}", SaHolder.getRequest().getRequestPath());
             response.setStatus(401);
             return UNAUTHENTICATED;
         }
-        LOG.error("Same-Token 校验失败：会话存储不可用（{}）", failure.getClass().getName());
+        LOG.error("event=same_token_store_unavailable reason={}", failure.getClass().getName());
         response.setStatus(503);
         return UNAVAILABLE;
     }

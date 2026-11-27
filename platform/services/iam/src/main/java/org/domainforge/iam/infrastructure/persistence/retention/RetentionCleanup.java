@@ -49,7 +49,7 @@ public final class RetentionCleanup {
             return count;
         } catch (RuntimeException error) {
             failures.increment();
-            LOG.warn("IAM retention failed type={}", error.getClass().getSimpleName());
+            LOG.warn("event=iam_retention_failed type={}", error.getClass().getSimpleName());
             throw new IllegalStateException("IAM 过期数据清理失败，数据保留到下个周期", error);
         }
     }

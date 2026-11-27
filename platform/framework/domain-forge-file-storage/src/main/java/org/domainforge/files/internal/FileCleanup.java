@@ -74,7 +74,7 @@ public final class FileCleanup implements ScheduledTask {
     public void run(TaskRun run) {
         int purged = purgeDeleted();
         int orphans = sweepOrphans(days(run.parameters()));
-        LOGGER.info("file_cleanup purged={} orphans={}", purged, orphans);
+        LOGGER.info("event=file_cleanup purged={} orphans={}", purged, orphans);
     }
 
     /**
