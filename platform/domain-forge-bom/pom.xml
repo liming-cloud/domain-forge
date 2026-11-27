@@ -110,6 +110,12 @@
                 <artifactId>mybatis-plus-jsqlparser</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
+            <!-- 由代码生成 OpenAPI（H-05）：IAM 与模板生成的服务共用一个版本。 -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+                <version>3.2.0</version>
+            </dependency>
             <dependency>
                 <groupId>org.domainforge</groupId>
                 <artifactId>domain-forge-access-control</artifactId>
