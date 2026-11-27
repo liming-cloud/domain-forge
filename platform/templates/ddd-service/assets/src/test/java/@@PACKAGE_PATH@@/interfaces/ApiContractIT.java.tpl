@@ -1,36 +1,43 @@
 package @@PACKAGE@@.interfaces;
 
 import @@PACKAGE@@.bootstrap.@@APP_CLASS@@;
+import org.domainforge.access.api.SameTokens;
 import org.domainforge.buildrules.testsupport.ApiContract;
 import org.junit.jupiter.api.Test;
-import org.springdoc.webmvc.api.OpenApiWebMvcResource;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.core.env.Environment;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * 本服务的接口契约（H-05）：真实 PostgreSQL 与 Redis 上启动服务，springdoc 生成的 OpenAPI 文档与模块根目录的 openapi.json 一致。
  * 首次在本机运行时写出快照，随服务提交；接口有意变化时按失败信息更新快照，并在 PR 中说明对调用方的影响。
- * <p>
- * 直接调用 springdoc 的文档 Bean，不经 HTTP：文档端点不属于业务接口，访问控制按未声明访问策略拒绝它。
+ * 文档端点只在测试中打开，请求带当前 Same-Token。
  */
 class ApiContractIT {
 
     @Test
-    void openApiDocumentMatchesSnapshot() throws Exception {
+    void openApiDocumentMatchesSnapshot() throws IOException, InterruptedException {
         assertNotNull(System.getenv("POSTGRES_PORT"), "需要真实数据库验证环境");
-        try (ConfigurableApplicationContext application = start()) {
-            byte[] document = application.getBean(OpenApiWebMvcResource.class)
-                    .openapiJson(new MockHttpServletRequest(), "/v3/api-docs", Locale.ROOT);
+        try (ConfigurableApplicationContext application = start(); HttpClient client = HttpClient.newHttpClient()) {
+            String port = application.getBean(Environment.class).getProperty("local.server.port");
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/v3/api-docs"))
+                            .header(SameTokens.HEADER, SameTokens.current())
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
 
-            ApiContract.verify(new String(document, StandardCharsets.UTF_8));
+            assertEquals(200, response.statusCode(), response.body());
+            ApiContract.verify(response.body());
         }
     }
 

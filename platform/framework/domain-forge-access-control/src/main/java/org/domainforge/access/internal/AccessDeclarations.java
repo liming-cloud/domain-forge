@@ -29,10 +29,12 @@ public final class AccessDeclarations {
             List.of(SaCheckSafe.class, SaCheckHttpBasic.class, SaCheckHttpDigest.class, SaCheckDisable.class);
 
     /**
-     * 框架自有处理器（如错误页）不按业务入口检查；应用控制器没有默认匿名豁免。
+     * 框架自有处理器（如错误页、springdoc 的 OpenAPI 文档端点）不按业务入口检查；应用控制器没有默认匿名豁免。
+     * 文档端点默认关闭，打开后仍要经过 Same-Token 校验。
      */
     public static boolean framework(HandlerMethod method) {
-        return method.getBeanType().getPackageName().startsWith("org.springframework.");
+        String name = method.getBeanType().getPackageName();
+        return name.startsWith("org.springframework.") || name.startsWith("org.springdoc.");
     }
 
     private static <A extends Annotation> A annotation(AnnotatedElement element, Class<A> kind) {
