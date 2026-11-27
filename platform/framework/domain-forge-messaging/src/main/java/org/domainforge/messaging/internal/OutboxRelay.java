@@ -127,7 +127,7 @@ public final class OutboxRelay implements SmartLifecycle {
                 outbox.release(token);
             });
             failed.increment();
-            LOG.warn("messaging_outbox_send_failed event_id={} topic={} attempts={} reason={}",
+            LOG.warn("event=messaging_outbox_send_failed event_id={} topic={} attempts={} reason={}",
                     row.eventId(), row.topic(), row.attempts() + 1, failure.getClass().getName());
             return new Batch(rows.size(), delivered, true);
         }
@@ -179,7 +179,7 @@ public final class OutboxRelay implements SmartLifecycle {
         try {
             action.getAsInt();
         } catch (RuntimeException failure) {
-            LOG.error("messaging_relay_failed reason={}", failure.getClass().getName());
+            LOG.error("event=messaging_relay_failed reason={}", failure.getClass().getName());
         }
     }
 

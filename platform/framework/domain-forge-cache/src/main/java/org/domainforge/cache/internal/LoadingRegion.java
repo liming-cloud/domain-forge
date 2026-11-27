@@ -84,7 +84,7 @@ final class LoadingRegion<T> implements CacheRegion<T> {
                     remove(key);
                 } catch (RuntimeException failure) {
                     // 已提交的数据库事务不能因缓存删除失败而回滚或重试；旧值在 TTL 内可能被读到。
-                    LOG.warn("cache_evict_after_commit_failed region={} type={}", name,
+                    LOG.warn("event=cache_evict_after_commit_failed region={} type={}", name,
                             failure.getClass().getSimpleName());
                 }
             }
@@ -151,7 +151,7 @@ final class LoadingRegion<T> implements CacheRegion<T> {
             if (value != null) storage.put(key, value, ttl());
             else if (!settings.nullTtl().isZero()) marker(key).set("1", settings.nullTtl());
         } catch (RuntimeException failure) {
-            LOG.warn("cache_fill_failed region={} type={}", name, failure.getClass().getSimpleName());
+            LOG.warn("event=cache_fill_failed region={} type={}", name, failure.getClass().getSimpleName());
         }
         return value;
     }

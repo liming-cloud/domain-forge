@@ -37,15 +37,15 @@ public final class IamHttpErrors {
     public ResponseEntity<ProblemDetail> handle(Exception failure) {
         if (failure instanceof IamException iam && iam.retryAfterSeconds() > 0) return limited(iam);
         if (failure instanceof TransactionSystemException) {
-            LOG.error("iam_request_failed failureType={}", failure.getClass().getSimpleName());
+            LOG.error("event=iam_request_failed failureType={}", failure.getClass().getSimpleName());
             return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "IAM_RESULT_UNKNOWN", "处理结果未知，请查询后再操作");
         }
         if (failure instanceof DataIntegrityViolationException) {
-            LOG.error("iam_request_failed failureType={}", failure.getClass().getSimpleName());
+            LOG.error("event=iam_request_failed failureType={}", failure.getClass().getSimpleName());
             return Problems.of(HttpStatus.CONFLICT, "VERSION_CONFLICT", "数据已被并发修改，请重新读取后再操作");
         }
         if (failure instanceof DataAccessException || failure instanceof TransactionException) {
-            LOG.error("iam_request_failed failureType={}", failure.getClass().getSimpleName());
+            LOG.error("event=iam_request_failed failureType={}", failure.getClass().getSimpleName());
             return Problems.of(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "必要服务暂不可用");
         }
         return Problems.dispatch(failure);

@@ -90,7 +90,7 @@ public final class EventConsumers implements SmartLifecycle {
             if (!Boolean.TRUE.equals(fresh)) {
                 Counter.builder("domainforge.messaging.duplicate").tag("group", handler.group())
                         .register(metrics).increment();
-                LOG.info("messaging_duplicate group={} event_id={}", handler.group(), event.id());
+                LOG.info("event=messaging_duplicate group={} event_id={}", handler.group(), event.id());
             }
             return ConsumeResult.SUCCESS;
         } catch (RuntimeException failure) {
@@ -98,11 +98,11 @@ public final class EventConsumers implements SmartLifecycle {
             if (event.attempt() >= maxAttempts) {
                 Counter.builder("domainforge.messaging.dead-letter").tag("group", handler.group())
                         .register(metrics).increment();
-                LOG.error("messaging_dead_letter group={} topic={} event_id={} type={} attempts={} reason={}",
+                LOG.error("event=messaging_dead_letter group={} topic={} event_id={} type={} attempts={} reason={}",
                         handler.group(), handler.topic(), event.id(), event.type(), event.attempt(),
                         failure.getClass().getName());
             } else {
-                LOG.warn("messaging_consume_failed group={} event_id={} attempt={} reason={}",
+                LOG.warn("event=messaging_consume_failed group={} event_id={} attempt={} reason={}",
                         handler.group(), event.id(), event.attempt(), failure.getClass().getName());
             }
             return ConsumeResult.FAILURE;
@@ -132,7 +132,7 @@ public final class EventConsumers implements SmartLifecycle {
             try {
                 consumer.close();
             } catch (java.io.IOException failure) {
-                LOG.warn("messaging_consumer_close_failed group={}", consumer.getConsumerGroup());
+                LOG.warn("event=messaging_consumer_close_failed group={}", consumer.getConsumerGroup());
             }
         }
         consumers.clear();

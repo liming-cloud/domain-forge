@@ -62,7 +62,7 @@ public class RateLimitFilter implements WebFilter, Ordered {
             return result != null && result == 1L;
         } catch (RuntimeException failure) {
             unavailable.increment();
-            LOG.error("gateway_rate_limit_unavailable reason={}", failure.getClass().getName());
+            LOG.error("event=gateway_rate_limit_unavailable reason={}", failure.getClass().getName());
             return true;
         }
     }

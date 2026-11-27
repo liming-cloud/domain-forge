@@ -171,7 +171,7 @@ public final class SqlFileStore implements FileStore {
             try {
                 storage.delete(key);
             } catch (RuntimeException failure) {
-                LOGGER.warn("file_rollback_cleanup_failed key={}", key, failure);
+                LOGGER.warn("event=file_rollback_cleanup_failed key={}", key, failure);
             }
         }
     }

@@ -31,7 +31,7 @@ public final class AccessLogServletFilter extends OncePerRequestFilter implement
         } finally {
             // 异常传出时容器随后按 500 处理，此刻响应状态尚未改写。
             int status = completed ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-            LOG.info("http_access method={} path={} status={} millis={}", request.getMethod(),
+            LOG.info("event=http_access method={} path={} status={} millis={}", request.getMethod(),
                     request.getRequestURI(), status, (System.nanoTime() - start) / 1_000_000);
         }
     }

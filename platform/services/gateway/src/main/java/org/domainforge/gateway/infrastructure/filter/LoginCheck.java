@@ -68,7 +68,7 @@ public final class LoginCheck {
             response.setStatus(401);
             return UNAUTHENTICATED;
         }
-        LOG.error("gateway_session_unavailable reason={}", failure.getClass().getName());
+        LOG.error("event=gateway_session_unavailable reason={}", failure.getClass().getName());
         response.setStatus(503);
         return UNAVAILABLE;
     }

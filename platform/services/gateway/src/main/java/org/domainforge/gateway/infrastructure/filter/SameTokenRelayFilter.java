@@ -28,7 +28,7 @@ public class SameTokenRelayFilter implements GlobalFilter, Ordered {
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(Optional::of)
                 .onErrorResume(failure -> {
-                    LOG.error("gateway_same_token_unavailable reason={}", failure.getClass().getName());
+                    LOG.error("event=gateway_same_token_unavailable reason={}", failure.getClass().getName());
                     return Mono.just(Optional.empty());
                 })
                 .flatMap(token -> token.isEmpty() ? GatewayResponses.unavailable(exchange)

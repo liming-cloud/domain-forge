@@ -104,7 +104,7 @@ gateway:
 
 ### 链路标识
 
-- 网关为每个请求开启链路的根 span（Nginx 已删除客户端带来的追踪头），向后端发送 `traceparent`，在响应头 `X-Trace-Id` 返回 traceId，并写访问日志 `gateway_access trace_id=… method=… path=… status=… route=… millis=…`。
+- 网关为每个请求开启链路的根 span（Nginx 已删除客户端带来的追踪头），向后端发送 `traceparent`，在响应头 `X-Trace-Id` 返回 traceId，并写访问日志 `event=gateway_access trace_id=… method=… path=… status=… route=… millis=…`。
 - 后端响应中的 `X-Trace-Id` 在复制前删除，响应只带网关写入的一个值。传播、采样与导出见[链路追踪](tracing.md)。
 - 只用于关联日志与链路，不作为幂等键或安全依据。
 

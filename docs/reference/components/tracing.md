@@ -9,7 +9,7 @@
 | 位置 | 行为 |
 |---|---|
 | Nginx | 删除客户端带来的 `traceparent`、`tracestate`、`baggage`：链路从网关开始，外部不能指定 traceId 或强制采样 |
-| 网关 | Spring Cloud Gateway 的观测为每个请求开启根 span 并向后端发送 `traceparent`；访问日志 `gateway_access trace_id=… method=… path=… status=… route=… millis=…`；响应头 `X-Trace-Id` 只保留网关写入的一个值（后端响应中的同名头在复制前删除） |
+| 网关 | Spring Cloud Gateway 的观测为每个请求开启根 span 并向后端发送 `traceparent`；访问日志 `event=gateway_access trace_id=… method=… path=… status=… route=… millis=…`；响应头 `X-Trace-Id` 只保留网关写入的一个值（后端响应中的同名头在复制前删除） |
 | 后端 HTTP 入口 | Spring MVC 观测沿用传入的 `traceparent`（本地开发不经网关时自行开启新链路）；响应头 `X-Trace-Id` |
 | 同步调用 | OpenFeign 的 Micrometer 观测（`feign-micrometer`，由[跨服务调用组件](service-call.md)带入）为每次调用开启客户端 span 并发送 `traceparent` |
 | Outbox 消息 | 发布时把当前链路的 `traceparent` 写入 Outbox 行（列 `trace_parent`）；中继发送时以它为父开启 `send <主题>` span，并写入消息属性 `traceparent`；消费方以消息属性为父开启 `consume <主题>` span（标签 `messaging.consumer.group`），处理者内的日志与后续调用都在这条链路中。见[消息与 Outbox](messaging.md) |

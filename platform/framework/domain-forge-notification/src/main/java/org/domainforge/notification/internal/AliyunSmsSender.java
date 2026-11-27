@@ -60,12 +60,14 @@ public final class AliyunSmsSender implements SmsSender {
             return receipt;
         } catch (SmsRejected rejected) {
             metrics.counter("domainforge.sms.sent", "template", message.template(), "result", "rejected").increment();
-            LOGGER.warn("sms_rejected phone={} template={} reason={}", PhoneNumbers.mask(phone), message.template(),
+            LOGGER.warn("event=sms_rejected phone={} template={} reason={}", PhoneNumbers.mask(phone),
+                    message.template(),
                     rejected.reason());
             throw rejected;
         } catch (NotificationUnavailableException failure) {
             metrics.counter("domainforge.sms.sent", "template", message.template(), "result", "failure").increment();
-            LOGGER.error("sms_failed phone={} template={}", PhoneNumbers.mask(phone), message.template(), failure);
+            LOGGER.error("event=sms_failed phone={} template={}", PhoneNumbers.mask(phone), message.template(),
+                    failure);
             throw failure;
         }
     }

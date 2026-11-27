@@ -61,10 +61,10 @@ public final class EnvironmentSettingsBinder
             try {
                 settings.refresh();
                 applied(settings.prefix());
-                LOG.info("config_applied group={}", settings.prefix());
+                LOG.info("event=config_applied group={}", settings.prefix());
             } catch (RuntimeException failure) {
                 count(settings.prefix(), "rejected");
-                LOG.error("config_rejected group={} reason={}", settings.prefix(), failure.getMessage());
+                LOG.error("event=config_rejected group={} reason={}", settings.prefix(), failure.getMessage());
             }
         }
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
         "https://checkstyle.org/dtds/configuration_1_3.dtd">
-<!-- 生产源码：类型说明、复杂度上限、禁止 Java 中出现 SQL 文本。 -->
+<!-- 生产源码：类型说明、复杂度上限、禁止 Java 中出现 SQL 文本、日志消息格式。 -->
 <module name="Checker">
     <property name="charset" value="UTF-8"/>
     <property name="severity" value="error"/>
@@ -26,6 +26,12 @@
             <property name="format"
                       value="(?is)^&quot;?\s*(select\b.+\bfrom\b|insert\s+into\b|update\s+\S+\s+set\b|delete\s+from\b|merge\s+into\b)"/>
             <property name="message" value="SQL 必须写在 Mapper XML，Java 中禁止出现 SQL 文本"/>
+        </module>
+        <module name="MatchXpath">
+            <property name="id" value="LogEventFormat"/>
+            <property name="query"
+                      value="//METHOD_CALL[./DOT/IDENT[last()][@text='trace' or @text='debug' or @text='info' or @text='warn' or @text='error']]/ELIST/EXPR[1][./PLUS or ./STRING_LITERAL[not(matches(@text, '^event=[a-z0-9_]+( |$)'))]]"/>
+            <message key="matchxpath.match" value="日志消息格式为 event=snake_case 键=值，用占位符，不拼接字符串（F-05）"/>
         </module>
     </module>
 </module>

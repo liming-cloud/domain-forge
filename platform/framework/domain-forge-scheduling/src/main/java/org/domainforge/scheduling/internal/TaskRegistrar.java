@@ -66,14 +66,14 @@ public final class TaskRegistrar {
         Set<String> created = new java.util.TreeSet<>();
         for (ScheduledTask task : tasks) {
             if (existing.contains(task.name())) {
-                LOG.info("scheduling_task_kept task={}", task.name());
+                LOG.info("event=scheduling_task_kept task={}", task.name());
                 continue;
             }
             var saved = client.saveJob(request(task));
             if (!saved.isSuccess())
                 throw new IllegalStateException("无法登记任务 " + task.name() + "：" + saved.getMessage());
             created.add(task.name());
-            LOG.info("scheduling_task_created task={} id={} cron={}", task.name(), saved.getData(), task.cron());
+            LOG.info("event=scheduling_task_created task={} id={} cron={}", task.name(), saved.getData(), task.cron());
         }
         return created;
     }
