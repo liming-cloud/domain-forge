@@ -195,10 +195,13 @@ def generate(root, name, package, namespace=None, with_example=False, call_peer=
 
 
 def format_module(root, name):
-    """对新服务模块执行 spotless:apply；返回进程退出码。"""
-    command = [str(root / 'platform' / 'mvnw'), '-q', '-f', str(root / 'platform' / 'pom.xml'),
+    """对新服务模块执行 spotless:apply；返回进程退出码。失败时把 Maven 的完整输出写到标准错误，便于定位原因。"""
+    command = [str(root / 'platform' / 'mvnw'), '-B', '-ntp', '-f', str(root / 'platform' / 'pom.xml'),
                '-pl', 'services/' + name, 'spotless:apply']
-    return subprocess.run(command, check=False).returncode
+    completed = subprocess.run(command, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if completed.returncode != 0:
+        sys.stderr.write(completed.stdout)
+    return completed.returncode
 
 
 def main():

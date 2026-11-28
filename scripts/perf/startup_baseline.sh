@@ -62,7 +62,8 @@ step "构建 IAM、网关与 order-service"
 step "启动整套服务，初始化管理员"
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "ORDER_SERVICE_IMAGE_TAG=$tag" \
     "ORDER_SERVICE_DB_PASSWORD=$(secret)"
-up_wait --build --quiet-pull > "$results/compose-up.log" 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+up_wait --build --quiet-pull || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+cp "$work/compose-up.log" "$results/compose-up.log"
 admin_pw="Admin-$(secret)"
 initialize_admin "$admin_pw"
 (umask 077 && token admin "$admin_pw" > "$work/token")

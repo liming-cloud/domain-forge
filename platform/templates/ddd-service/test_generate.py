@@ -1,5 +1,6 @@
 """generate.py 的输入校验、命名推导与失败回滚；构建与运行验证见 scripts/verify_template.sh。"""
 
+import io
 import json
 from pathlib import Path
 import shutil
@@ -184,10 +185,10 @@ class GenerateTest(unittest.TestCase):
             generate.generate(self.root, 'order', 'com.company.order')
         self.assertEqual(before, (self.root / 'platform' / 'services' / 'pom.xml').read_text(encoding='utf-8'))
 
-    def run_main(self, returncode, *extra):
+    def run_main(self, returncode, *extra, output=''):
         argv = ['generate.py', '--root', str(self.root), '--name', 'order-service', '--package', 'com.company.order']
         with mock.patch('sys.argv', argv + list(extra)), \
-                mock.patch('generate.subprocess.run', return_value=mock.Mock(returncode=returncode)) as run:
+                mock.patch('generate.subprocess.run', return_value=mock.Mock(returncode=returncode, stdout=output)) as run:
             generate.main()
         return run
 
@@ -202,6 +203,11 @@ class GenerateTest(unittest.TestCase):
             self.run_main(1)
         self.assertEqual(3, exited.exception.code)
         self.assertTrue((self.root / 'platform' / 'services' / 'order-service' / 'pom.xml').is_file())
+
+    def test_format_failure_prints_maven_output_to_stderr(self):
+        with self.assertRaises(SystemExit), mock.patch('sys.stderr', new_callable=io.StringIO) as stderr:
+            self.run_main(1, output='[ERROR] Failed to execute goal spotless\n')
+        self.assertIn('[ERROR] Failed to execute goal spotless', stderr.getvalue())
 
     def test_no_format_skips_formatting(self):
         with mock.patch('builtins.print'):
