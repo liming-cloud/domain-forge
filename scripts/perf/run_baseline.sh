@@ -88,7 +88,8 @@ step "构建 IAM、网关、order-service 与 board-service"
 step "启动整套服务"
 write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "ORDER_SERVICE_IMAGE_TAG=$tag" \
     "ORDER_SERVICE_DB_PASSWORD=$(secret)" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
-up_wait --build --quiet-pull > "$results/compose-up.log" 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+up_wait --build --quiet-pull || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+cp "$work/compose-up.log" "$results/compose-up.log"
 
 step "初始化管理员、安装订单权限目录、建订单角色（本人范围读写）"
 admin_pw="Admin-$(secret)"

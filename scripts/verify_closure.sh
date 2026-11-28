@@ -62,7 +62,7 @@ write_env "$port" "IAM_IMAGE_TAG=$tag" "GATEWAY_IMAGE_TAG=$tag" "ORDER_SERVICE_I
     "ORDER_SERVICE_DB_PASSWORD=$service_db_pw" "BOARD_SERVICE_IMAGE_TAG=$tag" "BOARD_SERVICE_DB_PASSWORD=$(secret)"
 [ "$mq_acl" = 1 ] && printf 'ROCKETMQ_ADMIN_ACCESS_KEY=dfadmin\nROCKETMQ_ADMIN_SECRET_KEY=%s\nROCKETMQ_APP_ACCESS_KEY=dfapp\nROCKETMQ_APP_SECRET_KEY=%s\n' \
     "$(secret)" "$(secret)" >> "$env_file"
-up_wait --build --quiet-pull > /dev/null 2>&1 || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
+up_wait --build --quiet-pull || { compose ps -a; compose logs --tail 80; fail "整套服务未全部健康"; }
 published=$(compose ps --format '{{.Ports}}' | grep -c -- '->' || true)
 [ "$published" = "1" ] || fail "应只有 nginx 发布主机端口"
 # 服务以 config-center 启动：能通过健康检查即说明已从 Nacos 读到带来源标记的 order-service.yaml。
@@ -250,7 +250,7 @@ expect 401 "无令牌访问调用方"
 compose stop order-service > /dev/null 2>&1
 get /api/board/order-digest "$alice_token" > /dev/null
 expect 503 "被调方停机时调用方返回不可用"
-up_wait order-service > /dev/null 2>&1 || fail "order-service 重新启动未健康"
+up_wait order-service || fail "order-service 重新启动未健康"
 for attempt in $(seq 1 30); do
     [ "$(get_status /api/board/order-digest "$alice_token")" = "200" ] && break
     [ "$attempt" = "30" ] && fail "被调方恢复后调用方应恢复正常"
@@ -352,7 +352,7 @@ submit_order "$outage_id"
 expect 200 "RocketMQ 停机时业务提交不受影响"
 [ "$(sql "select count(*) from order_service.domainforge_outbox where sent_at is null")" -ge 1 ] \
     || fail "停机期间的事件应留在 Outbox 等待发送"
-up_wait rocketmq-broker > /dev/null 2>&1 || fail "RocketMQ 重新启动未健康"
+up_wait rocketmq-broker || fail "RocketMQ 重新启动未健康"
 tally_is 3
 
 step "撤销角色后立即生效"

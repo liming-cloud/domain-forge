@@ -49,12 +49,25 @@ get_status() { get "$1" "$2" > /dev/null; cat "$work/status"; }
 expect() { [ "$(cat "$work/status")" = "$1" ] || fail "$2：期望 $1，实际 $(cat "$work/status") $(cat "$work/body")"; }
 login() { post /api/auth/login "{\"loginName\":\"$1\",\"password\":\"$2\"}" > /dev/null; cat "$work/status"; }
 # up_wait [compose up 参数...]：启动并等待健康（300 秒超时）。资源紧张时某个容器可能在启动阶段超时退出（如 IAM 连接 Redis），
-# 由重启策略拉起后即可恢复，而 --wait 会因容器退出直接失败：失败时输出状态，再等待一次。
+# 由重启策略拉起后即可恢复，而 --wait 会因容器退出直接失败：失败时记下容器状态，再等待一次。
+# compose 自身的输出（拉取、构建、等待）写入 $work/compose-up.log：成功时不输出，两次都失败时经 show_output 输出。
 up_wait() {
-    compose up -d --wait --wait-timeout 300 "$@" && return
-    echo "首次等待未全部健康，容器状态如下，重试一次" >&2
-    compose ps -a >&2
-    compose up -d --wait --wait-timeout 300 "$@"
+    local log="$work/compose-up.log"
+    compose up -d --wait --wait-timeout 300 "$@" > "$log" 2>&1 && return
+    echo "首次等待未全部健康，重试一次" >&2
+    { echo "---- 首次等待后的容器状态"; compose ps -a; echo "---- 重试"; } >> "$log" 2>&1
+    compose up -d --wait --wait-timeout 300 "$@" >> "$log" 2>&1 && return
+    show_output compose-up "$log"
+    return 1
+}
+
+# show_output <名称> <文件>：步骤失败时打印输出末尾 80 行；设置了 DIAGNOSTICS_DIR 时整份保存为该目录下的 <名称>.log
+show_output() {
+    echo "---- $1 输出末尾 80 行" >&2
+    tail -n 80 "$2" >&2
+    [ -n "${DIAGNOSTICS_DIR:-}" ] || return 0
+    mkdir -p "$DIAGNOSTICS_DIR"
+    cp "$2" "$DIAGNOSTICS_DIR/$1.log"
 }
 
 # login_is <登录名> <密码> <期望状态> <失败说明>：重建、回退或恢复后入口与 IAM 需要片刻才能接住请求，在 20 秒内重试到状态一致
@@ -79,12 +92,16 @@ register() {
 }
 
 # initialize_admin <密码>：密码经标准输入写入容器内仅属服务用户的临时文件，不出现在命令参数中。
+# 失败时输出这个一次性容器的 stdout 与 stderr（其中没有密码）。
 initialize_admin() {
-    local output
-    output=$(printf '%s' "$1" | compose run --rm -T --entrypoint sh iam -c \
+    local status=0
+    printf '%s' "$1" | compose run --rm -T --entrypoint sh iam -c \
         'umask 077; cat > /tmp/admin-password; exec java -jar /app/app.jar initialize-admin --login-name=admin --password-file=/tmp/admin-password' \
-        2> "$work/init.log") || { cat "$work/init.log"; fail "管理员初始化"; }
-    grep -q administrator_initialized <<< "$output" || fail "管理员初始化未确认"
+        > "$work/init.out" 2> "$work/init.log" || status=$?
+    [ "$status" -eq 0 ] && grep -q administrator_initialized "$work/init.out" && return
+    show_output admin-init-stdout "$work/init.out"
+    show_output admin-init-stderr "$work/init.log"
+    fail "管理员初始化未确认（退出码 ${status}）"
 }
 
 # check_json_logs <服务> [traceId]：服务的容器日志逐行为 ECS JSON 对象，带固定字段（时间、级别、日志器、服务名、消息），
